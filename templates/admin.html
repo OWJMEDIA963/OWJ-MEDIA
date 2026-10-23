@@ -19,6 +19,15 @@
         </div>
     </div>
 
+    <section class="rounded-3xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+        <h2 class="mb-2 text-sm font-black text-white">سعر صرف الليرة السورية</h2>
+        <p class="mb-4 text-xs text-gray-400">أدخل السعر اليومي للدولار مقابل الليرة السورية القديمة. الموقع يعرض الليرة الجديدة بحذف صفرين.</p>
+        <form action="/admin/update_exchange_rate" method="POST" class="flex flex-col gap-3 sm:flex-row">
+            <label class="flex-1"><span class="mb-1 block text-xs text-gray-400">سعر الدولار بالليرة القديمة</span><input name="syp_rate" type="number" min="1" step="any" value="{{ syp_rate }}" required class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white"></label>
+            <button class="self-end rounded-xl bg-cyan-500 px-5 py-3 text-xs font-black text-gray-950">حفظ سعر الصرف</button>
+        </form>
+    </section>
+
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}

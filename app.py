@@ -34,6 +34,7 @@ class User(db.Model):
     full_name = db.Column(db.String(120), default='')
     email = db.Column(db.String(160), default='')
     phone = db.Column(db.String(40), default='')
+    avatar_url = db.Column(db.String(500), default='')
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), default='user')
     balance_usd = db.Column(db.Float, default=0.0)
@@ -43,6 +44,10 @@ class User(db.Model):
     def is_authenticated(self): return True
     def set_password(self, password): self.password_hash = generate_password_hash(password)
     def check_password(self, password): return check_password_hash(self.password_hash, password)
+
+class SiteSetting(db.Model):
+    key = db.Column(db.String(80), primary_key=True)
+    value = db.Column(db.String(160), default='')
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -115,7 +120,8 @@ class DepositRequest(db.Model):
 @app.context_processor
 def inject_globals():
     user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
-    return {'current_user': user, 'site_name': 'أوج ميديا'}
+    rate = SiteSetting.query.filter_by(key='syp_rate').first()
+    return {'current_user': user, 'site_name': 'أوج ميديا', 'syp_rate': float(rate.value) if rate and rate.value else 15000.0}
 
 def login_required(fn):
     @wraps(fn)
@@ -194,6 +200,11 @@ def profile():
         user.full_name = request.form.get('full_name', user.full_name).strip()
         user.email = request.form.get('email', user.email).strip()
         user.phone = request.form.get('phone', user.phone).strip()
+        try:
+            avatar = save_uploaded_image('avatar_file')
+            if avatar: user.avatar_url = avatar
+        except ValueError as exc:
+            flash(str(exc), 'error'); return redirect(url_for('profile'))
         db.session.commit(); flash('تم تحديث بياناتك.', 'success'); return redirect(url_for('profile'))
     return render_template('profile.html', user=user)
 
@@ -303,7 +314,8 @@ def ai_chat():
 @app.route('/admin')
 @admin_required
 def admin():
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all())
+    rate = SiteSetting.query.filter_by(key='syp_rate').first()
+    return render_template('admin.html', syp_rate=float(rate.value) if rate and rate.value else 15000.0, orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all())
 
 @app.route('/admin/complete_order/<int:order_id>', methods=['POST'])
 @admin_required
@@ -322,6 +334,21 @@ def handle_verification(req_id):
             flash('اكتب سبب الرفض ليظهر للمستخدم.', 'error'); return redirect(url_for('admin'))
         req.status='rejected'; req.rejection_reason=reason
     db.session.commit(); flash('تم تحديث طلب التوثيق.', 'success'); return redirect(url_for('admin'))
+
+@app.route('/admin/update_exchange_rate', methods=['POST'])
+@admin_required
+def update_exchange_rate():
+    rate = request.form.get('syp_rate', type=float)
+    if rate is None or rate <= 0:
+        flash('أدخل سعر صرف صحيحاً.', 'error')
+    else:
+        setting = SiteSetting.query.filter_by(key='syp_rate').first()
+        if setting is None:
+            setting = SiteSetting(key='syp_rate', value=str(rate)); db.session.add(setting)
+        else:
+            setting.value = str(rate)
+        db.session.commit(); flash('تم تحديث سعر الصرف.', 'success')
+    return redirect(url_for('admin'))
 
 @app.route('/admin/send_balance', methods=['POST'])
 @admin_required
@@ -448,6 +475,13 @@ with app.app_context():
     db.create_all()
     # Add fields to existing SQLite databases without deleting user data.
     try:
+        user_columns = {row[1] for row in db.session.execute(db.text('PRAGMA table_info(user)')).fetchall()}
+        if 'avatar_url' not in user_columns:
+            db.session.execute(db.text("ALTER TABLE user ADD COLUMN avatar_url VARCHAR(500) DEFAULT ''"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    try:
         columns = {row[1] for row in db.session.execute(db.text('PRAGMA table_info(verification_request)')).fetchall()}
         for col, definition in [('gender', "VARCHAR(30) DEFAULT ''"), ('age', 'INTEGER DEFAULT 0'), ('rejection_reason', "VARCHAR(500) DEFAULT ''")]:
             if col not in columns:
@@ -455,6 +489,9 @@ with app.app_context():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    if SiteSetting.query.filter_by(key='syp_rate').first() is None:
+        db.session.add(SiteSetting(key='syp_rate', value='15000'))
+        db.session.commit()
     # Ensure the requested administrator credentials are always synchronized.
     admin_user = User.query.filter_by(username='yosf').first()
     if admin_user is None:

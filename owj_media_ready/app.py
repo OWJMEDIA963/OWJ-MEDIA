@@ -8,11 +8,7 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-this-secret-key-before-deployment')
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///owj_media.db').strip()
-if database_url.startswith('postgres://'):
-    database_url = 'postgresql://' + database_url[len('postgres://'):]
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///owj_media.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
@@ -38,7 +34,6 @@ class User(db.Model):
     full_name = db.Column(db.String(120), default='')
     email = db.Column(db.String(160), default='')
     phone = db.Column(db.String(40), default='')
-    avatar_url = db.Column(db.String(500), default='')
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), default='user')
     balance_usd = db.Column(db.Float, default=0.0)
@@ -48,10 +43,6 @@ class User(db.Model):
     def is_authenticated(self): return True
     def set_password(self, password): self.password_hash = generate_password_hash(password)
     def check_password(self, password): return check_password_hash(self.password_hash, password)
-
-class SiteSetting(db.Model):
-    key = db.Column(db.String(80), primary_key=True)
-    value = db.Column(db.String(160), default='')
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -203,11 +194,6 @@ def profile():
         user.full_name = request.form.get('full_name', user.full_name).strip()
         user.email = request.form.get('email', user.email).strip()
         user.phone = request.form.get('phone', user.phone).strip()
-        try:
-            avatar = save_uploaded_image('avatar_file')
-            if avatar: user.avatar_url = avatar
-        except ValueError as exc:
-            flash(str(exc), 'error'); return redirect(url_for('profile'))
         db.session.commit(); flash('تم تحديث بياناتك.', 'success'); return redirect(url_for('profile'))
     return render_template('profile.html', user=user)
 
@@ -460,27 +446,15 @@ def toggle_service(service_id):
 
 with app.app_context():
     db.create_all()
-    # Migrate columns on both SQLite and PostgreSQL without dropping existing data.
-    from sqlalchemy import inspect
-    migrations = {
-        'user': {'avatar_url': "VARCHAR(500) DEFAULT ''"},
-        'verification_request': {
-            'gender': "VARCHAR(30) DEFAULT ''",
-            'age': 'INTEGER DEFAULT 0',
-            'rejection_reason': "VARCHAR(500) DEFAULT ''",
-        },
-    }
-    inspector = inspect(db.engine)
-    for table_name, columns_to_add in migrations.items():
-        if table_name not in inspector.get_table_names():
-            continue
-        existing_columns = {column['name'] for column in inspector.get_columns(table_name)}
-        for column_name, column_definition in columns_to_add.items():
-            if column_name not in existing_columns:
-                with db.engine.begin() as connection:
-                    connection.execute(db.text(
-                        f'ALTER TABLE "{table_name}" ADD COLUMN "{column_name}" {column_definition}'
-                    ))
+    # Add fields to existing SQLite databases without deleting user data.
+    try:
+        columns = {row[1] for row in db.session.execute(db.text('PRAGMA table_info(verification_request)')).fetchall()}
+        for col, definition in [('gender', "VARCHAR(30) DEFAULT ''"), ('age', 'INTEGER DEFAULT 0'), ('rejection_reason', "VARCHAR(500) DEFAULT ''")]:
+            if col not in columns:
+                db.session.execute(db.text(f'ALTER TABLE verification_request ADD COLUMN {col} {definition}'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     # Ensure the requested administrator credentials are always synchronized.
     admin_user = User.query.filter_by(username='yosf').first()
     if admin_user is None:

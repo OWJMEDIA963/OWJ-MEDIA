@@ -29,7 +29,7 @@
         #owjBotForm { background:#fff; border-color:#e2e8f0 !important; }
         #owjBotInput { background:#f8fafc !important; color:#111827 !important; border-color:#cbd5e1 !important; }
         #owjBotClose { font-size:2.25rem; line-height:1; padding:.4rem .8rem; color:#334155 !important; }
-        @media(max-width:640px){#owjBotWindow{left:.75rem;right:.75rem;width:auto;bottom:5.75rem;max-width:none;border-radius:1.5rem;} #owjBotMessages{max-height:48dvh;}}
+        @media(max-width:640px){ #owjBotWindow{left:.75rem;right:.75rem;width:auto;bottom:5.75rem;max-width:none;border-radius:1.5rem;} #owjBotMessages{max-height:48dvh;}}
     </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
@@ -70,12 +70,6 @@
                     <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                     <span>حسابي الشخصي</span>
                 </a>
-            </div>
-            <div class="mt-6 rounded-2xl border border-gray-800 bg-gray-950 p-3 space-y-3">
-                <h4 class="text-xs font-black text-white">تحويل العملات</h4>
-                <div class="flex gap-2"><input id="currencyAmount" type="number" min="0" step="any" value="1" class="min-w-0 w-full rounded-xl border border-gray-800 bg-gray-900 p-2 text-xs text-white"><select id="currencyDirection" class="rounded-xl border border-gray-800 bg-gray-900 p-2 text-xs text-white"><option value="usd">دولار ← ل.س جديدة</option><option value="syp">ل.س جديدة ← دولار</option></select></div>
-                <p id="currencyResult" class="text-sm font-black text-cyan-300"></p>
-                <p class="text-[10px] text-gray-500">السعر المعتمد: $1 = {{ '{:,.0f}'.format(syp_rate) }} ل.س قديمة</p>
             </div>
             <button id="themeToggle" type="button" class="mt-3 w-full rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-xs font-bold text-white">التبديل إلى الوضع النهاري</button>
         </div>
@@ -192,9 +186,6 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')hideStoreUna
 </script>
 
     <script>
-        const currencyAmount=document.getElementById('currencyAmount'), currencyDirection=document.getElementById('currencyDirection'), currencyResult=document.getElementById('currencyResult');
-        function updateCurrency(){if(!currencyAmount||!currencyDirection||!currencyResult)return;const amount=Math.max(0,Number(currencyAmount.value)||0), rate={{ syp_rate }}/100;currencyResult.textContent=currencyDirection.value==='usd'?(amount*rate).toLocaleString('en-US',{maximumFractionDigits:2})+' ل.س جديدة': '$'+(rate?amount/rate:0).toLocaleString('en-US',{maximumFractionDigits:2});}
-        currencyAmount?.addEventListener('input',updateCurrency);currencyDirection?.addEventListener('change',updateCurrency);updateCurrency();
         const themeToggle=document.getElementById('themeToggle');
         function applyTheme(light){document.body.classList.toggle('day-mode',light);if(themeToggle)themeToggle.textContent=light?'التبديل إلى الوضع الليلي':'التبديل إلى الوضع النهاري';try{localStorage.setItem('owj-theme',light?'day':'night')}catch(e){}}
         try{applyTheme(localStorage.getItem('owj-theme')==='day')}catch(e){}

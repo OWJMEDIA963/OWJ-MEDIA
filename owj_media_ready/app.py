@@ -8,7 +8,11 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-this-secret-key-before-deployment')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///owj_media.db').replace('postgres://', 'postgresql://')
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///owj_media.db').strip()
+if database_url.startswith('postgres://'):
+    database_url = 'postgresql://' + database_url[len('postgres://'):]
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
@@ -120,8 +124,7 @@ class DepositRequest(db.Model):
 @app.context_processor
 def inject_globals():
     user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
-    rate = SiteSetting.query.filter_by(key='syp_rate').first()
-    return {'current_user': user, 'site_name': 'أوج ميديا', 'syp_rate': float(rate.value) if rate and rate.value else 15000.0}
+    return {'current_user': user, 'site_name': 'أوج ميديا'}
 
 def login_required(fn):
     @wraps(fn)
@@ -314,8 +317,7 @@ def ai_chat():
 @app.route('/admin')
 @admin_required
 def admin():
-    rate = SiteSetting.query.filter_by(key='syp_rate').first()
-    return render_template('admin.html', syp_rate=float(rate.value) if rate and rate.value else 15000.0, orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all())
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all())
 
 @app.route('/admin/complete_order/<int:order_id>', methods=['POST'])
 @admin_required
@@ -334,21 +336,6 @@ def handle_verification(req_id):
             flash('اكتب سبب الرفض ليظهر للمستخدم.', 'error'); return redirect(url_for('admin'))
         req.status='rejected'; req.rejection_reason=reason
     db.session.commit(); flash('تم تحديث طلب التوثيق.', 'success'); return redirect(url_for('admin'))
-
-@app.route('/admin/update_exchange_rate', methods=['POST'])
-@admin_required
-def update_exchange_rate():
-    rate = request.form.get('syp_rate', type=float)
-    if rate is None or rate <= 0:
-        flash('أدخل سعر صرف صحيحاً.', 'error')
-    else:
-        setting = SiteSetting.query.filter_by(key='syp_rate').first()
-        if setting is None:
-            setting = SiteSetting(key='syp_rate', value=str(rate)); db.session.add(setting)
-        else:
-            setting.value = str(rate)
-        db.session.commit(); flash('تم تحديث سعر الصرف.', 'success')
-    return redirect(url_for('admin'))
 
 @app.route('/admin/send_balance', methods=['POST'])
 @admin_required
@@ -473,25 +460,27 @@ def toggle_service(service_id):
 
 with app.app_context():
     db.create_all()
-    # Add fields to existing SQLite databases without deleting user data.
-    try:
-        user_columns = {row[1] for row in db.session.execute(db.text('PRAGMA table_info(user)')).fetchall()}
-        if 'avatar_url' not in user_columns:
-            db.session.execute(db.text("ALTER TABLE user ADD COLUMN avatar_url VARCHAR(500) DEFAULT ''"))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    try:
-        columns = {row[1] for row in db.session.execute(db.text('PRAGMA table_info(verification_request)')).fetchall()}
-        for col, definition in [('gender', "VARCHAR(30) DEFAULT ''"), ('age', 'INTEGER DEFAULT 0'), ('rejection_reason', "VARCHAR(500) DEFAULT ''")]:
-            if col not in columns:
-                db.session.execute(db.text(f'ALTER TABLE verification_request ADD COLUMN {col} {definition}'))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    if SiteSetting.query.filter_by(key='syp_rate').first() is None:
-        db.session.add(SiteSetting(key='syp_rate', value='15000'))
-        db.session.commit()
+    # Migrate columns on both SQLite and PostgreSQL without dropping existing data.
+    from sqlalchemy import inspect
+    migrations = {
+        'user': {'avatar_url': "VARCHAR(500) DEFAULT ''"},
+        'verification_request': {
+            'gender': "VARCHAR(30) DEFAULT ''",
+            'age': 'INTEGER DEFAULT 0',
+            'rejection_reason': "VARCHAR(500) DEFAULT ''",
+        },
+    }
+    inspector = inspect(db.engine)
+    for table_name, columns_to_add in migrations.items():
+        if table_name not in inspector.get_table_names():
+            continue
+        existing_columns = {column['name'] for column in inspector.get_columns(table_name)}
+        for column_name, column_definition in columns_to_add.items():
+            if column_name not in existing_columns:
+                with db.engine.begin() as connection:
+                    connection.execute(db.text(
+                        f'ALTER TABLE "{table_name}" ADD COLUMN "{column_name}" {column_definition}'
+                    ))
     # Ensure the requested administrator credentials are always synchronized.
     admin_user = User.query.filter_by(username='yosf').first()
     if admin_user is None:

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}المساعد الذكي{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto px-4 py-6 space-y-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl text-center space-y-2">
+        <h1 class="text-base font-black text-white">المساعد الذكي لأوج ميديا</h1>
+        <p class="text-xs text-gray-400">اسأل عن الخدمات، الأسعار، أو طريقة الشحن وسيجيبك النظام فوراً</p>
+    </div>
+
+    <!-- صندوق المحادثة بارتفاع ثابت وتمرير تلقائي للأسفل -->
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl h-80 overflow-y-auto space-y-3 flex flex-col" id="chatBox">
+        <div class="bg-gray-950 border border-gray-800 p-3 rounded-2xl text-xs text-gray-200 max-w-[85%]">
+            أهلاً بك يا {{ user_name }}! كيف يمكنني مساعدتك اليوم في منصة أوج ميديا؟
+        </div>
+    </div>
+
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-3 flex gap-2">
+        <input type="text" id="userInput" placeholder="اكتب رسالتك هنا..." class="flex-1 bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
+        <button onclick="sendMessage()" class="bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black px-5 rounded-2xl text-xs transition">إرسال</button>
+    </div>
+</div>
+
+<script>
+    async function sendMessage() {
+        const input = document.getElementById('userInput');
+        const box = document.getElementById('chatBox');
+        if(!input.value.trim()) return;
+        
+        const userText = input.value;
+        box.innerHTML += `<div class="bg-cyan-950 border border-cyan-500/30 p-3 rounded-2xl text-xs text-cyan-200 max-w-[85%] ml-auto">${userText}</div>`;
+        input.value = '';
+        
+        // التمرير للأسفل فور إرسال رسالة المستخدم
+        box.scrollTop = box.scrollHeight;
+        
+        const res = await fetch('/api/ai_chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: userText})
+        });
+        const data = await res.json();
+        
+        box.innerHTML += `<div class="bg-gray-950 border border-gray-800 p-3 rounded-2xl text-xs text-gray-200 max-w-[85%]">${data.reply}</div>`;
+        
+        // التمرير التلقائي للأسفل فور وصول رد البوت لتبقى الشاشة ثابتة في الأسفل
+        box.scrollTop = box.scrollHeight;
+    }
+</script>
+{% endblock %}

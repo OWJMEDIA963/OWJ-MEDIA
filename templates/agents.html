@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}وكلاؤنا المعتمدون - أوج ميديا{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <h1 class="text-xl font-black text-white mb-2">🤝 وكلاؤنا المعتمدون</h1>
+    <p class="text-xs text-gray-400 mb-6">يمكنك شحن رصيدك أو التعامل مع وكلائنا المعتمدين رسمياً في المحافظات السورية.</p>
+    {% if agents %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {% for ag in agents %}
+        <div class="bg-gray-900 border border-gray-800 p-5 rounded-2xl shadow-lg">
+            <h3 class="text-sm font-black text-cyan-400 mb-1">{{ ag.name }}</h3>
+            <p class="text-xs text-gray-300 mb-1">📍 المدينة: {{ ag.city }}</p>
+            <p class="text-xs text-gray-300 mb-2">📞 الهاتف: {{ ag.phone }}</p>
+            {% if ag.details %}
+            <p class="text-[11px] text-gray-400 bg-gray-950 p-2.5 rounded-xl border border-gray-800">{{ ag.details }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-16 bg-gray-900/50 rounded-3xl border border-gray-800">
+        <p class="text-sm text-gray-400">لا يوجد وكلاء مضافين حالياً.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

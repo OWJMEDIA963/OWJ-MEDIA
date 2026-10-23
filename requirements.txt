@@ -2,3 +2,4 @@ Flask
 Flask-SQLAlchemy
 requests
 gunicorn
+psycopg2-binary

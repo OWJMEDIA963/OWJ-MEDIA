@@ -8,7 +8,11 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-this-secret-key-before-deployment')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///owj_media.db').replace('postgres://', 'postgresql://')
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///owj_media.db').strip()
+if database_url.startswith('postgres://'):
+    database_url = 'postgresql://' + database_url[len('postgres://'):]
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
@@ -473,22 +477,27 @@ def toggle_service(service_id):
 
 with app.app_context():
     db.create_all()
-    # Add fields to existing SQLite databases without deleting user data.
-    try:
-        user_columns = {row[1] for row in db.session.execute(db.text('PRAGMA table_info(user)')).fetchall()}
-        if 'avatar_url' not in user_columns:
-            db.session.execute(db.text("ALTER TABLE user ADD COLUMN avatar_url VARCHAR(500) DEFAULT ''"))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    try:
-        columns = {row[1] for row in db.session.execute(db.text('PRAGMA table_info(verification_request)')).fetchall()}
-        for col, definition in [('gender', "VARCHAR(30) DEFAULT ''"), ('age', 'INTEGER DEFAULT 0'), ('rejection_reason', "VARCHAR(500) DEFAULT ''")]:
-            if col not in columns:
-                db.session.execute(db.text(f'ALTER TABLE verification_request ADD COLUMN {col} {definition}'))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
+    # Migrate columns on both SQLite and PostgreSQL without dropping existing data.
+    from sqlalchemy import inspect
+    migrations = {
+        'user': {'avatar_url': "VARCHAR(500) DEFAULT ''"},
+        'verification_request': {
+            'gender': "VARCHAR(30) DEFAULT ''",
+            'age': 'INTEGER DEFAULT 0',
+            'rejection_reason': "VARCHAR(500) DEFAULT ''",
+        },
+    }
+    inspector = inspect(db.engine)
+    for table_name, columns_to_add in migrations.items():
+        if table_name not in inspector.get_table_names():
+            continue
+        existing_columns = {column['name'] for column in inspector.get_columns(table_name)}
+        for column_name, column_definition in columns_to_add.items():
+            if column_name not in existing_columns:
+                with db.engine.begin() as connection:
+                    connection.execute(db.text(
+                        f'ALTER TABLE "{table_name}" ADD COLUMN "{column_name}" {column_definition}'
+                    ))
     if SiteSetting.query.filter_by(key='syp_rate').first() is None:
         db.session.add(SiteSetting(key='syp_rate', value='15000'))
         db.session.commit()

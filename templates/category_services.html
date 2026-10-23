@@ -17,16 +17,16 @@
                     {{ service.name[:2] }}
                 </div>
                 {% endif %}
-                <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-8 sm:min-h-9 mb-1">{{ service.name }}</h3>
-                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">${{ "%.2f"|format(service.price) }}</p><p class="text-[9px] sm:text-[10px] text-emerald-300 mb-1">{{ "{:,.2f}".format(service.price * syp_rate / 100) }} ل.س جديدة</p>
+                <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-8 mb-1">{{ service.name }}</h3>
+                <p class="text-[11px] text-cyan-400 font-bold mb-1">${{ "%.2f"|format(service.price) }}</p>
                 {% if service.is_available %}
-                <span class="text-[8px] sm:text-[9px] text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded-full border border-emerald-500/30">متوفرة</span>
+                <span class="text-[9px] text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-500/30">متوفرة</span>
                 {% else %}
-                <span class="text-[8px] sm:text-[9px] text-rose-400 bg-rose-950/50 px-1.5 py-0.5 rounded-full border border-rose-500/30">غير متوفرة</span>
+                <span class="text-[9px] text-rose-400 bg-rose-950/50 px-2 py-0.5 rounded-full border border-rose-500/30">غير متوفرة</span>
                 {% endif %}
             </div>
 
-            <div class="mt-3">
+            <div class="mt-2">
                 {% if service.is_available %}
                 <button onclick="openOrderModal('{{ service.id }}', '{{ service.name }}', '{{ service.price }}', '{{ service.service_type }}', '{{ service.input_label }}', '{{ service.min_quantity }}')" class="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1.5 sm:py-2 rounded-lg text-[9px] sm:text-[10px] transition block shadow">
                     اطلب الآن
@@ -65,7 +65,7 @@
 
             <div class="bg-gray-950 p-3 rounded-2xl border border-gray-800 flex justify-between items-center text-xs">
                 <span class="text-gray-400 font-bold">التكلفة:</span>
-                <span class="text-left"><span id="modalTotal" class="block text-cyan-400 font-black">$0.00</span><span id="modalTotalSyp" class="block text-[10px] text-emerald-300">0 ل.س جديدة</span></span>
+                <span id="modalTotal" class="text-cyan-400 font-black">$0.00</span>
             </div>
 
             <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-2.5 rounded-2xl text-xs shadow-xl transition">
@@ -78,7 +78,6 @@
 <script>
     let currentPrice = 0;
     let currentType = '';
-    const sypRate = {{ syp_rate }} / 100;\n    function updateSypTotal(usd){ document.getElementById('modalTotalSyp').innerText = (Math.max(0, Number(usd)||0) * sypRate).toLocaleString('en-US',{maximumFractionDigits:2}) + ' ل.س جديدة'; }
 
     function openOrderModal(id, name, price, type, label, minQty) {
         currentPrice = parseFloat(price);
@@ -91,10 +90,10 @@
         if (type === 'smm') {
             qtyContainer.classList.remove('hidden');
             document.getElementById('modalQuantity').value = minQty;
-            document.getElementById('modalTotal').innerText = '$' + ((currentPrice / 1000) * minQty).toFixed(2);\n            updateSypTotal((currentPrice / 1000) * minQty);
+            document.getElementById('modalTotal').innerText = '$' + ((currentPrice / 1000) * minQty).toFixed(2);
         } else {
             qtyContainer.classList.add('hidden');
-            document.getElementById('modalTotal').innerText = '$' + currentPrice.toFixed(2);\n            updateSypTotal(currentPrice);
+            document.getElementById('modalTotal').innerText = '$' + currentPrice.toFixed(2);
         }
         
         document.getElementById('orderModal').classList.remove('hidden');
@@ -108,7 +107,7 @@
         if (currentType === 'smm') {
             const qty = document.getElementById('modalQuantity').value;
             const total = (currentPrice / 1000) * qty;
-            document.getElementById('modalTotal').innerText = '$' + total.toFixed(2);\n            updateSypTotal(total);
+            document.getElementById('modalTotal').innerText = '$' + total.toFixed(2);
         }
     }
 </script>

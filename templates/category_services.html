@@ -11,9 +11,9 @@
         <div class="min-w-0 bg-gray-900 border border-gray-800 p-2 sm:p-3 shadow-xl flex flex-col justify-between text-center group transition {% if not service.is_available %} opacity-60 {% endif %}" style="display:flex;flex-direction:column;aspect-ratio:1 / 1;width:100%;min-width:0;border-radius:20px;box-sizing:border-box;overflow:hidden;">
             <div class="flex min-h-0 flex-1 flex-col items-center justify-center">
                 {% if service.image_url and service.image_url.strip() != "" %}
-                <img src="{{ service.image_url }}" alt="{{ service.name }}" class="w-full mx-auto rounded-lg sm:rounded-2xl object-contain bg-gray-950 p-1 sm:p-2 border border-gray-800 mb-1 sm:mb-2 shadow" style="display:block;width:100%;height:56%;min-height:0;flex-shrink:0;object-fit:contain;" onerror="this.onerror=null; this.src='https://via.placeholder.com/150';">
+                <img src="{{ service.image_url }}" alt="{{ service.name }}" class="mx-auto bg-gray-950 border border-gray-800 mb-1 shadow" style="display:block;width:58%;aspect-ratio:1 / 1;height:auto;flex-shrink:0;border-radius:50%;object-fit:cover;" onerror="this.onerror=null; this.src='https://via.placeholder.com/150';">
                 {% else %}
-                <div class="w-full mx-auto bg-cyan-500/10 border border-cyan-500/30 rounded-xl flex items-center justify-center text-cyan-400 font-black text-3xl sm:text-4xl mb-1 sm:mb-2 shadow" style="height:56%;min-height:0;flex-shrink:0;">
+                <div class="mx-auto bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-black text-2xl sm:text-3xl mb-1 shadow" style="width:58%;aspect-ratio:1 / 1;flex-shrink:0;border-radius:50%;">
                     {{ service.name[:2] }}
                 </div>
                 {% endif %}

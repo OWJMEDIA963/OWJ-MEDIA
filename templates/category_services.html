@@ -6,33 +6,33 @@
         <h1 class="text-xs font-black text-white">قسم: {{ category.name }}</h1>
     </div>
 
-    <div class="grid grid-cols-3 gap-2 sm:gap-4">
+    <div class="grid grid-cols-3 gap-2 sm:gap-4" style="display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;grid-auto-rows:auto;align-items:stretch;width:100%;">
         {% for service in services %}
-        <div class="bg-gray-900 border border-gray-800 rounded-xl sm:rounded-3xl p-1.5 sm:p-3.5 shadow-xl flex flex-col justify-between text-center group transition {% if not service.is_available %} opacity-60 {% endif %}">
-            <div>
+        <div class="min-w-0 bg-gray-900 border border-gray-800 rounded-xl sm:rounded-3xl p-1.5 sm:p-3 shadow-xl flex flex-col justify-between text-center group transition {% if not service.is_available %} opacity-60 {% endif %}" style="display:flex;flex-direction:column;aspect-ratio:1 / 1;width:100%;height:auto;min-width:0;min-height:0;box-sizing:border-box;overflow:hidden;">
+            <div class="flex min-h-0 flex-1 flex-col items-center justify-center">
                 {% if service.image_url and service.image_url.strip() != "" %}
-                <img src="{{ service.image_url }}" alt="{{ service.name }}" class="w-full aspect-square max-w-[110px] mx-auto rounded-lg sm:rounded-2xl object-contain bg-gray-950 p-2 border border-gray-800 mb-4 shadow" onerror="this.onerror=null; this.src='https://via.placeholder.com/150';">
+                <img src="{{ service.image_url }}" alt="{{ service.name }}" class="w-full max-w-[110px] mx-auto rounded-lg sm:rounded-2xl object-contain bg-gray-950 p-1 sm:p-2 border border-gray-800 mb-1 sm:mb-2 shadow" style="display:block;width:100%;height:42%;max-height:90px;min-height:0;flex-shrink:0;object-fit:contain;" onerror="this.onerror=null; this.src='https://via.placeholder.com/150';">
                 {% else %}
-                <div class="w-40 h-40 max-w-full mx-auto bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-400 font-black text-lg sm:text-2xl mb-2 sm:mb-4 shadow">
+                <div class="w-full max-w-[90px] mx-auto bg-cyan-500/10 border border-cyan-500/30 rounded-xl flex items-center justify-center text-cyan-400 font-black text-lg sm:text-2xl mb-1 sm:mb-2 shadow" style="height:42%;min-height:0;flex-shrink:0;">
                     {{ service.name[:2] }}
                 </div>
                 {% endif %}
-                <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-8 mb-1">{{ service.name }}</h3>
-                <p class="text-[11px] text-cyan-400 font-bold mb-1">${{ "%.2f"|format(service.price) }}</p>
+                <h3 class="text-[9px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
+                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">${{ "%.2f"|format(service.price) }}</p>
                 {% if service.is_available %}
-                <span class="text-[9px] text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-500/30">متوفرة</span>
+                <span class="text-[8px] sm:text-[9px] text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded-full border border-emerald-500/30">متوفرة</span>
                 {% else %}
-                <span class="text-[9px] text-rose-400 bg-rose-950/50 px-2 py-0.5 rounded-full border border-rose-500/30">غير متوفرة</span>
+                <span class="text-[8px] sm:text-[9px] text-rose-400 bg-rose-950/50 px-1.5 py-0.5 rounded-full border border-rose-500/30">غير متوفرة</span>
                 {% endif %}
             </div>
 
-            <div class="mt-2 sm:mt-3">
+            <div class="mt-1 sm:mt-2">
                 {% if service.is_available %}
-                <button onclick="openOrderModal('{{ service.id }}', '{{ service.name }}', '{{ service.price }}', '{{ service.service_type }}', '{{ service.input_label }}', '{{ service.min_quantity }}')" class="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] transition block shadow">
+                <button onclick="openOrderModal('{{ service.id }}', '{{ service.name }}', '{{ service.price }}', '{{ service.service_type }}', '{{ service.input_label }}', '{{ service.min_quantity }}')" class="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow">
                     اطلب الآن
                 </button>
                 {% else %}
-                <button disabled class="w-full bg-gray-800 text-gray-500 font-black py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] cursor-not-allowed">
+                <button disabled class="w-full bg-gray-800 text-gray-500 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] cursor-not-allowed">
                     غير متوفرة
                 </button>
                 {% endif %}

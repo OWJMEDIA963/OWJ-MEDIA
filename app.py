@@ -140,7 +140,7 @@ def current_user():
 @app.route('/')
 def index():
     categories = Category.query.order_by(Category.id).all()
-    services = Service.query.order_by(Service.id.desc()).limit(9).all()
+    services = Service.query.order_by(Service.id.desc()).all()
     return render_template('index.html', categories=categories, services=services)
 
 @app.route('/accounts')

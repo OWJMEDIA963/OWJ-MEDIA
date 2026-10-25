@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}تواصل مع الدعم{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-3xl space-y-5 px-4 py-6">
+  <div class="rounded-3xl border border-cyan-500/20 bg-gray-900 p-5">
+    <h1 class="text-lg font-black text-white">تواصل مع الدعم</h1>
+    <p class="mt-2 text-xs leading-6 text-gray-400">اكتب مشكلتك أو استفسارك، وسيتمكن فريق أوج ميديا من الرد عليك هنا داخل الموقع.</p>
+  </div>
+  {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="rounded-xl border p-3 text-xs font-bold {% if category == 'success' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300{% else %}border-rose-500/30 bg-rose-500/10 text-rose-300{% endif %}">{{ message }}</div>{% endfor %}{% endwith %}
+  <form method="POST" class="space-y-3 rounded-3xl border border-gray-800 bg-gray-900 p-5">
+    <h2 class="text-sm font-black text-white">إرسال شكوى أو استفسار جديد</h2>
+    <input name="subject" maxlength="160" placeholder="عنوان المشكلة (مثلاً: مشكلة في الطلب)" class="w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 text-sm text-white" />
+    <textarea name="message" required maxlength="5000" rows="5" placeholder="اشرح لنا المشكلة بالتفصيل..." class="w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 text-sm text-white"></textarea>
+    <button class="w-full rounded-xl bg-cyan-500 px-4 py-3 text-sm font-black text-gray-950">إرسال إلى الدعم</button>
+  </form>
+  <section class="space-y-3">
+    <h2 class="text-sm font-black text-white">محادثاتي السابقة</h2>
+    {% for ticket in tickets %}
+    <a href="{{ url_for('support_ticket', ticket_id=ticket.id) }}" class="block rounded-2xl border border-gray-800 bg-gray-900 p-4 hover:border-cyan-500/40">
+      <div class="flex items-start justify-between gap-3"><div><p class="text-sm font-bold text-white">{{ ticket.subject }}</p><p class="mt-1 text-[10px] text-gray-500">رقم المحادثة #{{ ticket.id }} · {{ ticket.updated_at.strftime('%Y-%m-%d %H:%M') if ticket.updated_at else '' }}</p></div><span class="shrink-0 rounded-lg bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-300">{{ ticket.status }}</span></div>
+      <p class="mt-2 text-xs text-cyan-400">فتح المحادثة ←</p>
+    </a>
+    {% else %}<p class="rounded-2xl border border-gray-800 bg-gray-900 p-5 text-center text-xs text-gray-500">لا توجد محادثات بعد. أرسل رسالتك الأولى من النموذج أعلاه.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

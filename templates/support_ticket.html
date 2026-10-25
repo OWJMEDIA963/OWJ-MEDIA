@@ -12,8 +12,8 @@
   {% if is_admin %}
   <div class="flex flex-wrap gap-2"><form method="POST"><input type="hidden" name="action" value="{% if ticket.status == 'مغلقة' %}reopen{% else %}close{% endif %}"><button class="rounded-xl border border-gray-700 px-3 py-2 text-xs font-bold text-gray-300">{% if ticket.status == 'مغلقة' %}إعادة فتح المحادثة{% else %}إغلاق المحادثة{% endif %}</button></form><a href="{{ url_for('admin_support') }}" class="rounded-xl border border-gray-700 px-3 py-2 text-xs font-bold text-cyan-300">العودة إلى الشكاوى</a></div>
   {% else %}<a href="{{ url_for('support') }}" class="inline-block text-xs text-cyan-400">← العودة إلى محادثاتي</a>{% endif %}
-  {% if ticket.status != 'مغلقة' or is_admin %}
+  {% if true %}
   <form method="POST" class="space-y-3 rounded-3xl border border-gray-800 bg-gray-900 p-4"><textarea name="message" required maxlength="5000" rows="4" placeholder="{% if is_admin %}اكتب ردك للمستخدم...{% else %}اكتب ردك أو أضف تفاصيل للمشكلة...{% endif %}" class="w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 text-sm text-white"></textarea><button class="w-full rounded-xl {% if is_admin %}bg-emerald-500 text-gray-950{% else %}bg-cyan-500 text-gray-950{% endif %} px-4 py-3 text-sm font-black">{% if is_admin %}إرسال الرد للمستخدم{% else %}إرسال الرسالة{% endif %}</button></form>
-  {% else %}<p class="rounded-xl border border-gray-800 bg-gray-900 p-4 text-center text-xs text-gray-500">هذه المحادثة مغلقة. افتح شكوى جديدة إذا احتجت إلى مساعدة أخرى.</p>{% endif %}
+  {% else %}<p class="rounded-xl border border-gray-800 bg-gray-900 p-4 text-center text-xs text-gray-500">هذه محادثتك الدائمة مع خدمة العملاء؛ يمكنك إرسال رسالة جديدة هنا في أي وقت.</p>{% endif %}
 </div>
 {% endblock %}

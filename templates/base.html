@@ -69,6 +69,10 @@
                 <a href="/support" class="flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800">
                     <span class="text-cyan-400 text-lg">✉</span><span>تواصل مع الدعم</span>
                 </a>
+                <a href="/notifications" class="flex items-center justify-between gap-3 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800">
+                    <span class="flex items-center gap-4"><span class="text-cyan-400 text-lg">♢</span><span>الإشعارات</span></span>
+                    {% if unread_notification_count %}<span class="min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-center text-[10px] text-white">{{ unread_notification_count }}</span>{% endif %}
+                </a>
                 {% if current_user.role == 'admin' %}
                 <a href="/admin/support" class="flex items-center gap-4 px-4 py-3.5 bg-amber-500/10 text-amber-300 rounded-2xl text-xs font-bold border border-amber-500/30">
                     <span class="text-lg">⚑</span><span>الشكاوى والرسائل</span>

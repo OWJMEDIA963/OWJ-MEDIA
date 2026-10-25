@@ -146,10 +146,73 @@ class SupportMessage(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     sender = db.relationship('User')
 
+
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    title = db.Column(db.String(160), nullable=False)
+    message = db.Column(db.String(500), nullable=False)
+    url = db.Column(db.String(500), default='/notifications')
+    is_read = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    user = db.relationship('User', backref=db.backref('notifications', lazy=True, cascade='all, delete-orphan'))
+
+
+class PushSubscription(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    endpoint = db.Column(db.Text, unique=True, nullable=False)
+    p256dh = db.Column(db.String(255), nullable=False)
+    auth = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    user = db.relationship('User', backref=db.backref('push_subscriptions', lazy=True, cascade='all, delete-orphan'))
+
+
+def send_user_notification(user_id, title, message, url='/notifications'):
+    # Save an in-site notification; send phone/browser push when VAPID is configured.
+    db.session.add(Notification(user_id=user_id, title=title[:160], message=message[:500], url=url[:500]))
+    db.session.flush()
+    public_key = os.environ.get('VAPID_PUBLIC_KEY', '').strip()
+    private_key = os.environ.get('VAPID_PRIVATE_KEY', '').strip()
+    subject = os.environ.get('VAPID_SUBJECT', 'mailto:admin@example.com').strip()
+    if public_key and private_key:
+        try:
+            from pywebpush import webpush
+            import json
+            for sub in PushSubscription.query.filter_by(user_id=user_id).all():
+                try:
+                    webpush(subscription_info={'endpoint': sub.endpoint, 'keys': {'p256dh': sub.p256dh, 'auth': sub.auth}}, data=json.dumps({'title': title, 'body': message, 'url': url}), vapid_private_key=private_key, vapid_claims={'sub': subject})
+                except Exception as exc:
+                    status = getattr(getattr(exc, 'response', None), 'status_code', None)
+                    if status in (404, 410):
+                        db.session.delete(sub)
+        except ImportError:
+            app.logger.warning('pywebpush is not installed; saved in-app notification only')
+        except Exception:
+            app.logger.exception('Unable to send push notification')
+
+
+def get_or_create_single_support_ticket(user_id):
+    # Merge legacy tickets into one ongoing customer-service conversation.
+    tickets = SupportTicket.query.filter_by(user_id=user_id).order_by(SupportTicket.updated_at.desc(), SupportTicket.id.desc()).all()
+    if not tickets:
+        ticket = SupportTicket(user_id=user_id, subject='محادثة خدمة العملاء')
+        db.session.add(ticket)
+        db.session.flush()
+        return ticket
+    primary = tickets[0]
+    primary.subject = 'محادثة خدمة العملاء'
+    for old in tickets[1:]:
+        for msg in old.messages:
+            msg.ticket = primary
+        db.session.delete(old)
+    return primary
+
 @app.context_processor
 def inject_globals():
     user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
-    return {'current_user': user, 'site_name': 'أوج ميديا'}
+    unread_count = Notification.query.filter_by(user_id=user.id, is_read=False).count() if user else 0
+    return {'current_user': user, 'site_name': 'أوج ميديا', 'unread_notification_count': unread_count}
 
 def login_required(fn):
     @wraps(fn)
@@ -360,23 +423,9 @@ def ai_chat():
 @login_required
 def support():
     user = current_user()
-    if request.method == 'POST':
-        subject = request.form.get('subject', '').strip()[:160] or 'استفسار دعم'
-        content = request.form.get('message', '').strip()
-        if not content:
-            flash('اكتب تفاصيل المشكلة قبل الإرسال.', 'error')
-        elif len(content) > 5000:
-            flash('الرسالة طويلة جداً؛ الحد الأقصى 5000 حرف.', 'error')
-        else:
-            ticket = SupportTicket(user_id=user.id, subject=subject)
-            db.session.add(ticket)
-            db.session.flush()
-            db.session.add(SupportMessage(ticket_id=ticket.id, sender_id=user.id, sender_role='user', content=content))
-            db.session.commit()
-            flash('تم إرسال رسالتك للدعم. يمكنك متابعة الرد من نفس المحادثة.', 'success')
-            return redirect(url_for('support_ticket', ticket_id=ticket.id))
-    tickets = SupportTicket.query.filter_by(user_id=user.id).order_by(SupportTicket.updated_at.desc()).all()
-    return render_template('support.html', tickets=tickets)
+    ticket = get_or_create_single_support_ticket(user.id)
+    db.session.commit()
+    return redirect(url_for('support_ticket', ticket_id=ticket.id))
 
 
 @app.route('/support/<int:ticket_id>', methods=['GET', 'POST'])
@@ -392,14 +441,15 @@ def support_ticket(ticket_id):
             flash('اكتب رسالتك أولاً.', 'error')
         elif len(content) > 5000:
             flash('الرسالة طويلة جداً؛ الحد الأقصى 5000 حرف.', 'error')
-        elif ticket.status == 'مغلقة' and user.role != 'admin':
-            flash('هذه المحادثة مغلقة. افتح شكوى جديدة إذا احتجت للمساعدة.', 'error')
         else:
             role = 'admin' if user.role == 'admin' else 'user'
             db.session.add(SupportMessage(ticket_id=ticket.id, sender_id=user.id, sender_role=role, content=content))
             ticket.updated_at = datetime.utcnow()
-            if role == 'user': ticket.status = 'بانتظار الدعم'
-            else: ticket.status = 'تم الرد'
+            if role == 'user':
+                ticket.status = 'بانتظار الدعم'
+            else:
+                ticket.status = 'تم الرد'
+                send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق أوج ميديا بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
             db.session.commit()
             flash('تم إرسال الرد.', 'success')
             return redirect(url_for('admin_support_ticket' if user.role == 'admin' else 'support_ticket', ticket_id=ticket.id))
@@ -409,6 +459,10 @@ def support_ticket(ticket_id):
 @app.route('/admin/support')
 @admin_required
 def admin_support():
+    user_ids = [row[0] for row in db.session.query(SupportTicket.user_id).distinct().all()]
+    for uid in user_ids:
+        get_or_create_single_support_ticket(uid)
+    db.session.commit()
     tickets = SupportTicket.query.order_by(SupportTicket.updated_at.desc()).all()
     return render_template('admin_support.html', tickets=tickets)
 
@@ -441,10 +495,52 @@ def admin_support_ticket(ticket_id):
             db.session.add(SupportMessage(ticket_id=ticket.id, sender_id=admin_user.id, sender_role='admin', content=content))
             ticket.status = 'تم الرد'
             ticket.updated_at = datetime.utcnow()
+            send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق أوج ميديا بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
             db.session.commit()
             flash('تم إرسال الرد للمستخدم.', 'success')
             return redirect(url_for('admin_support_ticket', ticket_id=ticket.id))
     return render_template('support_ticket.html', ticket=ticket, is_admin=True)
+
+
+@app.route('/notifications')
+@login_required
+def notifications_page():
+    items = Notification.query.filter_by(user_id=current_user().id).order_by(Notification.created_at.desc()).limit(100).all()
+    return render_template('notifications.html', notifications=items, vapid_public_key=os.environ.get('VAPID_PUBLIC_KEY', ''))
+
+
+@app.route('/notifications/read/<int:notification_id>', methods=['POST'])
+@login_required
+def notification_read(notification_id):
+    item = Notification.query.filter_by(id=notification_id, user_id=current_user().id).first_or_404()
+    item.is_read = True
+    db.session.commit()
+    return redirect(item.url or url_for('notifications_page'))
+
+
+@app.route('/api/push/subscribe', methods=['POST'])
+@login_required
+def push_subscribe():
+    data = request.get_json(silent=True) or {}
+    sub = data.get('subscription') or {}
+    keys = sub.get('keys') or {}
+    endpoint, p256dh, auth = sub.get('endpoint'), keys.get('p256dh'), keys.get('auth')
+    if not all(isinstance(v, str) and v for v in (endpoint, p256dh, auth)):
+        return jsonify(ok=False, error='بيانات الاشتراك غير مكتملة'), 400
+    existing = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    if existing:
+        existing.user_id, existing.p256dh, existing.auth = current_user().id, p256dh, auth
+    else:
+        db.session.add(PushSubscription(user_id=current_user().id, endpoint=endpoint, p256dh=p256dh, auth=auth))
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+@app.route('/sw.js')
+def service_worker():
+    from flask import Response
+    js = "self.addEventListener('push', function(event) { let data = {}; try { data = event.data.json(); } catch (e) { data = {title: 'أوج ميديا', body: event.data ? event.data.text() : 'لديك إشعار جديد'}; } event.waitUntil(self.registration.showNotification(data.title || 'أوج ميديا', {body: data.body || '', data: {url: data.url || '/notifications'}})); }); self.addEventListener('notificationclick', function(event) { event.notification.close(); const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/notifications'; event.waitUntil(clients.matchAll({type: 'window', includeUncontrolled: true}).then(function(list) { for (const client of list) { if ('focus' in client) { client.navigate(url); return client.focus(); } } return clients.openWindow(url); })); });"
+    return Response(js, mimetype='application/javascript', headers={'Service-Worker-Allowed': '/'})
 
 
 @app.route('/admin')
@@ -469,6 +565,7 @@ def handle_deposit(deposit_id):
         user.balance_usd = (user.balance_usd or 0) + (deposit.amount or 0)
         deposit.status = 'مقبول'
         deposit.rejection_reason = ''
+        send_user_notification(user.id, 'تم شحن محفظتك', f'تمت الموافقة على طلب الشحن وإضافة ${deposit.amount:.2f} إلى حسابك.', url_for('deposit'))
         db.session.commit()
         flash(f'تم قبول طلب الشحن #{deposit.id} وإضافة ${deposit.amount:.2f} إلى المحفظة.', 'success')
     elif action == 'reject':
@@ -478,6 +575,7 @@ def handle_deposit(deposit_id):
             return redirect(url_for('admin'))
         deposit.status = 'مرفوض'
         deposit.rejection_reason = reason[:500]
+        send_user_notification(deposit.user_id, 'تم رفض طلب الشحن', f'سبب الرفض: {deposit.rejection_reason}', url_for('deposit'))
         db.session.commit()
         flash(f'تم رفض طلب الشحن #{deposit.id} مع حفظ سبب الرفض.', 'success')
     else:

@@ -598,20 +598,22 @@ def delete_service():
 @app.route('/admin/export_backup')
 @admin_required
 def export_backup():
-    """Export every application database table into one portable CSV file."""
+    """Export all mapped application tables into a portable CSV backup."""
     import csv, io, json
     from flask import Response
-    from sqlalchemy import inspect
 
     out = io.StringIO(newline='')
     writer = csv.writer(out)
-    writer.writerow(['backup_format', 'owj_media_full_backup_v2'])
+    writer.writerow(['backup_format', 'owj_media_full_backup_v3'])
     writer.writerow(['table_name', 'row_json'])
-    # Discover every table/model in this app, rather than exporting users only.
-    for mapper in db.Model.registry.mappers:
+    total = 0
+    # Include a table marker even when the table is empty, so the restore can
+    # distinguish a valid empty table from a backup that contains no records.
+    for mapper in sorted(db.Model.registry.mappers, key=lambda item: item.local_table.name):
         model = mapper.class_
-        rows = model.query.order_by(model.id).all() if hasattr(model, 'id') else model.query.all()
-        for obj in rows:
+        writer.writerow(['__table__', model.__tablename__])
+        query = model.query.order_by(model.id) if hasattr(model, 'id') else model.query
+        for obj in query.all():
             data = {}
             for column in mapper.columns:
                 value = getattr(obj, column.key)
@@ -619,9 +621,10 @@ def export_backup():
                     value = value.isoformat()
                 data[column.key] = value
             writer.writerow([model.__tablename__, json.dumps(data, ensure_ascii=False, separators=(',', ':'))])
+            total += 1
     payload = '\ufeff' + out.getvalue()
     return Response(payload, mimetype='text/csv; charset=utf-8', headers={
-        'Content-Disposition': 'attachment; filename=owj_media_full_backup.csv',
+        'Content-Disposition': 'attachment; filename=owj_media_full_backup_v3.csv',
         'Cache-Control': 'no-store'
     })
 
@@ -629,9 +632,10 @@ def export_backup():
 @app.route('/admin/import_backup', methods=['POST'])
 @admin_required
 def import_backup():
-    """Restore a full v2 CSV backup atomically, including balances and relationships."""
+    """Validate and atomically restore a complete v2/v3 CSV database backup."""
     import csv, io, json
     from sqlalchemy import text
+    from sqlalchemy.types import DateTime, Integer
 
     file = request.files.get('backup_file')
     if not file or not file.filename:
@@ -643,73 +647,100 @@ def import_backup():
 
     try:
         raw = file.stream.read().decode('utf-8-sig')
-        reader = csv.reader(io.StringIO(raw))
-        rows = list(reader)
-        if not rows or rows[0] != ['backup_format', 'owj_media_full_backup_v2']:
-            raise ValueError('هذا ليس ملف النسخة الكاملة v2. نزّل نسخة جديدة من زر «تنزيل نسخة احتياطية كاملة» أولاً.')
+        rows = list(csv.reader(io.StringIO(raw)))
+        if not rows or len(rows[0]) != 2 or rows[0][0] != 'backup_format' or rows[0][1] not in ('owj_media_full_backup_v2', 'owj_media_full_backup_v3'):
+            raise ValueError('صيغة النسخة غير مدعومة. نزّل نسخة جديدة من زر «تنزيل نسخة احتياطية كاملة (CSV)» ثم ارفعها.')
+        backup_version = rows[0][1]
         if len(rows) < 2 or rows[1] != ['table_name', 'row_json']:
-            raise ValueError('تنسيق ملف النسخة الاحتياطية غير صحيح.')
+            raise ValueError('ملف CSV غير مكتمل أو تنسيقه غير صحيح.')
 
-        models_by_table = {model.__tablename__: model for model in db.Model.registry.mappers for model in [model.class_]}
-        # Parse and validate all rows before touching the live database.
+        models_by_table = {mapper.local_table.name: mapper.class_ for mapper in db.Model.registry.mappers}
         grouped = {table: [] for table in models_by_table}
+        declared_tables = set()
         for line_no, row in enumerate(rows[2:], start=3):
             if not row or all(not cell for cell in row):
+                continue
+            if backup_version == 'owj_media_full_backup_v3' and len(row) == 2 and row[0] == '__table__':
+                if row[1] not in models_by_table:
+                    raise ValueError(f'النسخة تحتوي جدولًا غير معروف: {row[1]}')
+                declared_tables.add(row[1])
                 continue
             if len(row) != 2 or row[0] not in models_by_table:
                 raise ValueError(f'بيانات غير صالحة في السطر {line_no}.')
             table_name, raw_json = row
-            data = json.loads(raw_json)
+            try:
+                data = json.loads(raw_json)
+            except Exception:
+                raise ValueError(f'تعذر قراءة سجل CSV في السطر {line_no}.')
             if not isinstance(data, dict):
                 raise ValueError(f'سجل غير صالح في السطر {line_no}.')
             model = models_by_table[table_name]
             allowed = {column.key for column in model.__table__.columns}
             if not set(data).issubset(allowed):
-                raise ValueError(f'أعمدة غير معروفة في جدول {table_name}.')
-            # Convert ISO date strings back to Python datetime values.
+                raise ValueError(f'تحتوي النسخة أعمدة غير معروفة في جدول {table_name}.')
             for column in model.__table__.columns:
                 value = data.get(column.key)
-                if value is not None and isinstance(column.type, __import__('sqlalchemy').types.DateTime) and isinstance(value, str):
+                if value is not None and isinstance(column.type, DateTime) and isinstance(value, str):
                     data[column.key] = datetime.fromisoformat(value)
             grouped[table_name].append(data)
 
-        # Build dependency order from foreign keys. Insert parents first, delete children first.
+        total_records = sum(len(items) for items in grouped.values())
+        if total_records == 0:
+            raise ValueError('الملف لا يحتوي أي سجلات لاستعادتها؛ لم يتم تغيير قاعدة البيانات.')
+        if 'user' in models_by_table and not grouped.get('user'):
+            raise ValueError('النسخة لا تحتوي حسابات مستخدمين؛ رفضت الاستعادة لحماية بيانات الموقع الحالية.')
+        if backup_version == 'owj_media_full_backup_v3' and not declared_tables:
+            raise ValueError('النسخة لا تحتوي تعريفات الجداول؛ لم يتم تغيير قاعدة البيانات.')
+
+        # Parent tables are inserted before dependent tables. Delete in reverse order.
         ordered = []
         pending = set(models_by_table)
         while pending:
             ready = []
             for table in pending:
-                deps = {fk.column.table.name for fk in models_by_table[table].__table__.foreign_keys if fk.column.table.name in pending and fk.column.table.name != table}
+                deps = {fk.column.table.name for fk in models_by_table[table].__table__.foreign_keys
+                        if fk.column.table.name in pending and fk.column.table.name != table}
                 if not deps:
                     ready.append(table)
             if not ready:
-                # No cyclic foreign-key relationships exist in the current schema; fail safely if schema changes.
-                raise ValueError('تعذر تحديد ترتيب الجداول للاستعادة بسبب علاقة دائرية.')
+                raise ValueError('تعذر تحديد ترتيب الجداول بسبب علاقة دائرية؛ لم يتم تغيير البيانات.')
             for table in sorted(ready):
                 ordered.append(table)
                 pending.remove(table)
 
-        # Restore all tables in one transaction; rollback keeps the current site intact on failure.
         with db.engine.begin() as connection:
+            # Deletion and insertion are in one transaction: any failure rolls back everything.
             for table in reversed(ordered):
                 connection.execute(text(f'DELETE FROM "{table}"'))
             for table in ordered:
                 model = models_by_table[table]
-                for data in grouped[table]:
-                    connection.execute(model.__table__.insert().values(**data))
-            # Keep PostgreSQL autoincrement sequences above restored IDs.
+                if grouped[table]:
+                    connection.execute(model.__table__.insert(), grouped[table])
+            # Verify the restored row counts before committing the transaction.
+            mismatches = []
+            for table in ordered:
+                actual = connection.execute(text(f'SELECT COUNT(*) FROM "{table}"')).scalar_one()
+                expected = len(grouped[table])
+                if actual != expected:
+                    mismatches.append(f'{table}: المتوقع {expected} / الموجود {actual}')
+            if mismatches:
+                raise ValueError('فشل التحقق من بعض الجداول: ' + '، '.join(mismatches[:5]))
             if db.engine.dialect.name == 'postgresql':
                 for table in ordered:
                     model = models_by_table[table]
                     pk = next(iter(model.__table__.primary_key.columns), None)
-                    if pk is not None and isinstance(pk.type, __import__('sqlalchemy').types.Integer):
-                        connection.execute(text("SELECT setval(pg_get_serial_sequence(:table_name, :column_name), GREATEST(COALESCE((SELECT MAX(\"" + pk.name + "\") FROM \"" + table + "\"), 1), 1), true)"), {'table_name': table, 'column_name': pk.name})
+                    if pk is not None and isinstance(pk.type, Integer):
+                        connection.execute(text(
+                            "SELECT setval(pg_get_serial_sequence(:table_name, :column_name), "
+                            "GREATEST(COALESCE((SELECT MAX(\"" + pk.name + "\") FROM \"" + table + "\"), 1), 1), true)"
+                        ), {'table_name': table, 'column_name': pk.name})
 
-        restored = sum(len(items) for items in grouped.values())
-        flash(f'تمت استعادة النسخة الكاملة بنجاح: {restored} سجلًا عبر {sum(1 for items in grouped.values() if items)} جداول، بما فيها الحسابات والأرصدة والطلبات والأقسام والخدمات والوكلاء وطرق الدفع والشكاوى ومزوّدو API.', 'success')
+        nonempty_tables = sum(1 for items in grouped.values() if items)
+        details = '، '.join(f'{table}: {len(items)}' for table, items in grouped.items() if items)
+        flash(f'تم التحقق من الاستعادة بنجاح: {total_records} سجلًا في {nonempty_tables} جداول. {details}', 'success')
     except Exception as exc:
         db.session.rollback()
-        flash('لم تتم الاستعادة ولم تُحذف البيانات الحالية. السبب: ' + str(exc), 'error')
+        flash('فشلت الاستعادة ولم تُعتمد أي تغييرات. السبب: ' + str(exc), 'error')
     return redirect(url_for('admin'))
 
 @app.route('/admin/toggle_service/<int:service_id>', methods=['POST'])

@@ -121,6 +121,7 @@ class DepositRequest(db.Model):
     amount = db.Column(db.Float, default=0)
     proof = db.Column(db.String(500), default='')
     status = db.Column(db.String(30), default='قيد المراجعة')
+    rejection_reason = db.Column(db.String(500), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('User')
 
@@ -322,7 +323,9 @@ def deposit():
         else:
             db.session.add(DepositRequest(user_id=current_user().id, amount=amount, proof=request.form.get('proof','').strip()))
             db.session.commit(); flash('تم إرسال طلب الشحن للمراجعة.', 'success'); return redirect(url_for('deposit'))
-    return render_template('deposit.html', payments=payments)
+    user = current_user() if session.get('user_id') else None
+    my_deposits = DepositRequest.query.filter_by(user_id=user.id).order_by(DepositRequest.id.desc()).all() if user else []
+    return render_template('deposit.html', payments=payments, my_deposits=my_deposits)
 
 @app.route('/agents')
 def agents(): return render_template('agents.html', agents=Agent.query.order_by(Agent.id.desc()).all())
@@ -448,6 +451,38 @@ def admin_support_ticket(ticket_id):
 @admin_required
 def admin():
     return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count())
+
+
+@app.route('/admin/handle_deposit/<int:deposit_id>', methods=['POST'])
+@admin_required
+def handle_deposit(deposit_id):
+    deposit = DepositRequest.query.get_or_404(deposit_id)
+    action = request.form.get('action', '').strip()
+    if deposit.status != 'قيد المراجعة':
+        flash('تمت معالجة طلب التحويل هذا سابقاً.', 'error')
+        return redirect(url_for('admin'))
+    if action == 'approve':
+        user = db.session.get(User, deposit.user_id)
+        if not user:
+            flash('تعذر العثور على حساب صاحب الطلب.', 'error')
+            return redirect(url_for('admin'))
+        user.balance_usd = (user.balance_usd or 0) + (deposit.amount or 0)
+        deposit.status = 'مقبول'
+        deposit.rejection_reason = ''
+        db.session.commit()
+        flash(f'تم قبول طلب الشحن #{deposit.id} وإضافة ${deposit.amount:.2f} إلى المحفظة.', 'success')
+    elif action == 'reject':
+        reason = request.form.get('reject_reason', '').strip()
+        if not reason:
+            flash('اكتب سبب رفض التحويل ليظهر للمستخدم.', 'error')
+            return redirect(url_for('admin'))
+        deposit.status = 'مرفوض'
+        deposit.rejection_reason = reason[:500]
+        db.session.commit()
+        flash(f'تم رفض طلب الشحن #{deposit.id} مع حفظ سبب الرفض.', 'success')
+    else:
+        flash('الإجراء غير معروف.', 'error')
+    return redirect(url_for('admin'))
 
 @app.route('/admin/complete_order/<int:order_id>', methods=['POST'])
 @admin_required
@@ -684,6 +719,15 @@ def toggle_service(service_id):
 
 with app.app_context():
     db.create_all()
+    # Add fields to existing databases without deleting user data.
+    try:
+        from sqlalchemy import inspect
+        deposit_columns = {column['name'] for column in inspect(db.engine).get_columns('deposit_request')}
+        if 'rejection_reason' not in deposit_columns:
+            db.session.execute(db.text("ALTER TABLE deposit_request ADD COLUMN rejection_reason VARCHAR(500) DEFAULT ''"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     # Add fields to existing SQLite databases without deleting user data.
     try:
         columns = {row[1] for row in db.session.execute(db.text('PRAGMA table_info(verification_request)')).fetchall()}

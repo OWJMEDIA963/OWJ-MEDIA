@@ -30,6 +30,32 @@
         {% endif %}
     {% endwith %}
 
+    <!-- طلبات شحن المحفظة والتحويلات -->
+    <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between gap-3"><h2 class="text-sm font-black text-white">طلبات تحويل وشحن المحفظة</h2><span class="text-[10px] text-amber-300">المعلقة تحتاج مراجعتك</span></div>
+        {% if deposits %}
+        <div class="space-y-3">
+            {% for dep in deposits %}
+            <div class="bg-gray-950 border border-gray-800 rounded-2xl p-4 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <strong class="text-white">طلب #{{ dep.id }} — {{ dep.user.username if dep.user else 'مستخدم محذوف' }}</strong>
+                    <span class="rounded-lg px-2 py-1 {% if dep.status == 'مقبول' %}bg-emerald-500/15 text-emerald-300{% elif dep.status == 'مرفوض' %}bg-rose-500/15 text-rose-300{% else %}bg-amber-500/15 text-amber-300{% endif %}">{{ dep.status }}</span>
+                </div>
+                <p class="text-xs text-gray-300">المبلغ: <b class="text-cyan-300">${{ '%.2f'|format(dep.amount) }}</b> | المستخدم ID: {{ dep.user_id }} | التاريخ: {{ dep.created_at.strftime('%Y-%m-%d %H:%M') if dep.created_at else '-' }}</p>
+                <p class="text-xs text-gray-400 break-words">إثبات/رقم العملية: {{ dep.proof or 'لم يضف المستخدم إثباتاً' }}</p>
+                {% if dep.status == 'مرفوض' and dep.rejection_reason %}<p class="rounded-xl border border-rose-500/30 bg-rose-950/30 p-3 text-xs text-rose-300">سبب الرفض: {{ dep.rejection_reason }}</p>{% endif %}
+                {% if dep.status == 'قيد المراجعة' %}
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-gray-800">
+                    <form action="{{ url_for('handle_deposit', deposit_id=dep.id) }}" method="post" onsubmit="return confirm('تأكيد قبول التحويل وإضافة المبلغ إلى محفظة المستخدم؟')"><input type="hidden" name="action" value="approve"><button class="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3 py-2.5 text-xs font-black text-white">قبول وإضافة الرصيد</button></form>
+                    <form action="{{ url_for('handle_deposit', deposit_id=dep.id) }}" method="post" class="flex gap-2"><input type="hidden" name="action" value="reject"><input name="reject_reason" required maxlength="500" placeholder="اكتب سبب الرفض للمستخدم" class="min-w-0 flex-1 rounded-xl border border-rose-500/30 bg-gray-900 px-3 py-2 text-xs text-white"><button class="rounded-xl bg-rose-600 hover:bg-rose-500 px-4 py-2 text-xs font-black text-white">رفض</button></form>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}<p class="py-3 text-center text-xs text-gray-500">لا توجد طلبات شحن حتى الآن.</p>{% endif %}
+    </section>
+
     <!-- الطلبات اليدوية والواردة للموقع -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">الطلبات اليدوية والواردة للموقع</h2>

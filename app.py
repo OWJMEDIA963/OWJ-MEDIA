@@ -1,4 +1,5 @@
 import os
+import requests
 from datetime import datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort
@@ -59,10 +60,21 @@ class Service(db.Model):
     max_quantity = db.Column(db.Integer, default=10000)
     input_label = db.Column(db.String(180), default='الرابط أو الآيدي')
     service_type = db.Column(db.String(20), default='manual')
+    api_provider_id = db.Column(db.Integer, db.ForeignKey('smm_provider.id'), nullable=True)
+    api_service_id = db.Column(db.String(80), default='')
     image_url = db.Column(db.String(500), default='')
     description = db.Column(db.Text, default='')
     is_available = db.Column(db.Boolean, default=True)
     category = db.relationship('Category', backref=db.backref('services', lazy=True))
+
+class SMMProvider(db.Model):
+    __tablename__ = 'smm_provider'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    api_url = db.Column(db.String(500), nullable=False)
+    api_key = db.Column(db.Text, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -252,10 +264,30 @@ def place_order(service_id):
         total = service.price_per_1000 * quantity / 1000
     if user.balance_usd < total:
         flash('رصيدك غير كافٍ. يرجى شحن المحفظة أولاً.', 'error'); return redirect(url_for('deposit'))
+    provider_order_id = ''
+    if service.service_type == 'smm':
+        provider = SMMProvider.query.filter_by(id=service.api_provider_id, is_active=True).first() if service.api_provider_id else None
+        if not provider or not service.api_service_id:
+            flash('هذه الخدمة التلقائية غير مربوطة بمزوّد API بشكل صحيح. تواصل مع الإدارة.', 'error')
+            return redirect(url_for('category_services', category_id=service.category_id))
+        try:
+            response = requests.post(provider.api_url, data={
+                'key': provider.api_key, 'action': 'add', 'service': service.api_service_id,
+                'link': link, 'quantity': quantity
+            }, timeout=20)
+            response.raise_for_status()
+            api_result = response.json()
+            if api_result.get('error') or not api_result.get('order'):
+                raise ValueError(str(api_result.get('error') or 'لم يؤكد مزود الخدمة قبول الطلب.'))
+            provider_order_id = str(api_result['order'])
+        except Exception as exc:
+            app.logger.warning('SMM provider order failed: %s', exc)
+            flash('لم يقبل مزوّد الخدمة الطلب. لم يتم خصم رصيدك؛ تحقق من إعدادات API وحاول لاحقاً.', 'error')
+            return redirect(url_for('category_services', category_id=service.category_id))
     user.balance_usd -= total
-    order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total)
+    order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type == 'smm' else 'قيد المراجعة'))
     db.session.add(order); db.session.commit()
-    flash('تم استلام طلبك بنجاح.', 'success'); return redirect(url_for('my_orders'))
+    flash(('تم إرسال طلبك إلى مزوّد الخدمة. رقم الطلب: ' + provider_order_id) if provider_order_id else 'تم استلام طلبك بنجاح.', 'success'); return redirect(url_for('my_orders'))
 
 @app.route('/deposit', methods=['GET','POST'])
 def deposit():
@@ -303,7 +335,7 @@ def ai_chat():
 @app.route('/admin')
 @admin_required
 def admin():
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all())
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all())
 
 @app.route('/admin/complete_order/<int:order_id>', methods=['POST'])
 @admin_required
@@ -350,6 +382,30 @@ def add_payment():
 def add_agent():
     db.session.add(Agent(name=request.form.get('name','').strip(), city=request.form.get('city','').strip(), phone=request.form.get('phone','').strip(), details=request.form.get('address','').strip())); db.session.commit(); flash('تمت إضافة الوكيل.', 'success'); return redirect(url_for('admin'))
 
+@app.route('/admin/add_smm_provider', methods=['POST'])
+@admin_required
+def add_smm_provider():
+    name = request.form.get('provider_name', '').strip()
+    api_url = request.form.get('api_url', '').strip()
+    api_key = request.form.get('api_key', '').strip()
+    if not name or not api_url.startswith(('https://', 'http://')) or not api_key:
+        flash('أدخل اسم المزوّد ورابط API صحيحاً ومفتاح API.', 'error')
+    else:
+        db.session.add(SMMProvider(name=name, api_url=api_url, api_key=api_key))
+        db.session.commit()
+        flash('تم حفظ مزوّد API. احتفظ بالمفتاح سرياً.', 'success')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/delete_smm_provider/<int:provider_id>', methods=['POST'])
+@admin_required
+def delete_smm_provider(provider_id):
+    provider = SMMProvider.query.get_or_404(provider_id)
+    for service in Service.query.filter_by(api_provider_id=provider.id).all():
+        service.api_provider_id = None
+    db.session.delete(provider); db.session.commit()
+    flash('تم حذف مزوّد API وفصل الخدمات المرتبطة به.', 'success')
+    return redirect(url_for('admin'))
+
 @app.route('/admin/add_service', methods=['POST'])
 @admin_required
 def add_service():
@@ -369,7 +425,11 @@ def add_service():
     typ=request.form.get('service_type','manual')
     minimum = request.form.get('min_quantity',type=int) or 1
     maximum = request.form.get('max_quantity',type=int) or 10000
-    service=Service(name=name, category_id=cat.id, price=price, price_per_1000=price, min_quantity=(minimum if typ == 'smm' else 1), max_quantity=(maximum if typ == 'smm' else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, image_url=product_image, description=request.form.get('description','').strip())
+    provider_id = request.form.get('api_provider_id', type=int) if typ == 'smm' else None
+    api_service_id = request.form.get('api_service_id', '').strip() if typ == 'smm' else ''
+    if typ == 'smm' and (not provider_id or not api_service_id):
+        flash('لخدمة SMM تلقائية، اختر مزوّد API وأدخل رقم الخدمة لدى المزوّد.', 'error'); return redirect(url_for('admin'))
+    service=Service(name=name, category_id=cat.id, price=price, price_per_1000=price, min_quantity=(minimum if typ == 'smm' else 1), max_quantity=(maximum if typ == 'smm' else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, api_provider_id=provider_id, api_service_id=api_service_id, image_url=product_image, description=request.form.get('description','').strip())
     db.session.add(service); db.session.commit(); flash('تمت إضافة الخدمة.', 'success'); return redirect(url_for('admin'))
 
 @app.route('/admin/delete_category', methods=['POST'])
@@ -452,6 +512,16 @@ with app.app_context():
         for col, definition in [('gender', "VARCHAR(30) DEFAULT ''"), ('age', 'INTEGER DEFAULT 0'), ('rejection_reason', "VARCHAR(500) DEFAULT ''")]:
             if col not in columns:
                 db.session.execute(db.text(f'ALTER TABLE verification_request ADD COLUMN {col} {definition}'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    try:
+        from sqlalchemy import inspect
+        service_columns = {column['name'] for column in inspect(db.engine).get_columns('service')}
+        if 'api_provider_id' not in service_columns:
+            db.session.execute(db.text('ALTER TABLE service ADD COLUMN api_provider_id INTEGER'))
+        if 'api_service_id' not in service_columns:
+            db.session.execute(db.text("ALTER TABLE service ADD COLUMN api_service_id VARCHAR(80) DEFAULT ''"))
         db.session.commit()
     except Exception:
         db.session.rollback()

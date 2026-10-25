@@ -162,6 +162,28 @@
         </div>
     </div>
 
+    <!-- مزودو SMM API -->
+    <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <h2 class="text-sm font-black text-white">إعدادات مزوّدي SMM API</h2>
+        <p class="text-xs text-gray-400 leading-6">أضف رابط API ومفتاحه من لوحة مزوّد SMM الذي تملك حساباً لديه. المفتاح يُحفظ في قاعدة بيانات الموقع ولا يظهر للزوار.</p>
+        <form action="/admin/add_smm_provider" method="POST" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input name="provider_name" required placeholder="اسم المزوّد (مثلاً: مزوّد SMM 1)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+            <input name="api_url" type="url" required placeholder="رابط API مثل https://provider.com/api/v2" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+            <input name="api_key" type="password" required autocomplete="new-password" placeholder="مفتاح API السري" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white sm:col-span-2">
+            <button class="sm:col-span-2 bg-cyan-500 text-gray-950 font-black py-3 rounded-xl text-xs">حفظ مزوّد API</button>
+        </form>
+        {% if smm_providers %}
+        <div class="space-y-2">
+            {% for provider in smm_providers %}
+            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950 p-3">
+                <div><p class="text-xs font-bold text-white">{{ provider.name }}</p><p dir="ltr" class="text-[10px] text-gray-500 break-all">{{ provider.api_url }}</p><p class="text-[10px] text-emerald-400">مفتاح API محفوظ</p></div>
+                <form action="/admin/delete_smm_provider/{{ provider.id }}" method="POST" onsubmit="return confirm('حذف المزوّد؟ سيتم فصل الخدمات المرتبطة به.')"><button class="rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 px-3 py-2 text-[10px]">حذف</button></form>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
     <!-- إضافة خدمة مع رابط صورة القسم وصورة المنتج -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إضافة وتعديل الخدمات وتخصيص حقول الإدخال</h2>
@@ -185,6 +207,13 @@
                 </select>
                 <p class="text-[10px] leading-5 text-gray-500">اليدوي / شحن الألعاب: السعر ثابت لكل طلب ولا يحتاج كمية. التلقائي: السعر لكل 1000 مع حدود كمية.</p>
             </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div><label class="block text-[11px] font-bold text-gray-300 mb-1">مزوّد API للخدمة</label>
+                    <select name="api_provider_id" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">-- اختر مزوّد API --</option>{% for provider in smm_providers %}<option value="{{ provider.id }}">{{ provider.name }}</option>{% endfor %}</select>
+                </div>
+                <div><label class="block text-[11px] font-bold text-gray-300 mb-1">رقم الخدمة لدى مزوّد SMM</label><input name="api_service_id" placeholder="Service ID من لوحة المزوّد" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"></div>
+            </div>
+            <p class="text-[10px] text-amber-300 leading-5">يجب اختيار المزوّد وإدخال رقم الخدمة عند اختيار النوع التلقائي SMM. الربط يستخدم واجهة API المتوافقة مع صيغة action=add / service / link / quantity.</p>
 
             <label class="block text-xs font-bold text-gray-300">صورة المنتج / الخدمة (اختياري)</label>
             <input type="file" name="image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">

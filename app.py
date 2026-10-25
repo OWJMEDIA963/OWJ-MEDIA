@@ -124,6 +124,27 @@ class DepositRequest(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('User')
 
+
+class SupportTicket(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    subject = db.Column(db.String(160), nullable=False, default='استفسار دعم')
+    status = db.Column(db.String(30), nullable=False, default='مفتوحة')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user = db.relationship('User', backref=db.backref('support_tickets', lazy=True))
+    messages = db.relationship('SupportMessage', backref='ticket', lazy=True, cascade='all, delete-orphan', order_by='SupportMessage.created_at')
+
+
+class SupportMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.Integer, db.ForeignKey('support_ticket.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    sender_role = db.Column(db.String(20), nullable=False, default='user')
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sender = db.relationship('User')
+
 @app.context_processor
 def inject_globals():
     user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
@@ -332,10 +353,101 @@ def ai_chat():
         reply = 'أنا مساعد أوج ميديا التجريبي. أستطيع إرشادك إلى الخدمات والطلبات والشحن. للمساعدة الخاصة، تواصل مع فريق الدعم من خلال الوكلاء المعتمدين.'
     return jsonify(reply=reply)
 
+@app.route('/support', methods=['GET', 'POST'])
+@login_required
+def support():
+    user = current_user()
+    if request.method == 'POST':
+        subject = request.form.get('subject', '').strip()[:160] or 'استفسار دعم'
+        content = request.form.get('message', '').strip()
+        if not content:
+            flash('اكتب تفاصيل المشكلة قبل الإرسال.', 'error')
+        elif len(content) > 5000:
+            flash('الرسالة طويلة جداً؛ الحد الأقصى 5000 حرف.', 'error')
+        else:
+            ticket = SupportTicket(user_id=user.id, subject=subject)
+            db.session.add(ticket)
+            db.session.flush()
+            db.session.add(SupportMessage(ticket_id=ticket.id, sender_id=user.id, sender_role='user', content=content))
+            db.session.commit()
+            flash('تم إرسال رسالتك للدعم. يمكنك متابعة الرد من نفس المحادثة.', 'success')
+            return redirect(url_for('support_ticket', ticket_id=ticket.id))
+    tickets = SupportTicket.query.filter_by(user_id=user.id).order_by(SupportTicket.updated_at.desc()).all()
+    return render_template('support.html', tickets=tickets)
+
+
+@app.route('/support/<int:ticket_id>', methods=['GET', 'POST'])
+@login_required
+def support_ticket(ticket_id):
+    user = current_user()
+    ticket = SupportTicket.query.get_or_404(ticket_id)
+    if ticket.user_id != user.id and user.role != 'admin':
+        abort(403)
+    if request.method == 'POST':
+        content = request.form.get('message', '').strip()
+        if not content:
+            flash('اكتب رسالتك أولاً.', 'error')
+        elif len(content) > 5000:
+            flash('الرسالة طويلة جداً؛ الحد الأقصى 5000 حرف.', 'error')
+        elif ticket.status == 'مغلقة' and user.role != 'admin':
+            flash('هذه المحادثة مغلقة. افتح شكوى جديدة إذا احتجت للمساعدة.', 'error')
+        else:
+            role = 'admin' if user.role == 'admin' else 'user'
+            db.session.add(SupportMessage(ticket_id=ticket.id, sender_id=user.id, sender_role=role, content=content))
+            ticket.updated_at = datetime.utcnow()
+            if role == 'user': ticket.status = 'بانتظار الدعم'
+            else: ticket.status = 'تم الرد'
+            db.session.commit()
+            flash('تم إرسال الرد.', 'success')
+            return redirect(url_for('admin_support_ticket' if user.role == 'admin' else 'support_ticket', ticket_id=ticket.id))
+    return render_template('support_ticket.html', ticket=ticket, is_admin=(user.role == 'admin'))
+
+
+@app.route('/admin/support')
+@admin_required
+def admin_support():
+    tickets = SupportTicket.query.order_by(SupportTicket.updated_at.desc()).all()
+    return render_template('admin_support.html', tickets=tickets)
+
+
+@app.route('/admin/support/<int:ticket_id>', methods=['GET', 'POST'])
+@admin_required
+def admin_support_ticket(ticket_id):
+    ticket = SupportTicket.query.get_or_404(ticket_id)
+    if request.method == 'POST':
+        action = request.form.get('action', 'reply')
+        if action == 'close':
+            ticket.status = 'مغلقة'
+            ticket.updated_at = datetime.utcnow()
+            db.session.commit()
+            flash('تم إغلاق الشكوى.', 'success')
+            return redirect(url_for('admin_support_ticket', ticket_id=ticket.id))
+        if action == 'reopen':
+            ticket.status = 'مفتوحة'
+            ticket.updated_at = datetime.utcnow()
+            db.session.commit()
+            flash('تم إعادة فتح الشكوى.', 'success')
+            return redirect(url_for('admin_support_ticket', ticket_id=ticket.id))
+        content = request.form.get('message', '').strip()
+        if not content:
+            flash('اكتب الرد قبل الإرسال.', 'error')
+        elif len(content) > 5000:
+            flash('الرسالة طويلة جداً؛ الحد الأقصى 5000 حرف.', 'error')
+        else:
+            admin_user = current_user()
+            db.session.add(SupportMessage(ticket_id=ticket.id, sender_id=admin_user.id, sender_role='admin', content=content))
+            ticket.status = 'تم الرد'
+            ticket.updated_at = datetime.utcnow()
+            db.session.commit()
+            flash('تم إرسال الرد للمستخدم.', 'success')
+            return redirect(url_for('admin_support_ticket', ticket_id=ticket.id))
+    return render_template('support_ticket.html', ticket=ticket, is_admin=True)
+
+
 @app.route('/admin')
 @admin_required
 def admin():
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all())
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count())
 
 @app.route('/admin/complete_order/<int:order_id>', methods=['POST'])
 @admin_required

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}{{ category.name }}{% endblock %}
+{% block content %}
+<style>
+/* Force all service text and controls below the image, never on top of it */
+.owj-service-card{display:flex!important;flex-direction:column!important;justify-content:flex-start!important;align-items:stretch!important;position:relative!important;isolation:isolate;min-width:0;min-height:0!important;height:auto!important;aspect-ratio:auto!important;padding:0!important;overflow:hidden!important;background:#111827!important;border:1px solid rgba(34,211,238,.28)!important;}
+.owj-service-media{position:relative!important;display:block!important;flex:0 0 auto!important;width:100%!important;aspect-ratio:1/1!important;overflow:hidden!important;background:#030712;order:0!important;}
+.owj-service-background{position:absolute!important;inset:0!important;z-index:0!important;width:100%!important;height:100%!important;object-fit:cover!important;object-position:center!important;opacity:1!important;border-radius:0!important;}
+.owj-service-media:after{content:"";position:absolute;inset:0;z-index:1;background:transparent!important;pointer-events:none;}
+.owj-service-placeholder{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(6,182,212,.28),rgba(17,24,39,.9));color:#67e8f9;font-size:30px;font-weight:900;}
+.owj-service-content{position:relative!important;inset:auto!important;z-index:2!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;flex:0 0 auto!important;width:100%!important;min-height:0!important;box-sizing:border-box!important;order:1!important;padding:9px 7px 6px!important;background:rgba(15,23,42,.98)!important;}
+.owj-service-content h3,.owj-service-content p,.owj-service-content span{position:static!important;text-shadow:none!important;}
+.owj-service-content h3{font-size:clamp(10px,2.5vw,13px);line-height:1.35;overflow-wrap:anywhere;color:#fff!important;}
+.owj-service-content p{font-size:clamp(11px,2.7vw,14px)!important;line-height:1.4!important;color:#67e8f9!important;margin:3px 0!important;font-weight:900!important;}
+.owj-service-card>div:last-child{position:relative!important;inset:auto!important;z-index:3!important;order:2!important;width:100%!important;box-sizing:border-box!important;margin:0!important;padding:0 7px 8px!important;background:rgba(15,23,42,.98)!important;}
+.owj-service-card button{position:relative!important;inset:auto!important;display:block!important;width:100%!important;margin:4px 0 0!important;box-sizing:border-box!important;background:#22d3ee!important;color:#082f49!important;}
+@media(max-width:420px){.owj-service-content{padding:7px 4px 5px!important}.owj-service-content h3{font-size:clamp(9px,2.7vw,11px);line-height:1.3}.owj-service-content p{font-size:11px!important}.owj-service-card button{font-size:9px;padding-top:6px;padding-bottom:6px;margin-top:4px!important}}
+@media(min-width:640px){.owj-service-card{border-radius:18px}.owj-service-content{padding:10px 8px 6px!important}.owj-service-card>div:last-child{padding:0 9px 9px!important}}
+</style>
+<div class="max-w-4xl mx-auto px-3 py-4 space-y-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl py-3 px-4 text-center shadow">
+        <h1 class="text-xs font-black text-white">قسم: {{ category.name }}</h1>
+    </div>
+
+    <div class="grid grid-cols-3 gap-2 sm:gap-4" style="display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;grid-auto-rows:1fr;align-items:stretch;width:100%;">
+        {% for service in services %}
+        <div id="service-{{ service.id }}" class="owj-service-card min-w-0 bg-gray-900 border border-gray-800 rounded-xl sm:rounded-3xl p-1.5 sm:p-3 shadow-xl flex flex-col justify-between text-center group transition relative {% if not service.is_available %} opacity-90 {% endif %}" style="display:flex;flex-direction:column;width:100%;height:auto;min-width:0;min-height:0;box-sizing:border-box;overflow:hidden;position:relative;isolation:isolate;">
+            <div class="owj-service-media">
+            {% if service.image_url and service.image_url.strip() != "" %}
+            <img src="{{ service.image_url }}" alt="" aria-hidden="true" loading="lazy" class="owj-service-background" onerror="this.remove();">
+            {% else %}
+            <div class="owj-service-background owj-service-placeholder" aria-hidden="true">{{ service.name[:2] }}</div>
+            {% endif %}
+            </div>
+            <div class="owj-service-content">
+                <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
+                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">${{ "%.2f"|format(service.price) }}</p>
+                {% if service.is_available %}
+                <span class="text-[8px] sm:text-[9px] text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded-full border border-emerald-500/30">متوفرة</span>
+                {% else %}
+                <span class="text-[8px] sm:text-[9px] text-rose-400 bg-rose-950/50 px-1.5 py-0.5 rounded-full border border-rose-500/30">غير متوفرة</span>
+                {% endif %}
+            </div>
+
+            <div class="mt-1 sm:mt-2">
+                {% if service.is_available %}
+                <button onclick="openOrderModal('{{ service.id }}', '{{ service.name }}', '{{ service.price }}', '{{ service.service_type }}', '{{ service.input_label }}', '{{ service.min_quantity }}')" class="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow">
+                    اطلب الآن
+                </button>
+                {% else %}
+                <button disabled class="w-full bg-gray-800 text-gray-500 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] cursor-not-allowed">
+                    غير متوفرة
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- نافذة الطلب المنبثقة مع تغبيش الخلفية (Modal) والتوجيه التلقائي لطلباتي -->
+<div id="orderModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center px-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
+        <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+            <h3 id="modalServiceName" class="text-xs font-black text-white"></h3>
+            <button onclick="closeOrderModal()" class="text-gray-400 hover:text-white p-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <form id="orderForm" method="POST" class="space-y-3">
+            <div class="space-y-1">
+                <label id="modalInputLabel" class="block text-[11px] font-bold text-gray-300"></label>
+                <input type="text" name="link" placeholder="أدخل المطلوب هنا..." required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none">
+            </div>
+
+            <div id="quantityContainer" class="space-y-1 hidden">
+                <label class="block text-[11px] font-bold text-gray-300">الكمية</label>
+                <input type="number" id="modalQuantity" name="quantity" value="10" min="1" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none" oninput="calcTotal()">
+            </div>
+
+            <div class="bg-gray-950 p-3 rounded-2xl border border-gray-800 flex justify-between items-center text-xs">
+                <span class="text-gray-400 font-bold">التكلفة:</span>
+                <span id="modalTotal" class="text-cyan-400 font-black">$0.00</span>
+            </div>
+
+            <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-2.5 rounded-2xl text-xs shadow-xl transition">
+                تأكيد وإرسال الطلب
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    let currentPrice = 0;
+    let currentType = '';
+
+    function openOrderModal(id, name, price, type, label, minQty) {
+        currentPrice = parseFloat(price);
+        currentType = type;
+        document.getElementById('modalServiceName').innerText = name;
+        document.getElementById('modalInputLabel').innerText = label;
+        document.getElementById('orderForm').action = '/order/' + id;
+        
+        const qtyContainer = document.getElementById('quantityContainer');
+        if (type === 'smm') {
+            qtyContainer.classList.remove('hidden');
+            document.getElementById('modalQuantity').value = minQty;
+            document.getElementById('modalTotal').innerText = '$' + ((currentPrice / 1000) * minQty).toFixed(2);
+        } else {
+            qtyContainer.classList.add('hidden');
+            document.getElementById('modalTotal').innerText = '$' + currentPrice.toFixed(2);
+        }
+        
+        document.getElementById('orderModal').classList.remove('hidden');
+    }
+
+    function closeOrderModal() {
+        document.getElementById('orderModal').classList.add('hidden');
+    }
+
+    function calcTotal() {
+        if (currentType === 'smm') {
+            const qty = document.getElementById('modalQuantity').value;
+            const total = (currentPrice / 1000) * qty;
+            document.getElementById('modalTotal').innerText = '$' + total.toFixed(2);
+        }
+    }
+</script>
+{% endblock %}

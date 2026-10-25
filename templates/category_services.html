@@ -44,7 +44,7 @@
 
             <div class="mt-1 sm:mt-2">
                 {% if service.is_available %}
-                <button onclick="openOrderModal({{ service.id }}, {{ service.name|tojson }}, {{ service.price|tojson }}, {{ service.service_type|tojson }}, {{ service.input_label|tojson }}, {{ service.min_quantity|tojson }}, {{ (service.description or '')|tojson }})" class="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow">
+                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.price }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-service-description="{{ (service.description or '')|e }}">
                     اطلب الآن
                 </button>
                 {% else %}
@@ -99,38 +99,62 @@
     let currentType = '';
 
     function openOrderModal(id, name, price, type, label, minQty, description) {
-        currentPrice = parseFloat(price);
-        currentType = type;
-        document.getElementById('modalServiceName').innerText = name;
-        document.getElementById('modalInputLabel').innerText = label;
+        currentPrice = Number.parseFloat(price) || 0;
+        currentType = type || '';
+        document.getElementById('modalServiceName').textContent = name || '';
+        document.getElementById('modalInputLabel').textContent = label || 'الرابط';
         const descriptionBox = document.getElementById('modalServiceDescription');
         descriptionBox.textContent = description || '';
-        descriptionBox.classList.toggle('hidden', !description || !description.trim());
-        document.getElementById('orderForm').action = '/order/' + id;
-        
+        descriptionBox.classList.toggle('hidden', !(description && description.trim()));
+        document.getElementById('orderForm').action = '/order/' + encodeURIComponent(id);
+
         const qtyContainer = document.getElementById('quantityContainer');
-        if (type === 'smm') {
+        const quantityInput = document.getElementById('modalQuantity');
+        if (currentType === 'smm') {
             qtyContainer.classList.remove('hidden');
-            document.getElementById('modalQuantity').value = minQty;
-            document.getElementById('modalTotal').innerText = '$' + ((currentPrice / 1000) * minQty).toFixed(2);
+            quantityInput.value = Number.parseInt(minQty, 10) || 1;
+            document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * Number(quantityInput.value)).toFixed(2);
         } else {
             qtyContainer.classList.add('hidden');
-            document.getElementById('modalTotal').innerText = '$' + currentPrice.toFixed(2);
+            document.getElementById('modalTotal').textContent = '$' + currentPrice.toFixed(2);
         }
-        
         document.getElementById('orderModal').classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
     }
+
+    document.querySelectorAll('.js-open-order').forEach(function(button) {
+        button.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            openOrderModal(
+                button.dataset.serviceId,
+                button.dataset.serviceName,
+                button.dataset.servicePrice,
+                button.dataset.serviceType,
+                button.dataset.inputLabel,
+                button.dataset.minQuantity,
+                button.dataset.serviceDescription
+            );
+        });
+    });
 
     function closeOrderModal() {
         document.getElementById('orderModal').classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
     }
 
     function calcTotal() {
         if (currentType === 'smm') {
-            const qty = document.getElementById('modalQuantity').value;
-            const total = (currentPrice / 1000) * qty;
-            document.getElementById('modalTotal').innerText = '$' + total.toFixed(2);
+            const qty = Number.parseFloat(document.getElementById('modalQuantity').value) || 0;
+            document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * qty).toFixed(2);
         }
     }
+
+    document.getElementById('orderModal').addEventListener('click', function(event) {
+        if (event.target === this) closeOrderModal();
+    });
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') closeOrderModal();
+    });
 </script>
 {% endblock %}

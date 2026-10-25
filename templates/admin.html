@@ -6,17 +6,18 @@
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl flex items-center justify-between">
         <div>
             <h1 class="text-base font-black text-white mb-1">لوحة التحكم الإدارية</h1>
-            <p class="text-xs text-gray-400">إدارة الطلبات اليدوية، التوثيق، الوكلاء، والخدمات.</p>
+            <p class="text-xs text-gray-400">إدارة الحسابات والطلبات والمحافظ والخدمات والوكلاء والدعم والنسخ الاحتياطي.</p>
         </div>
         <div class="flex flex-col sm:flex-row gap-2">
             <a href="/admin/export_backup" class="bg-cyan-500 hover:bg-cyan-400 text-gray-950 px-4 py-2.5 rounded-2xl text-xs font-black transition shadow text-center">
-                تنزيل نسخة احتياطية (CSV)
+                تنزيل نسخة احتياطية كاملة (CSV)
             </a>
             <form action="/admin/import_backup" method="POST" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-2 rounded-2xl border border-gray-700 bg-gray-950 p-2">
                 <input type="file" name="backup_file" accept=".csv,text/csv" required class="max-w-full text-[10px] text-gray-300 file:mr-2 file:rounded-lg file:border-0 file:bg-gray-800 file:px-3 file:py-2 file:text-white">
-                <button type="submit" onclick="return confirm('سيتم تحديث بيانات الحسابات الموجودة فقط حسب ملف CSV. هل تريد المتابعة؟')" class="bg-amber-400 hover:bg-amber-300 text-gray-950 px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap">استيراد / استعادة CSV</button>
+                <button type="submit" onclick="return confirm('تحذير: ستستبدل هذه العملية بيانات قاعدة الموقع الحالية بالكامل بالبيانات الموجودة في النسخة الاحتياطية، بما فيها الحسابات والأرصدة والطلبات والخدمات والوكلاء والشكاوى. خذ نسخة احتياطية حالية أولاً. هل تريد المتابعة؟')" class="bg-amber-400 hover:bg-amber-300 text-gray-950 px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap">استعادة النسخة الكاملة</button>
             </form>
         </div>
+        <a href="/admin/support" class="bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-2xl text-xs font-black text-center">الشكاوى ورسائل الدعم</a>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}

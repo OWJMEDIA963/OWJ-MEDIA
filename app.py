@@ -563,52 +563,118 @@ def delete_service():
 @app.route('/admin/export_backup')
 @admin_required
 def export_backup():
+    """Export every application database table into one portable CSV file."""
+    import csv, io, json
     from flask import Response
-    import csv, io
-    out=io.StringIO(); writer=csv.writer(out); writer.writerow(['id','username','email','balance_usd','role'])
-    for u in User.query.all(): writer.writerow([u.id,u.username,u.email,u.balance_usd,u.role])
-    return Response('\ufeff'+out.getvalue(), mimetype='text/csv', headers={'Content-Disposition':'attachment; filename=owj_users_backup.csv'})
+    from sqlalchemy import inspect
+
+    out = io.StringIO(newline='')
+    writer = csv.writer(out)
+    writer.writerow(['backup_format', 'owj_media_full_backup_v2'])
+    writer.writerow(['table_name', 'row_json'])
+    # Discover every table/model in this app, rather than exporting users only.
+    for mapper in db.Model.registry.mappers:
+        model = mapper.class_
+        rows = model.query.order_by(model.id).all() if hasattr(model, 'id') else model.query.all()
+        for obj in rows:
+            data = {}
+            for column in mapper.columns:
+                value = getattr(obj, column.key)
+                if isinstance(value, datetime):
+                    value = value.isoformat()
+                data[column.key] = value
+            writer.writerow([model.__tablename__, json.dumps(data, ensure_ascii=False, separators=(',', ':'))])
+    payload = '\ufeff' + out.getvalue()
+    return Response(payload, mimetype='text/csv; charset=utf-8', headers={
+        'Content-Disposition': 'attachment; filename=owj_media_full_backup.csv',
+        'Cache-Control': 'no-store'
+    })
+
 
 @app.route('/admin/import_backup', methods=['POST'])
 @admin_required
 def import_backup():
-    import csv, io
+    """Restore a full v2 CSV backup atomically, including balances and relationships."""
+    import csv, io, json
+    from sqlalchemy import text
+
     file = request.files.get('backup_file')
     if not file or not file.filename:
-        flash('اختر ملف CSV أولاً.', 'error')
+        flash('اختر ملف النسخة الاحتياطية CSV أولاً.', 'error')
         return redirect(url_for('admin'))
     if not file.filename.lower().endswith('.csv'):
         flash('الملف يجب أن يكون بصيغة CSV.', 'error')
         return redirect(url_for('admin'))
+
     try:
         raw = file.stream.read().decode('utf-8-sig')
-        reader = csv.DictReader(io.StringIO(raw))
-        required = {'username', 'email', 'balance_usd', 'role'}
-        if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
-            raise ValueError('أعمدة الملف غير مطابقة للنسخة الاحتياطية المتوقعة.')
-        updated = 0
-        for row in reader:
-            username = (row.get('username') or '').strip()
-            if not username:
+        reader = csv.reader(io.StringIO(raw))
+        rows = list(reader)
+        if not rows or rows[0] != ['backup_format', 'owj_media_full_backup_v2']:
+            raise ValueError('هذا ليس ملف النسخة الكاملة v2. نزّل نسخة جديدة من زر «تنزيل نسخة احتياطية كاملة» أولاً.')
+        if len(rows) < 2 or rows[1] != ['table_name', 'row_json']:
+            raise ValueError('تنسيق ملف النسخة الاحتياطية غير صحيح.')
+
+        models_by_table = {model.__tablename__: model for model in db.Model.registry.mappers for model in [model.class_]}
+        # Parse and validate all rows before touching the live database.
+        grouped = {table: [] for table in models_by_table}
+        for line_no, row in enumerate(rows[2:], start=3):
+            if not row or all(not cell for cell in row):
                 continue
-            user = User.query.filter_by(username=username).first()
-            # Restore only existing accounts; importing a CSV never creates accounts or changes passwords.
-            if not user:
-                continue
-            balance = float(row.get('balance_usd') or 0)
-            if balance < 0:
-                raise ValueError('لا يمكن استيراد رصيد سالب.')
-            user.email = (row.get('email') or '').strip()
-            user.balance_usd = balance
-            role = (row.get('role') or 'user').strip().lower()
-            if role in ('user', 'admin'):
-                user.role = role
-            updated += 1
-        db.session.commit()
-        flash(f'تم استيراد النسخة الاحتياطية وتحديث {updated} حساباً موجوداً. لم يتم إنشاء حسابات جديدة أو تغيير كلمات المرور.', 'success')
+            if len(row) != 2 or row[0] not in models_by_table:
+                raise ValueError(f'بيانات غير صالحة في السطر {line_no}.')
+            table_name, raw_json = row
+            data = json.loads(raw_json)
+            if not isinstance(data, dict):
+                raise ValueError(f'سجل غير صالح في السطر {line_no}.')
+            model = models_by_table[table_name]
+            allowed = {column.key for column in model.__table__.columns}
+            if not set(data).issubset(allowed):
+                raise ValueError(f'أعمدة غير معروفة في جدول {table_name}.')
+            # Convert ISO date strings back to Python datetime values.
+            for column in model.__table__.columns:
+                value = data.get(column.key)
+                if value is not None and isinstance(column.type, __import__('sqlalchemy').types.DateTime) and isinstance(value, str):
+                    data[column.key] = datetime.fromisoformat(value)
+            grouped[table_name].append(data)
+
+        # Build dependency order from foreign keys. Insert parents first, delete children first.
+        ordered = []
+        pending = set(models_by_table)
+        while pending:
+            ready = []
+            for table in pending:
+                deps = {fk.column.table.name for fk in models_by_table[table].__table__.foreign_keys if fk.column.table.name in pending and fk.column.table.name != table}
+                if not deps:
+                    ready.append(table)
+            if not ready:
+                # No cyclic foreign-key relationships exist in the current schema; fail safely if schema changes.
+                raise ValueError('تعذر تحديد ترتيب الجداول للاستعادة بسبب علاقة دائرية.')
+            for table in sorted(ready):
+                ordered.append(table)
+                pending.remove(table)
+
+        # Restore all tables in one transaction; rollback keeps the current site intact on failure.
+        with db.engine.begin() as connection:
+            for table in reversed(ordered):
+                connection.execute(text(f'DELETE FROM "{table}"'))
+            for table in ordered:
+                model = models_by_table[table]
+                for data in grouped[table]:
+                    connection.execute(model.__table__.insert().values(**data))
+            # Keep PostgreSQL autoincrement sequences above restored IDs.
+            if db.engine.dialect.name == 'postgresql':
+                for table in ordered:
+                    model = models_by_table[table]
+                    pk = next(iter(model.__table__.primary_key.columns), None)
+                    if pk is not None and isinstance(pk.type, __import__('sqlalchemy').types.Integer):
+                        connection.execute(text("SELECT setval(pg_get_serial_sequence(:table_name, :column_name), GREATEST(COALESCE((SELECT MAX(\"" + pk.name + "\") FROM \"" + table + "\"), 1), 1), true)"), {'table_name': table, 'column_name': pk.name})
+
+        restored = sum(len(items) for items in grouped.values())
+        flash(f'تمت استعادة النسخة الكاملة بنجاح: {restored} سجلًا عبر {sum(1 for items in grouped.values() if items)} جداول، بما فيها الحسابات والأرصدة والطلبات والأقسام والخدمات والوكلاء وطرق الدفع والشكاوى ومزوّدو API.', 'success')
     except Exception as exc:
         db.session.rollback()
-        flash('تعذّر استيراد الملف: ' + str(exc), 'error')
+        flash('لم تتم الاستعادة ولم تُحذف البيانات الحالية. السبب: ' + str(exc), 'error')
     return redirect(url_for('admin'))
 
 @app.route('/admin/toggle_service/<int:service_id>', methods=['POST'])

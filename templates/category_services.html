@@ -34,7 +34,7 @@
             </div>
             <div class="owj-service-content">
                 <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
-                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">${{ "%.2f"|format(service.price) }}</p>
+                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">{% if service.service_type in ['smm', 'manual_quantity'] %}${{ "%.2f"|format(service.price_per_1000 or service.price) }} / 1000{% else %}${{ "%.2f"|format(service.price) }}{% endif %}</p>
                 {% if service.is_available %}
                 <span class="text-[8px] sm:text-[9px] text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded-full border border-emerald-500/30">متوفرة</span>
                 {% else %}
@@ -44,7 +44,7 @@
 
             <div class="mt-1 sm:mt-2">
                 {% if service.is_available %}
-                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.price }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-service-description="{{ (service.description or '')|e }}">
+                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.price_per_1000 if service.service_type in ['smm', 'manual_quantity'] else service.price }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}">
                     اطلب الآن
                 </button>
                 {% else %}
@@ -71,6 +71,7 @@
         <div id="modalServiceDescription" class="hidden rounded-xl border border-red-500/50 bg-red-950/40 p-3 text-xs leading-6 text-red-300 font-bold whitespace-pre-line"></div>
 
         <form id="orderForm" method="POST" class="space-y-3">
+            <div id="orderValidationMessage" role="alert" aria-live="polite" class="hidden rounded-xl border border-red-500/50 bg-red-950/50 p-3 text-xs font-black leading-6 text-red-300"></div>
             <div class="space-y-1">
                 <label id="modalInputLabel" class="block text-[11px] font-bold text-gray-300"></label>
                 <input type="text" name="link" placeholder="أدخل المطلوب هنا..." required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none">
@@ -96,10 +97,26 @@
 <script>
     let currentPrice = 0;
     let currentType = '';
+    let currentMinQuantity = 1;
+    let currentMaxQuantity = 10000;
 
-    function openOrderModal(id, name, price, type, label, minQty, description) {
+    function showOrderValidation(message) {
+        const box = document.getElementById('orderValidationMessage');
+        box.textContent = message;
+        box.classList.remove('hidden');
+    }
+    function clearOrderValidation() {
+        const box = document.getElementById('orderValidationMessage');
+        box.textContent = '';
+        box.classList.add('hidden');
+    }
+
+    function openOrderModal(id, name, price, type, label, minQty, maxQty, description) {
         currentPrice = Number.parseFloat(price) || 0;
         currentType = type || '';
+        currentMinQuantity = Number.parseInt(minQty, 10) || 1;
+        currentMaxQuantity = Number.parseInt(maxQty, 10) || 10000;
+        clearOrderValidation();
         document.getElementById('modalServiceName').textContent = name || '';
         document.getElementById('modalInputLabel').textContent = label || 'الرابط';
         const descriptionBox = document.getElementById('modalServiceDescription');
@@ -109,9 +126,11 @@
 
         const qtyContainer = document.getElementById('quantityContainer');
         const quantityInput = document.getElementById('modalQuantity');
-        if (currentType === 'smm') {
+        if (currentType === 'smm' || currentType === 'manual_quantity') {
             qtyContainer.classList.remove('hidden');
-            quantityInput.value = Number.parseInt(minQty, 10) || 1;
+            quantityInput.min = String(currentMinQuantity);
+            quantityInput.max = String(currentMaxQuantity);
+            quantityInput.value = currentMinQuantity;
             document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * Number(quantityInput.value)).toFixed(2);
         } else {
             qtyContainer.classList.add('hidden');
@@ -132,6 +151,7 @@
                 button.dataset.serviceType,
                 button.dataset.inputLabel,
                 button.dataset.minQuantity,
+                button.dataset.maxQuantity,
                 button.dataset.serviceDescription
             );
         });
@@ -142,8 +162,28 @@
         document.body.classList.remove('overflow-hidden');
     }
 
+    document.getElementById('modalQuantity').addEventListener('input', clearOrderValidation);
+    document.querySelector('#orderForm input[name="link"]').addEventListener('input', clearOrderValidation);
+    document.getElementById('orderForm').addEventListener('submit', function(event) {
+        clearOrderValidation();
+        if (currentType === 'smm' || currentType === 'manual_quantity') {
+            const quantity = Number.parseInt(document.getElementById('modalQuantity').value, 10) || 0;
+            if (quantity < currentMinQuantity) {
+                event.preventDefault();
+                showOrderValidation('الكمية أقل من المطلوب. لازم تكون الكمية ' + currentMinQuantity + ' على الأقل.');
+                document.getElementById('modalQuantity').focus();
+                return;
+            }
+            if (quantity > currentMaxQuantity) {
+                event.preventDefault();
+                showOrderValidation('الكمية أكبر من الحد المسموح. الحد الأقصى هو ' + currentMaxQuantity + '.');
+                document.getElementById('modalQuantity').focus();
+            }
+        }
+    });
+
     function calcTotal() {
-        if (currentType === 'smm') {
+        if (currentType === 'smm' || currentType === 'manual_quantity') {
             const qty = Number.parseFloat(document.getElementById('modalQuantity').value) || 0;
             document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * qty).toFixed(2);
         }

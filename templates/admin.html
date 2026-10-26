@@ -219,7 +219,7 @@
             <input type="text" name="category_name" placeholder="القسم الرئيسي" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
             
             <div class="grid grid-cols-3 gap-2">
-                <input type="number" step="0.01" min="0.01" name="price_per_1000" placeholder="السعر الثابت للمنتج اليدوي / لكل 1000 للتلقائي ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
+                <input type="number" step="0.01" min="0.00" name="price_per_1000" placeholder="السعر الثابت أو السعر لكل 1000 ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
                 <input type="number" name="min_quantity" placeholder="الحد الأدنى" value="10" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
                 <input type="number" name="max_quantity" placeholder="الحد الأقصى" value="10000" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
             </div>
@@ -229,10 +229,11 @@
             <div class="space-y-1">
                 <label class="block text-[11px] font-bold text-gray-300">نوع الخدمة</label>
                 <select name="service_type" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
-                    <option value="manual">يدوي / شحن ألعاب</option>
+                    <option value="manual">يدوي بسعر ثابت لكل طلب</option>
+                    <option value="manual_quantity">يدوي بالكمية (سعر لكل 1000 نقطة/عملة)</option>
                     <option value="smm">تلقائي SMM (ربط API)</option>
                 </select>
-                <p class="text-[10px] leading-5 text-gray-500">اليدوي / شحن الألعاب: السعر ثابت لكل طلب ولا يحتاج كمية. التلقائي: السعر لكل 1000 مع حدود كمية.</p>
+                <p class="text-[10px] leading-5 text-gray-500">اليدوي بالكمية مناسب لجواكر والنقاط والعملات: ضع السعر لكل 1000، وحدد الحد الأدنى والأقصى؛ الزبون يختار الكمية ويُحسب السعر تلقائياً، ثم تستلم الطلب وتنفذه يدوياً. اليدوي الثابت يبقى بسعر لكل طلب.</p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label class="block text-[11px] font-bold text-gray-300 mb-1">مزوّد API للخدمة</label>
@@ -250,10 +251,45 @@
             <input type="url" name="category_image_url" placeholder="أو رابط صورة القسم" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
             <p class="text-[11px] text-gray-500">الصور المرفوعة: PNG أو JPG أو WEBP أو GIF، بحد أقصى 5 ميغابايت.</p>
             
+            <label class="block text-[11px] font-bold text-gray-300">حالة المنتج</label><select name="is_available" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="1">متوفر</option><option value="0">غير متوفر</option></select>
             <textarea name="description" placeholder="تفاصيل الخدمة..." rows="2" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none"></textarea>
             <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-2xl text-xs">حفظ وإضافة الخدمة</button>
         </form>
     </div>
+
+    <!-- تعديل المنتجات الحالية وتغيير التوفر -->
+    <section class="bg-gray-900 border border-gray-800 rounded-3xl p-5 shadow-xl space-y-4">
+        <h2 class="text-sm font-black text-white">تعديل المنتجات وتغيير التوفر</h2>
+        <p class="text-[11px] text-gray-400">يمكنك تعديل السعر والحدود والوصف ونوع المنتج، أو إيقافه مؤقتاً ليظهر للزبون كغير متوفر.</p>
+        {% for s in services %}
+        <details class="rounded-2xl border border-gray-800 bg-gray-950 p-3">
+            <summary class="cursor-pointer flex items-center justify-between gap-3 text-xs font-bold text-white"><span>{{ s.name }}</span><span class="text-[10px] {% if s.is_available %}text-emerald-400{% else %}text-rose-400{% endif %}">{% if s.is_available %}متوفر{% else %}غير متوفر{% endif %}</span></summary>
+            <form action="/admin/update_service/{{ s.id }}" method="POST" enctype="multipart/form-data" class="mt-4 space-y-3">
+                <input name="name" value="{{ s.name }}" required placeholder="اسم المنتج" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                <input name="category_name" value="{{ s.category.name }}" required placeholder="القسم" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                <div class="grid grid-cols-3 gap-2">
+                    <input type="number" step="0.01" min="0" name="price_per_1000" value="{{ s.price_per_1000 if s.service_type in ['smm','manual_quantity'] else s.price }}" required placeholder="السعر" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
+                    <input type="number" min="1" name="min_quantity" value="{{ s.min_quantity or 1 }}" required placeholder="الأدنى" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
+                    <input type="number" min="1" name="max_quantity" value="{{ s.max_quantity or 10000 }}" required placeholder="الأقصى" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
+                </div>
+                <select name="service_type" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                    <option value="manual" {% if s.service_type == 'manual' %}selected{% endif %}>يدوي بسعر ثابت لكل طلب</option>
+                    <option value="manual_quantity" {% if s.service_type == 'manual_quantity' %}selected{% endif %}>يدوي بالكمية (لكل 1000)</option>
+                    <option value="smm" {% if s.service_type == 'smm' %}selected{% endif %}>تلقائي SMM عبر API</option>
+                </select>
+                <input name="input_label" value="{{ s.input_label }}" required placeholder="حقل بيانات الزبون" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                <textarea name="description" rows="2" placeholder="الوصف / التنبيه الأحمر" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">{{ s.description or '' }}</textarea>
+                <select name="api_provider_id" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">-- مزوّد API (للتلقائي فقط) --</option>{% for provider in smm_providers %}<option value="{{ provider.id }}" {% if s.api_provider_id == provider.id %}selected{% endif %}>{{ provider.name }}</option>{% endfor %}</select>
+                <input name="api_service_id" value="{{ s.api_service_id or '' }}" placeholder="Service ID لدى مزوّد API" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                <label class="block text-[11px] font-bold text-gray-300">توفّر المنتج</label>
+                <select name="is_available" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="1" {% if s.is_available %}selected{% endif %}>متوفر</option><option value="0" {% if not s.is_available %}selected{% endif %}>غير متوفر</option></select>
+                <label class="block text-[11px] font-bold text-gray-300">تغيير صورة المنتج (اختياري)</label><input type="file" name="image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full text-xs text-gray-300">
+                <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-xl text-xs">حفظ تعديلات {{ s.name }}</button>
+            </form>
+            <form action="/admin/toggle_service/{{ s.id }}" method="POST" class="mt-2"><button type="submit" class="w-full {% if s.is_available %}bg-rose-600{% else %}bg-emerald-600{% endif %} text-white font-bold py-2 rounded-xl text-xs">{% if s.is_available %}إيقاف المنتج وجعله غير متوفر{% else %}إعادة توفير المنتج{% endif %}</button></form>
+        </details>
+        {% else %}<p class="text-xs text-gray-500">لا توجد منتجات بعد.</p>{% endfor %}
+    </section>
 
 </div>
 {% endblock %}

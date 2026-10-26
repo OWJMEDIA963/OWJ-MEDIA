@@ -917,11 +917,6 @@ def import_backup():
         flash('فشلت الاستعادة ولم تُعتمد أي تغييرات. السبب: ' + str(exc), 'error')
     return redirect(url_for('admin'))
 
-@app.route('/admin/toggle_service/<int:service_id>', methods=['POST'])
-@admin_required
-def toggle_service(service_id):
-    service=Service.query.get_or_404(service_id); service.is_available=not service.is_available; db.session.commit(); flash('تم تحديث توفر الخدمة.', 'success'); return redirect(url_for('admin'))
-
 with app.app_context():
     db.create_all()
     # Add fields to existing databases without deleting user data.

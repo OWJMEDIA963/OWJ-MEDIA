@@ -34,7 +34,7 @@
             </div>
             <div class="owj-service-content">
                 <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
-                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">{% if service.service_type in ['smm', 'manual_quantity'] %}${{ "%.2f"|format(service.price_per_1000 or service.price) }} / 1000{% else %}${{ "%.2f"|format(service.price) }}{% endif %}</p>
+                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">${{ "%.2f"|format(service.price_per_1000 or service.price if service.service_type in ['smm', 'manual_quantity'] else service.price) }}</p>
                 {% if service.is_available %}
                 <span class="text-[8px] sm:text-[9px] text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded-full border border-emerald-500/30">متوفرة</span>
                 {% else %}

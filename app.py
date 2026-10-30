@@ -1,4 +1,6 @@
 import os
+import base64
+import mimetypes
 import requests
 from datetime import datetime
 from functools import wraps
@@ -11,7 +13,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-this-secret-key-before-deployment')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///owj_media.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
 
 
 def format_money(value):
@@ -25,6 +27,33 @@ def format_money(value):
 app.jinja_env.filters['money'] = format_money
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
+
+def save_deposit_proof_image(field_name):
+    """Store a small receipt image inside the database so Render deploys/restarts cannot erase it."""
+    file = request.files.get(field_name)
+    if not file or not file.filename:
+        raise ValueError('ارفق صورة إشعار الحوالة قبل إرسال طلب الشحن.')
+    filename = secure_filename(file.filename)
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    mime = {'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'webp': 'image/webp', 'gif': 'image/gif'}.get(ext)
+    if not mime:
+        raise ValueError('صيغة الصورة غير مدعومة. استخدم PNG أو JPG أو WEBP أو GIF.')
+    raw = file.read(1024 * 1024 + 1)
+    if not raw:
+        raise ValueError('الصورة المرفقة فارغة. اختر صورة صحيحة.')
+    if len(raw) > 1024 * 1024:
+        raise ValueError('حجم صورة الإشعار يجب ألا يتجاوز 1 ميغابايت.')
+    # Basic file signature checks prevent renamed non-image files.
+    signatures = {
+        'png': raw.startswith(b'\x89PNG\r\n\x1a\n'),
+        'jpg': raw.startswith(b'\xff\xd8\xff'), 'jpeg': raw.startswith(b'\xff\xd8\xff'),
+        'gif': raw.startswith((b'GIF87a', b'GIF89a')),
+        'webp': len(raw) >= 12 and raw[:4] == b'RIFF' and raw[8:12] == b'WEBP'
+    }
+    if not signatures.get(ext, False):
+        raise ValueError('الملف المرفق ليس صورة صالحة من النوع المحدد.')
+    return 'data:' + mime + ';base64,' + base64.b64encode(raw).decode('ascii')
+
 
 def save_uploaded_image(field_name):
     file = request.files.get(field_name)
@@ -142,7 +171,7 @@ class DepositRequest(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     amount = db.Column(db.Float, default=0)
     proof = db.Column(db.String(500), default='')
-    proof_image = db.Column(db.String(500), default='')
+    proof_image = db.Column(db.Text, default='')
     status = db.Column(db.String(30), default='قيد المراجعة')
     rejection_reason = db.Column(db.String(500), default='')
     payment_method_name = db.Column(db.String(120), default='')
@@ -407,6 +436,12 @@ def place_order(service_id):
     db.session.add(order); db.session.commit()
     flash(('تم إرسال طلبك إلى مزوّد الخدمة. رقم الطلب: ' + provider_order_id) if provider_order_id else 'تم استلام طلبك بنجاح.', 'success'); return redirect(url_for('my_orders'))
 
+@app.errorhandler(413)
+def uploaded_file_too_large(error):
+    flash('حجم الملف كبير جداً. الحد الأقصى لإرسال الطلب هو 2 ميغابايت، وحجم صورة الإشعار 1 ميغابايت.', 'error')
+    return redirect(url_for('deposit'))
+
+
 @app.route('/deposit', methods=['GET','POST'])
 def deposit():
     payments = PaymentMethod.query.order_by(PaymentMethod.id.desc()).all()
@@ -423,7 +458,7 @@ def deposit():
                 flash('اختر طريقة الدفع المناسبة قبل إرسال الطلب.', 'error')
                 return redirect(url_for('deposit'))
             try:
-                proof_image = save_uploaded_image('proof_image')
+                proof_image = save_deposit_proof_image('proof_image')
             except ValueError as exc:
                 flash(str(exc), 'error')
                 return redirect(url_for('deposit'))
@@ -1007,7 +1042,9 @@ with app.app_context():
         if 'rejection_reason' not in deposit_columns:
             db.session.execute(db.text("ALTER TABLE deposit_request ADD COLUMN rejection_reason VARCHAR(500) DEFAULT ''"))
         if 'proof_image' not in deposit_columns:
-            db.session.execute(db.text("ALTER TABLE deposit_request ADD COLUMN proof_image VARCHAR(500) DEFAULT ''"))
+            db.session.execute(db.text("ALTER TABLE deposit_request ADD COLUMN proof_image TEXT DEFAULT ''"))
+        elif db.engine.dialect.name == 'postgresql':
+            db.session.execute(db.text("ALTER TABLE deposit_request ALTER COLUMN proof_image TYPE TEXT"))
         if 'payment_method_name' not in deposit_columns:
             db.session.execute(db.text("ALTER TABLE deposit_request ADD COLUMN payment_method_name VARCHAR(120) DEFAULT ''"))
         db.session.commit()

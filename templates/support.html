@@ -6,7 +6,7 @@
     <h1 class="text-lg font-black text-white">تواصل مع الدعم</h1>
     <p class="mt-2 text-xs leading-6 text-gray-400">اكتب مشكلتك أو استفسارك، وسيتمكن فريق أوج ميديا من الرد عليك هنا داخل الموقع.</p>
   </div>
-  {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="rounded-xl border p-3 text-xs font-bold {% if category == 'success' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300{% else %}border-rose-500/30 bg-rose-500/10 text-rose-300{% endif %}">{{ message }}</div>{% endfor %}{% endwith %}
+  
   <form method="POST" class="space-y-3 rounded-3xl border border-gray-800 bg-gray-900 p-5">
     <h2 class="text-sm font-black text-white">إرسال شكوى أو استفسار جديد</h2>
     <input name="subject" maxlength="160" placeholder="عنوان المشكلة (مثلاً: مشكلة في الطلب)" class="w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 text-sm text-white" />

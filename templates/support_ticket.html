@@ -3,7 +3,7 @@
 {% block content %}
 <div class="mx-auto max-w-3xl space-y-4 px-4 py-6">
   <div class="flex items-center justify-between gap-3 rounded-3xl border border-gray-800 bg-gray-900 p-4"><div><h1 class="text-base font-black text-white">{{ ticket.subject }}</h1><p class="mt-1 text-[10px] text-gray-500">محادثة #{{ ticket.id }} · {{ ticket.user.full_name or ticket.user.username }}</p></div><span class="rounded-lg bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-300">{{ ticket.status }}</span></div>
-  {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="rounded-xl border p-3 text-xs font-bold {% if category == 'success' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300{% else %}border-rose-500/30 bg-rose-500/10 text-rose-300{% endif %}">{{ message }}</div>{% endfor %}{% endwith %}
+  
   <div class="space-y-3 rounded-3xl border border-gray-800 bg-gray-950 p-4">
     {% for msg in ticket.messages %}
     <div class="flex {% if msg.sender_role == 'admin' %}justify-start{% else %}justify-end{% endif %}"><div class="max-w-[90%] rounded-2xl border p-3 {% if msg.sender_role == 'admin' %}border-emerald-500/20 bg-emerald-950/40{% else %}border-cyan-500/20 bg-cyan-950/40{% endif %}"><div class="mb-2 flex items-center gap-2"><span class="text-[10px] font-black {% if msg.sender_role == 'admin' %}text-emerald-300{% else %}text-cyan-300{% endif %}">{% if msg.sender_role == 'admin' %}الدعم الفني{% else %}{{ msg.sender.full_name or msg.sender.username }}{% endif %}</span><span class="text-[9px] text-gray-500">{{ msg.created_at.strftime('%Y-%m-%d %H:%M') if msg.created_at else '' }}</span></div><p class="whitespace-pre-wrap break-words text-xs leading-6 text-gray-200">{{ msg.content }}</p></div></div>

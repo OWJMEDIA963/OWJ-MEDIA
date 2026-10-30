@@ -8,6 +8,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Cairo', sans-serif; background-color: #0b0f19; color: #f3f4f6; touch-action: manipulation; }
+
+        /* Global flash toasts */
+        #owjToastStack{position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:120;display:flex;flex-direction:column;gap:.65rem;width:min(92vw,440px);pointer-events:none}
+        .owj-toast{pointer-events:auto;display:flex;align-items:flex-start;gap:.7rem;padding:.9rem 1rem;border-radius:1rem;border:1px solid;box-shadow:0 16px 45px rgba(0,0,0,.32);backdrop-filter:blur(14px);animation:owjToastIn .42s cubic-bezier(.2,.8,.2,1) both;transition:opacity .3s,transform .3s}
+        .owj-toast.success{background:rgba(6,78,59,.96);border-color:rgba(52,211,153,.55);color:#d1fae5}
+        .owj-toast.error{background:rgba(136,19,55,.97);border-color:rgba(251,113,133,.6);color:#ffe4e6}
+        .owj-toast.warning{background:rgba(120,53,15,.97);border-color:rgba(251,191,36,.6);color:#fef3c7}
+        .owj-toast.info{background:rgba(30,41,59,.97);border-color:rgba(148,163,184,.5);color:#f1f5f9}
+        .owj-toast.hide{opacity:0;transform:translateY(-18px)}
+        @keyframes owjToastIn{from{opacity:0;transform:translateY(-28px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+
         #sidebarMenu {
             position: fixed; top: 0; right: 0; bottom: 0; width: 320px; max-width: 88%;
             background-color: #030712; border-left: 1px solid #1f2937; z-index: 60;
@@ -122,6 +133,21 @@
     </header>
 
     <main class="flex-1">{% block content %}{% endblock %}</main>
+    {% with toast_messages = get_flashed_messages(with_categories=true) %}
+      {% if toast_messages %}<div id="owjToastStack" aria-live="polite" aria-atomic="false">
+        {% for category, message in toast_messages %}
+          {% set tone = 'success' if category == 'success' else ('warning' if category in ['warning','warn'] else ('info' if category in ['info','message'] else 'error')) %}
+          <div class="owj-toast {{ tone }}" role="status">
+            <span class="text-lg leading-5">{% if tone == 'success' %}✓{% elif tone == 'warning' %}⚠{% elif tone == 'info' %}ⓘ{% else %}✕{% endif %}</span>
+            <p class="flex-1 text-xs sm:text-sm font-bold leading-6">{{ message }}</p>
+            <button type="button" class="owj-toast-close rounded-lg px-2 text-lg leading-5 opacity-80 hover:opacity-100" aria-label="إغلاق التنبيه">×</button>
+          </div>
+        {% endfor %}
+      </div>{% endif %}
+    {% endwith %}
+    <script>
+    (()=>{const stack=document.getElementById('owjToastStack');if(!stack)return;stack.querySelectorAll('.owj-toast').forEach(toast=>{let timer=setTimeout(close,5200);function close(){clearTimeout(timer);toast.classList.add('hide');setTimeout(()=>toast.remove(),320);}toast.querySelector('.owj-toast-close')?.addEventListener('click',close);});})();
+    </script>
 
     <!-- شريط التنقل السفلي -->
     <nav class="fixed bottom-0 left-0 right-0 bg-gray-950/95 border-t border-gray-800/80 backdrop-blur-lg z-40 py-2.5 px-4 shadow-2xl">

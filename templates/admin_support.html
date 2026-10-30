@@ -3,7 +3,7 @@
 {% block content %}
 <div class="mx-auto max-w-4xl space-y-5 px-4 py-6">
   <div class="flex items-center justify-between gap-3 rounded-3xl border border-amber-500/20 bg-gray-900 p-5"><div><h1 class="text-lg font-black text-white">الشكاوى ورسائل الدعم</h1><p class="mt-1 text-xs text-gray-400">افتح أي محادثة لقراءة رسالة المستخدم والرد عليه.</p></div><span class="rounded-xl bg-amber-500/10 px-3 py-2 text-xs font-black text-amber-300">{{ tickets|length }} محادثة</span></div>
-  {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="rounded-xl border p-3 text-xs font-bold {% if category == 'success' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300{% else %}border-rose-500/30 bg-rose-500/10 text-rose-300{% endif %}">{{ message }}</div>{% endfor %}{% endwith %}
+  
   <div class="space-y-3">
     {% for ticket in tickets %}
     <a href="{{ url_for('admin_support_ticket', ticket_id=ticket.id) }}" class="block rounded-2xl border border-gray-800 bg-gray-900 p-4 hover:border-cyan-500/40">

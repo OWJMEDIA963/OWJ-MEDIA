@@ -20,15 +20,7 @@
         <a href="/admin/support" class="bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-2xl text-xs font-black text-center">الشكاوى ورسائل الدعم</a>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="p-4 rounded-2xl text-xs font-bold {% if category == 'success' %} bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 {% else %} bg-rose-500/10 text-rose-400 border border-rose-500/30 {% endif %}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+
 
     <!-- طلبات شحن المحفظة والتحويلات -->
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
@@ -42,7 +34,7 @@
                     <span class="rounded-lg px-2 py-1 {% if dep.status == 'مقبول' %}bg-emerald-500/15 text-emerald-300{% elif dep.status == 'مرفوض' %}bg-rose-500/15 text-rose-300{% else %}bg-amber-500/15 text-amber-300{% endif %}">{{ dep.status }}</span>
                 </div>
                 <p class="text-xs text-gray-300">المبلغ: <b class="text-cyan-300">${{ dep.amount|money }}</b>{% if dep.payment_method_name %} | طريقة الدفع: <b class="text-cyan-300">{{ dep.payment_method_name }}</b>{% endif %} | المستخدم ID: {{ dep.user_id }} | التاريخ: {{ dep.created_at.strftime('%Y-%m-%d %H:%M') if dep.created_at else '-' }}</p>
-                {% if dep.proof %}<p class="text-xs text-gray-400 break-words">رقم العملية / تفاصيل التحويل: {{ dep.proof }}</p>{% endif %}{% if dep.proof_image %}<div class="space-y-2"><p class="text-xs font-bold text-cyan-300">صورة إشعار الحوالة:</p><a href="{{ dep.proof_image }}" target="_blank" rel="noopener"><img src="{{ dep.proof_image }}" alt="إشعار حوالة طلب {{ dep.id }}" loading="lazy" class="max-h-72 max-w-full rounded-xl border border-gray-700 object-contain"></a></div>{% endif %}{% if not dep.proof and not dep.proof_image %}<p class="text-xs text-gray-500">لم يضف المستخدم إثباتاً.</p>{% endif %}
+                {% if dep.proof %}<p class="text-xs text-gray-400 break-words">رقم العملية / تفاصيل التحويل: {{ dep.proof }}</p>{% endif %}{% if dep.proof_image %}<div class="space-y-2"><p class="text-xs font-bold text-cyan-300">صورة إشعار الحوالة:</p><a href="{{ dep.proof_image }}" target="_blank" rel="noopener" class="inline-flex flex-col gap-2"><img src="{{ dep.proof_image }}" alt="إشعار حوالة طلب {{ dep.id }}" loading="lazy" class="max-h-72 max-w-full rounded-xl border border-gray-700 bg-white object-contain"><span class="text-xs text-cyan-300 underline">فتح صورة الإشعار بالحجم الكامل</span></a></div>{% endif %}{% if not dep.proof_image %}<p class="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">لم تصل صورة إشعار الحوالة مع هذا الطلب. اطلب من المستخدم إعادة إرسالها.</p>{% endif %}
                 {% if dep.status == 'مرفوض' and dep.rejection_reason %}<p class="rounded-xl border border-rose-500/30 bg-rose-950/30 p-3 text-xs text-rose-300">سبب الرفض: {{ dep.rejection_reason }}</p>{% endif %}
                 {% if dep.status == 'قيد المراجعة' %}
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-gray-800">

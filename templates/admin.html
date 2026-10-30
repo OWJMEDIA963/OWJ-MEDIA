@@ -41,7 +41,7 @@
                     <strong class="text-white">طلب #{{ dep.id }} — {{ dep.user.username if dep.user else 'مستخدم محذوف' }}</strong>
                     <span class="rounded-lg px-2 py-1 {% if dep.status == 'مقبول' %}bg-emerald-500/15 text-emerald-300{% elif dep.status == 'مرفوض' %}bg-rose-500/15 text-rose-300{% else %}bg-amber-500/15 text-amber-300{% endif %}">{{ dep.status }}</span>
                 </div>
-                <p class="text-xs text-gray-300">المبلغ: <b class="text-cyan-300">${{ '%.2f'|format(dep.amount) }}</b>{% if dep.payment_method_name %} | طريقة الدفع: <b class="text-cyan-300">{{ dep.payment_method_name }}</b>{% endif %} | المستخدم ID: {{ dep.user_id }} | التاريخ: {{ dep.created_at.strftime('%Y-%m-%d %H:%M') if dep.created_at else '-' }}</p>
+                <p class="text-xs text-gray-300">المبلغ: <b class="text-cyan-300">${{ dep.amount|money }}</b>{% if dep.payment_method_name %} | طريقة الدفع: <b class="text-cyan-300">{{ dep.payment_method_name }}</b>{% endif %} | المستخدم ID: {{ dep.user_id }} | التاريخ: {{ dep.created_at.strftime('%Y-%m-%d %H:%M') if dep.created_at else '-' }}</p>
                 {% if dep.proof %}<p class="text-xs text-gray-400 break-words">رقم العملية / تفاصيل التحويل: {{ dep.proof }}</p>{% endif %}{% if dep.proof_image %}<div class="space-y-2"><p class="text-xs font-bold text-cyan-300">صورة إشعار الحوالة:</p><a href="{{ dep.proof_image }}" target="_blank" rel="noopener"><img src="{{ dep.proof_image }}" alt="إشعار حوالة طلب {{ dep.id }}" loading="lazy" class="max-h-72 max-w-full rounded-xl border border-gray-700 object-contain"></a></div>{% endif %}{% if not dep.proof and not dep.proof_image %}<p class="text-xs text-gray-500">لم يضف المستخدم إثباتاً.</p>{% endif %}
                 {% if dep.status == 'مرفوض' and dep.rejection_reason %}<p class="rounded-xl border border-rose-500/30 bg-rose-950/30 p-3 text-xs text-rose-300">سبب الرفض: {{ dep.rejection_reason }}</p>{% endif %}
                 {% if dep.status == 'قيد المراجعة' %}
@@ -66,7 +66,7 @@
                     <div class="space-y-1 text-xs text-gray-300">
                         <p class="font-bold text-white">الخدمة: {{ ord.service_name }} (#{{ ord.id }})</p>
                         <p>المطلوب/الرابط: <a href="{{ ord.link }}" target="_blank" class="text-cyan-400 underline">{{ ord.link }}</a></p>
-                        <p>الكمية: {{ ord.quantity }} | التكلفة: ${{ "%.2f"|format(ord.total_price) }}</p>
+                        <p>الكمية: {{ ord.quantity }} | التكلفة: ${{ ord.total_price|money }}</p>
                         <p>الحالة: <span class="px-2 py-0.5 rounded-lg text-[10px] {% if ord.status == 'مكتمل' %} bg-emerald-500/20 text-emerald-400 {% else %} bg-amber-500/20 text-amber-400 {% endif %}">{{ ord.status }}</span></p>
                     </div>
                     {% if ord.status != 'مكتمل' %}

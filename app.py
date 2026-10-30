@@ -12,6 +12,17 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-this-secret-key-
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///owj_media.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+
+
+def format_money(value):
+    try:
+        number = float(value or 0)
+    except (TypeError, ValueError):
+        number = 0.0
+    return f"{number:.2f}".rstrip('0').rstrip('.')
+
+
+app.jinja_env.filters['money'] = format_money
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
 
@@ -605,9 +616,9 @@ def handle_deposit(deposit_id):
         user.balance_usd = (user.balance_usd or 0) + (deposit.amount or 0)
         deposit.status = 'مقبول'
         deposit.rejection_reason = ''
-        send_user_notification(user.id, 'تم شحن محفظتك', f'تمت الموافقة على طلب الشحن وإضافة ${deposit.amount:.2f} إلى حسابك.', url_for('deposit'))
+        send_user_notification(user.id, 'تم شحن محفظتك', f'تمت الموافقة على طلب الشحن وإضافة ${format_money(deposit.amount)} إلى حسابك.', url_for('deposit'))
         db.session.commit()
-        flash(f'تم قبول طلب الشحن #{deposit.id} وإضافة ${deposit.amount:.2f} إلى المحفظة.', 'success')
+        flash(f'تم قبول طلب الشحن #{deposit.id} وإضافة ${format_money(deposit.amount)} إلى المحفظة.', 'success')
     elif action == 'reject':
         reason = request.form.get('reject_reason', '').strip()
         if not reason:

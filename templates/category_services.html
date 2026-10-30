@@ -34,7 +34,7 @@
             </div>
             <div class="owj-service-content">
                 <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
-                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">${{ "%.2f"|format(service.price_per_1000 or service.price if service.service_type in ['smm', 'manual_quantity'] else service.price) }}</p>
+                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">${{ (service.price_per_1000 or service.price if service.service_type in ['smm', 'manual_quantity'] else service.price)|money }}</p>
                 {% if service.is_available %}
                 <span class="text-[8px] sm:text-[9px] text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded-full border border-emerald-500/30">متوفرة</span>
                 {% else %}
@@ -131,10 +131,10 @@
             quantityInput.min = String(currentMinQuantity);
             quantityInput.max = String(currentMaxQuantity);
             quantityInput.value = currentMinQuantity;
-            document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * Number(quantityInput.value)).toFixed(2);
+            document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * Number(quantityInput.value)).toFixed(2).replace(/\.?0+$/,'');
         } else {
             qtyContainer.classList.add('hidden');
-            document.getElementById('modalTotal').textContent = '$' + currentPrice.toFixed(2);
+            document.getElementById('modalTotal').textContent = '$' + currentPrice.toFixed(2).replace(/\.?0+$/,'');
         }
         document.getElementById('orderModal').classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
@@ -185,7 +185,7 @@
     function calcTotal() {
         if (currentType === 'smm' || currentType === 'manual_quantity') {
             const qty = Number.parseFloat(document.getElementById('modalQuantity').value) || 0;
-            document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * qty).toFixed(2);
+            document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * qty).toFixed(2).replace(/\.?0+$/,'');
         }
     }
 

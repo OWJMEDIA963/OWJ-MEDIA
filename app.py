@@ -120,6 +120,7 @@ class DepositRequest(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     amount = db.Column(db.Float, default=0)
     proof = db.Column(db.String(500), default='')
+    proof_image = db.Column(db.String(500), default='')
     status = db.Column(db.String(30), default='قيد المراجعة')
     rejection_reason = db.Column(db.String(500), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -393,8 +394,20 @@ def deposit():
         if amount <= 0:
             flash('أدخل مبلغاً صحيحاً.', 'error')
         else:
-            db.session.add(DepositRequest(user_id=current_user().id, amount=amount, proof=request.form.get('proof','').strip()))
-            db.session.commit(); flash('تم إرسال طلب الشحن للمراجعة.', 'success'); return redirect(url_for('deposit'))
+            try:
+                proof_image = save_uploaded_image('proof_image')
+            except ValueError as exc:
+                flash(str(exc), 'error')
+                return redirect(url_for('deposit'))
+            db.session.add(DepositRequest(
+                user_id=current_user().id,
+                amount=amount,
+                proof=request.form.get('proof', '').strip(),
+                proof_image=proof_image
+            ))
+            db.session.commit()
+            flash('تم إرسال طلب الشحن للمراجعة.', 'success')
+            return redirect(url_for('deposit'))
     user = current_user() if session.get('user_id') else None
     my_deposits = DepositRequest.query.filter_by(user_id=user.id).order_by(DepositRequest.id.desc()).all() if user else []
     return render_template('deposit.html', payments=payments, my_deposits=my_deposits)
@@ -925,6 +938,8 @@ with app.app_context():
         deposit_columns = {column['name'] for column in inspect(db.engine).get_columns('deposit_request')}
         if 'rejection_reason' not in deposit_columns:
             db.session.execute(db.text("ALTER TABLE deposit_request ADD COLUMN rejection_reason VARCHAR(500) DEFAULT ''"))
+        if 'proof_image' not in deposit_columns:
+            db.session.execute(db.text("ALTER TABLE deposit_request ADD COLUMN proof_image VARCHAR(500) DEFAULT ''"))
         db.session.commit()
     except Exception:
         db.session.rollback()

@@ -56,7 +56,7 @@
         {% else %}<p class="py-3 text-center text-xs text-gray-500">لا توجد طلبات شحن حتى الآن.</p>{% endif %}
     </section>
 
-    <!-- الطلبات اليدوية والواردة للموقع -->
+
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">الطلبات اليدوية والواردة للموقع</h2>
         {% if orders %}
@@ -117,7 +117,7 @@
         {% endif %}
     </div>
 
-    <!-- إرسال رصيد أو مكافأة عبر (ID المستخدم) -->
+  
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إرسال رصيد أو مكافأة عبر (ID المستخدم)</h2>
         <form action="/admin/send_balance" method="POST" class="space-y-3">
@@ -127,7 +127,7 @@
         </form>
     </div>
 
-    <!-- إدارة حسابات التجار -->
+   
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إدارة حسابات التجار</h2>
         <form action="/admin/add_merchant" method="POST" class="space-y-3">
@@ -138,7 +138,7 @@
         </form>
     </div>
 
-    <!-- إضافة طريقة دفع / باركود تحويل للزبائن مع رقم قابل للنسخ -->
+   
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إضافة طريقة دفع / باركود ورقم قابل للنسخ</h2>
         <form action="/admin/add_payment" method="POST" class="space-y-3">
@@ -150,8 +150,7 @@
         </form>
     </div>
 
-    <!-- إدارة الوكلاء المعتمدين مع رقم واتساب ورابط محادثة مباشرة -->
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إدارة الوكلاء المعتمدين (مع زر واتساب)</h2>
         <form action="/admin/add_agent" method="POST" class="space-y-3">
             <input type="text" name="name" placeholder="اسم الوكيل / المحل" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
@@ -162,7 +161,7 @@
         </form>
     </div>
 
-    <!-- حذف قسم أو خدمة -->
+   
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">حذف قسم أو خدمة</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -189,7 +188,7 @@
         </div>
     </div>
 
-    <!-- مزودو SMM API -->
+    
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إعدادات مزوّدي SMM API</h2>
         <p class="text-xs text-gray-400 leading-6">أضف رابط API ومفتاحه من لوحة مزوّد SMM الذي تملك حساباً لديه. المفتاح يُحفظ في قاعدة بيانات الموقع ولا يظهر للزوار.</p>
@@ -211,7 +210,7 @@
         {% endif %}
     </section>
 
-    <!-- إضافة خدمة مع رابط صورة القسم وصورة المنتج -->
+   
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إضافة وتعديل الخدمات وتخصيص حقول الإدخال</h2>
         <form action="/admin/add_service" method="POST" enctype="multipart/form-data" class="space-y-3">
@@ -257,7 +256,7 @@
         </form>
     </div>
 
-    <!-- تعديل المنتجات الحالية وتغيير التوفر -->
+   
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-5 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">تعديل المنتجات وتغيير التوفر</h2>
         <p class="text-[11px] text-gray-400">يمكنك تعديل السعر والحدود والوصف ونوع المنتج، أو إيقافه مؤقتاً ليظهر للزبون كغير متوفر.</p>

@@ -115,6 +115,17 @@ class PaymentMethod(db.Model):
     account_number = db.Column(db.String(180), default='')
     instructions = db.Column(db.Text, default='')
 
+class SMSNumberProvider(db.Model):
+    __tablename__ = 'sms_number_provider'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    api_url = db.Column(db.String(500), nullable=False)
+    api_key = db.Column(db.Text, nullable=False)
+    protocol = db.Column(db.String(40), default='generic')
+    notes = db.Column(db.Text, default='')
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class DepositRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -123,6 +134,7 @@ class DepositRequest(db.Model):
     proof_image = db.Column(db.String(500), default='')
     status = db.Column(db.String(30), default='قيد المراجعة')
     rejection_reason = db.Column(db.String(500), default='')
+    payment_method_name = db.Column(db.String(120), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('User')
 
@@ -394,6 +406,11 @@ def deposit():
         if amount <= 0:
             flash('أدخل مبلغاً صحيحاً.', 'error')
         else:
+            payment_id = request.form.get('payment_method_id', type=int)
+            selected_payment = PaymentMethod.query.get(payment_id) if payment_id else None
+            if not selected_payment:
+                flash('اختر طريقة الدفع المناسبة قبل إرسال الطلب.', 'error')
+                return redirect(url_for('deposit'))
             try:
                 proof_image = save_uploaded_image('proof_image')
             except ValueError as exc:
@@ -403,7 +420,8 @@ def deposit():
                 user_id=current_user().id,
                 amount=amount,
                 proof=request.form.get('proof', '').strip(),
-                proof_image=proof_image
+                proof_image=proof_image,
+                payment_method_name=selected_payment.name
             ))
             db.session.commit()
             flash('تم إرسال طلب الشحن للمراجعة.', 'success')
@@ -568,7 +586,7 @@ def service_worker():
 @app.route('/admin')
 @admin_required
 def admin():
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count())
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count())
 
 
 @app.route('/admin/handle_deposit/<int:deposit_id>', methods=['POST'])
@@ -642,7 +660,46 @@ def add_merchant():
 @app.route('/admin/add_payment', methods=['POST'])
 @admin_required
 def add_payment():
-    db.session.add(PaymentMethod(name=request.form.get('name','').strip(), qr_code_url=request.form.get('qr_code_url','').strip(), account_number=request.form.get('account_number','').strip(), instructions=request.form.get('instructions','').strip())); db.session.commit(); flash('تمت إضافة طريقة الدفع.', 'success'); return redirect(url_for('admin'))
+    name = request.form.get('name','').strip()
+    if not name:
+        flash('اكتب اسم طريقة الدفع.', 'error')
+    else:
+        db.session.add(PaymentMethod(name=name, qr_code_url=request.form.get('qr_code_url','').strip(), account_number=request.form.get('account_number','').strip(), instructions=request.form.get('instructions','').strip()))
+        db.session.commit(); flash('تمت إضافة طريقة الدفع.', 'success')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/delete_payment/<int:payment_id>', methods=['POST'])
+@admin_required
+def delete_payment(payment_id):
+    payment = PaymentMethod.query.get_or_404(payment_id)
+    db.session.delete(payment)
+    db.session.commit()
+    flash('تم حذف طريقة الدفع.', 'success')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/add_sms_number_provider', methods=['POST'])
+@admin_required
+def add_sms_number_provider():
+    name = request.form.get('name', '').strip()
+    api_url = request.form.get('api_url', '').strip()
+    api_key = request.form.get('api_key', '').strip()
+    protocol = request.form.get('protocol', 'generic').strip()
+    if not name or not api_url.startswith(('https://', 'http://')) or not api_key:
+        flash('أدخل اسم مزوّد الأرقام ورابط API ومفتاح API بشكل صحيح.', 'error')
+    else:
+        db.session.add(SMSNumberProvider(name=name, api_url=api_url, api_key=api_key, protocol=protocol, notes=request.form.get('notes', '').strip()))
+        db.session.commit()
+        flash('تم حفظ إعدادات مزوّد الأرقام. تفعيل الشراء واستلام SMS يتطلب ضبط توافق API الخاص بالمزوّد.', 'success')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/delete_sms_number_provider/<int:provider_id>', methods=['POST'])
+@admin_required
+def delete_sms_number_provider(provider_id):
+    provider = SMSNumberProvider.query.get_or_404(provider_id)
+    db.session.delete(provider)
+    db.session.commit()
+    flash('تم حذف إعدادات مزوّد الأرقام.', 'success')
+    return redirect(url_for('admin'))
 
 @app.route('/admin/add_agent', methods=['POST'])
 @admin_required
@@ -940,6 +997,8 @@ with app.app_context():
             db.session.execute(db.text("ALTER TABLE deposit_request ADD COLUMN rejection_reason VARCHAR(500) DEFAULT ''"))
         if 'proof_image' not in deposit_columns:
             db.session.execute(db.text("ALTER TABLE deposit_request ADD COLUMN proof_image VARCHAR(500) DEFAULT ''"))
+        if 'payment_method_name' not in deposit_columns:
+            db.session.execute(db.text("ALTER TABLE deposit_request ADD COLUMN payment_method_name VARCHAR(120) DEFAULT ''"))
         db.session.commit()
     except Exception:
         db.session.rollback()

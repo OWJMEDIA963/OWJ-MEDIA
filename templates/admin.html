@@ -41,7 +41,7 @@
                     <strong class="text-white">طلب #{{ dep.id }} — {{ dep.user.username if dep.user else 'مستخدم محذوف' }}</strong>
                     <span class="rounded-lg px-2 py-1 {% if dep.status == 'مقبول' %}bg-emerald-500/15 text-emerald-300{% elif dep.status == 'مرفوض' %}bg-rose-500/15 text-rose-300{% else %}bg-amber-500/15 text-amber-300{% endif %}">{{ dep.status }}</span>
                 </div>
-                <p class="text-xs text-gray-300">المبلغ: <b class="text-cyan-300">${{ '%.2f'|format(dep.amount) }}</b> | المستخدم ID: {{ dep.user_id }} | التاريخ: {{ dep.created_at.strftime('%Y-%m-%d %H:%M') if dep.created_at else '-' }}</p>
+                <p class="text-xs text-gray-300">المبلغ: <b class="text-cyan-300">${{ '%.2f'|format(dep.amount) }}</b>{% if dep.payment_method_name %} | طريقة الدفع: <b class="text-cyan-300">{{ dep.payment_method_name }}</b>{% endif %} | المستخدم ID: {{ dep.user_id }} | التاريخ: {{ dep.created_at.strftime('%Y-%m-%d %H:%M') if dep.created_at else '-' }}</p>
                 {% if dep.proof %}<p class="text-xs text-gray-400 break-words">رقم العملية / تفاصيل التحويل: {{ dep.proof }}</p>{% endif %}{% if dep.proof_image %}<div class="space-y-2"><p class="text-xs font-bold text-cyan-300">صورة إشعار الحوالة:</p><a href="{{ dep.proof_image }}" target="_blank" rel="noopener"><img src="{{ dep.proof_image }}" alt="إشعار حوالة طلب {{ dep.id }}" loading="lazy" class="max-h-72 max-w-full rounded-xl border border-gray-700 object-contain"></a></div>{% endif %}{% if not dep.proof and not dep.proof_image %}<p class="text-xs text-gray-500">لم يضف المستخدم إثباتاً.</p>{% endif %}
                 {% if dep.status == 'مرفوض' and dep.rejection_reason %}<p class="rounded-xl border border-rose-500/30 bg-rose-950/30 p-3 text-xs text-rose-300">سبب الرفض: {{ dep.rejection_reason }}</p>{% endif %}
                 {% if dep.status == 'قيد المراجعة' %}
@@ -56,7 +56,7 @@
         {% else %}<p class="py-3 text-center text-xs text-gray-500">لا توجد طلبات شحن حتى الآن.</p>{% endif %}
     </section>
 
-
+    <!-- الطلبات اليدوية والواردة للموقع -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">الطلبات اليدوية والواردة للموقع</h2>
         {% if orders %}
@@ -117,7 +117,7 @@
         {% endif %}
     </div>
 
-  
+    <!-- إرسال رصيد أو مكافأة عبر (ID المستخدم) -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إرسال رصيد أو مكافأة عبر (ID المستخدم)</h2>
         <form action="/admin/send_balance" method="POST" class="space-y-3">
@@ -127,7 +127,7 @@
         </form>
     </div>
 
-   
+    <!-- إدارة حسابات التجار -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إدارة حسابات التجار</h2>
         <form action="/admin/add_merchant" method="POST" class="space-y-3">
@@ -138,7 +138,7 @@
         </form>
     </div>
 
-   
+    <!-- إضافة طريقة دفع / باركود تحويل للزبائن مع رقم قابل للنسخ -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إضافة طريقة دفع / باركود ورقم قابل للنسخ</h2>
         <form action="/admin/add_payment" method="POST" class="space-y-3">
@@ -148,9 +148,34 @@
             <textarea name="instructions" placeholder="تعليمات التحويل..." rows="2" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none"></textarea>
             <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-2xl text-xs">حفظ وإضافة طريقة الدفع</button>
         </form>
+        <div class="border-t border-gray-800 pt-4 space-y-2">
+            <h3 class="text-xs font-black text-white">طرق الدفع المضافة — حذف طريقة</h3>
+            {% for payment in payment_methods %}
+            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950 p-3">
+                <span class="text-xs text-gray-200">{{ payment.name }}</span>
+                <form action="/admin/delete_payment/{{ payment.id }}" method="POST" onsubmit="return confirm('هل تريد حذف طريقة الدفع: {{ payment.name|e }}؟')"><button class="rounded-lg bg-rose-600 px-3 py-2 text-[11px] font-black text-white">حذف</button></form>
+            </div>
+            {% else %}<p class="text-xs text-gray-500">لا توجد طرق دفع مضافة.</p>{% endfor %}
+        </div>
     </div>
 
-     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+    <!-- إعداد ربط مزود أرقام SMS -->
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <h2 class="text-sm font-black text-white">إعداد ربط مزوّد الأرقام الوهمية عبر API</h2>
+        <p class="text-xs leading-6 text-amber-300">احفظ بيانات مزوّد الأرقام هنا لتجهيز الربط. شراء الرقم واستقبال كود SMS يحتاجان توافقاً مع توثيق API الخاص بالموقع الذي ستختاره.</p>
+        <form action="/admin/add_sms_number_provider" method="POST" class="space-y-3">
+            <input name="name" required placeholder="اسم موقع مزوّد الأرقام" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
+            <input name="api_url" type="url" required placeholder="رابط API الأساسي https://..." class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
+            <input name="api_key" type="password" required placeholder="API Token / Key" autocomplete="new-password" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
+            <select name="protocol" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="generic">API مخصص / غير محدد</option><option value="5sim">5sim</option><option value="smm">SMM API</option></select>
+            <textarea name="notes" rows="2" placeholder="ملاحظات أو رابط توثيق API (اختياري)" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"></textarea>
+            <button class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-2xl text-xs">حفظ إعدادات مزوّد الأرقام</button>
+        </form>
+        <div class="space-y-2">{% for provider in sms_number_providers %}<div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-800 bg-gray-950 p-3"><div class="min-w-0"><p class="text-xs font-bold text-white">{{ provider.name }}</p><p class="break-all text-[10px] text-gray-500">{{ provider.api_url }} · {{ provider.protocol }}</p><p class="text-[10px] text-amber-300">إعدادات محفوظة — بانتظار توصيل عمليات API</p></div><form action="/admin/delete_sms_number_provider/{{ provider.id }}" method="POST" onsubmit="return confirm('حذف إعدادات مزوّد الأرقام؟')"><button class="rounded-lg bg-rose-600 px-3 py-2 text-[11px] font-black text-white">حذف</button></form></div>{% else %}<p class="text-xs text-gray-500">لم تتم إضافة مزوّد أرقام بعد.</p>{% endfor %}</div>
+    </div>
+
+    <!-- إدارة الوكلاء المعتمدين مع رقم واتساب ورابط محادثة مباشرة -->
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إدارة الوكلاء المعتمدين (مع زر واتساب)</h2>
         <form action="/admin/add_agent" method="POST" class="space-y-3">
             <input type="text" name="name" placeholder="اسم الوكيل / المحل" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
@@ -161,7 +186,7 @@
         </form>
     </div>
 
-   
+    <!-- حذف قسم أو خدمة -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">حذف قسم أو خدمة</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -188,7 +213,7 @@
         </div>
     </div>
 
-    
+    <!-- مزودو SMM API -->
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إعدادات مزوّدي SMM API</h2>
         <p class="text-xs text-gray-400 leading-6">أضف رابط API ومفتاحه من لوحة مزوّد SMM الذي تملك حساباً لديه. المفتاح يُحفظ في قاعدة بيانات الموقع ولا يظهر للزوار.</p>
@@ -210,7 +235,7 @@
         {% endif %}
     </section>
 
-   
+    <!-- إضافة خدمة مع رابط صورة القسم وصورة المنتج -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إضافة وتعديل الخدمات وتخصيص حقول الإدخال</h2>
         <form action="/admin/add_service" method="POST" enctype="multipart/form-data" class="space-y-3">
@@ -256,7 +281,7 @@
         </form>
     </div>
 
-   
+    <!-- تعديل المنتجات الحالية وتغيير التوفر -->
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-5 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">تعديل المنتجات وتغيير التوفر</h2>
         <p class="text-[11px] text-gray-400">يمكنك تعديل السعر والحدود والوصف ونوع المنتج، أو إيقافه مؤقتاً ليظهر للزبون كغير متوفر.</p>

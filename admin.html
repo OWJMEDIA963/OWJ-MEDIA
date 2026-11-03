@@ -6,28 +6,47 @@
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl flex items-center justify-between">
         <div>
             <h1 class="text-base font-black text-white mb-1">لوحة التحكم الإدارية</h1>
-            <p class="text-xs text-gray-400">إدارة الطلبات اليدوية، التوثيق، الوكلاء، والخدمات.</p>
+            <p class="text-xs text-gray-400">إدارة الحسابات والطلبات والمحافظ والخدمات والوكلاء والدعم والنسخ الاحتياطي.</p>
         </div>
         <div class="flex flex-col sm:flex-row gap-2">
             <a href="/admin/export_backup" class="bg-cyan-500 hover:bg-cyan-400 text-gray-950 px-4 py-2.5 rounded-2xl text-xs font-black transition shadow text-center">
-                تنزيل نسخة احتياطية (CSV)
+                تنزيل نسخة احتياطية كاملة (CSV)
             </a>
             <form action="/admin/import_backup" method="POST" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-2 rounded-2xl border border-gray-700 bg-gray-950 p-2">
                 <input type="file" name="backup_file" accept=".csv,text/csv" required class="max-w-full text-[10px] text-gray-300 file:mr-2 file:rounded-lg file:border-0 file:bg-gray-800 file:px-3 file:py-2 file:text-white">
-                <button type="submit" onclick="return confirm('سيتم تحديث بيانات الحسابات الموجودة فقط حسب ملف CSV. هل تريد المتابعة؟')" class="bg-amber-400 hover:bg-amber-300 text-gray-950 px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap">استيراد / استعادة CSV</button>
+                <button type="submit" onclick="return confirm('تحذير: ستستبدل هذه العملية بيانات قاعدة الموقع الحالية بالكامل بالبيانات الموجودة في النسخة الاحتياطية، بما فيها الحسابات والأرصدة والطلبات والخدمات والوكلاء والشكاوى. خذ نسخة احتياطية حالية أولاً. هل تريد المتابعة؟')" class="bg-amber-400 hover:bg-amber-300 text-gray-950 px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap">استعادة النسخة الكاملة</button>
             </form>
         </div>
+        <a href="/admin/support" class="bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-2xl text-xs font-black text-center">الشكاوى ورسائل الدعم</a>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="p-4 rounded-2xl text-xs font-bold {% if category == 'success' %} bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 {% else %} bg-rose-500/10 text-rose-400 border border-rose-500/30 {% endif %}">
-                    {{ message }}
+
+
+    <!-- طلبات شحن المحفظة والتحويلات -->
+    <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between gap-3"><h2 class="text-sm font-black text-white">طلبات تحويل وشحن المحفظة</h2><span class="text-[10px] text-amber-300">المعلقة تحتاج مراجعتك</span></div>
+        {% if deposits %}
+        <div class="space-y-3">
+            {% for dep in deposits %}
+            <div class="bg-gray-950 border border-gray-800 rounded-2xl p-4 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <strong class="text-white">طلب #{{ dep.id }} — {{ dep.user.username if dep.user else 'مستخدم محذوف' }}</strong>
+                    <span class="rounded-lg px-2 py-1 {% if dep.status == 'مقبول' %}bg-emerald-500/15 text-emerald-300{% elif dep.status == 'مرفوض' %}bg-rose-500/15 text-rose-300{% else %}bg-amber-500/15 text-amber-300{% endif %}">{{ dep.status }}</span>
                 </div>
+                <p class="text-xs text-gray-300">المبلغ: <b class="text-cyan-300">${{ dep.amount|money }}</b>{% if dep.payment_method_name %} | طريقة الدفع: <b class="text-cyan-300">{{ dep.payment_method_name }}</b>{% endif %} | المستخدم ID: {{ dep.user_id }} | التاريخ: {{ dep.created_at.strftime('%Y-%m-%d %H:%M') if dep.created_at else '-' }}</p>
+                {% if dep.proof %}<p class="text-xs text-gray-400 break-words">رقم العملية / تفاصيل التحويل: {{ dep.proof }}</p>{% endif %}{% if dep.proof_image %}<div class="space-y-2"><p class="text-xs font-bold text-cyan-300">صورة إشعار الحوالة:</p><a href="{{ dep.proof_image }}" target="_blank" rel="noopener" class="inline-flex flex-col gap-2"><img src="{{ dep.proof_image }}" alt="إشعار حوالة طلب {{ dep.id }}" loading="lazy" class="max-h-72 max-w-full rounded-xl border border-gray-700 bg-white object-contain"><span class="text-xs text-cyan-300 underline">فتح صورة الإشعار بالحجم الكامل</span></a></div>{% endif %}{% if not dep.proof_image %}<p class="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">لم تصل صورة إشعار الحوالة مع هذا الطلب. اطلب من المستخدم إعادة إرسالها.</p>{% endif %}
+                {% if dep.status == 'مرفوض' and dep.rejection_reason %}<p class="rounded-xl border border-rose-500/30 bg-rose-950/30 p-3 text-xs text-rose-300">سبب الرفض: {{ dep.rejection_reason }}</p>{% endif %}
+                {% if dep.status == 'قيد المراجعة' %}
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-gray-800">
+                    <form action="{{ url_for('handle_deposit', deposit_id=dep.id) }}" method="post" onsubmit="return confirm('تأكيد قبول التحويل وإضافة المبلغ إلى محفظة المستخدم؟')"><input type="hidden" name="action" value="approve"><button class="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3 py-2.5 text-xs font-black text-white">قبول وإضافة الرصيد</button></form>
+                    <form action="{{ url_for('handle_deposit', deposit_id=dep.id) }}" method="post" class="flex gap-2"><input type="hidden" name="action" value="reject"><input name="reject_reason" required maxlength="500" placeholder="اكتب سبب الرفض للمستخدم" class="min-w-0 flex-1 rounded-xl border border-rose-500/30 bg-gray-900 px-3 py-2 text-xs text-white"><button class="rounded-xl bg-rose-600 hover:bg-rose-500 px-4 py-2 text-xs font-black text-white">رفض</button></form>
+                </div>
+                {% endif %}
+            </div>
             {% endfor %}
-        {% endif %}
-    {% endwith %}
+        </div>
+        {% else %}<p class="py-3 text-center text-xs text-gray-500">لا توجد طلبات شحن قيد المراجعة حالياً.</p>{% endif %}
+    </section>
 
     <!-- الطلبات اليدوية والواردة للموقع -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
@@ -39,7 +58,7 @@
                     <div class="space-y-1 text-xs text-gray-300">
                         <p class="font-bold text-white">الخدمة: {{ ord.service_name }} (#{{ ord.id }})</p>
                         <p>المطلوب/الرابط: <a href="{{ ord.link }}" target="_blank" class="text-cyan-400 underline">{{ ord.link }}</a></p>
-                        <p>الكمية: {{ ord.quantity }} | التكلفة: ${{ "%.2f"|format(ord.total_price) }}</p>
+                        <p>الكمية: {{ ord.quantity }} | التكلفة: ${{ ord.total_price|money }}</p>
                         <p>الحالة: <span class="px-2 py-0.5 rounded-lg text-[10px] {% if ord.status == 'مكتمل' %} bg-emerald-500/20 text-emerald-400 {% else %} bg-amber-500/20 text-amber-400 {% endif %}">{{ ord.status }}</span></p>
                     </div>
                     {% if ord.status != 'مكتمل' %}
@@ -121,6 +140,30 @@
             <textarea name="instructions" placeholder="تعليمات التحويل..." rows="2" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none"></textarea>
             <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-2xl text-xs">حفظ وإضافة طريقة الدفع</button>
         </form>
+        <div class="border-t border-gray-800 pt-4 space-y-2">
+            <h3 class="text-xs font-black text-white">طرق الدفع المضافة — حذف طريقة</h3>
+            {% for payment in payment_methods %}
+            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950 p-3">
+                <span class="text-xs text-gray-200">{{ payment.name }}</span>
+                <form action="/admin/delete_payment/{{ payment.id }}" method="POST" onsubmit="return confirm('هل تريد حذف طريقة الدفع: {{ payment.name|e }}؟')"><button class="rounded-lg bg-rose-600 px-3 py-2 text-[11px] font-black text-white">حذف</button></form>
+            </div>
+            {% else %}<p class="text-xs text-gray-500">لا توجد طرق دفع مضافة.</p>{% endfor %}
+        </div>
+    </div>
+
+    <!-- إعداد ربط مزود أرقام SMS -->
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <h2 class="text-sm font-black text-white">إعداد ربط مزوّد الأرقام الوهمية عبر API</h2>
+        <p class="text-xs leading-6 text-amber-300">احفظ بيانات مزوّد الأرقام هنا لتجهيز الربط. شراء الرقم واستقبال كود SMS يحتاجان توافقاً مع توثيق API الخاص بالموقع الذي ستختاره.</p>
+        <form action="/admin/add_sms_number_provider" method="POST" class="space-y-3">
+            <input name="name" required placeholder="اسم موقع مزوّد الأرقام" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
+            <input name="api_url" type="url" required placeholder="رابط API الأساسي https://..." class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
+            <input name="api_key" type="password" required placeholder="API Token / Key" autocomplete="new-password" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
+            <select name="protocol" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="generic">API مخصص / غير محدد</option><option value="5sim">5sim</option><option value="smm">SMM API</option></select>
+            <textarea name="notes" rows="2" placeholder="ملاحظات أو رابط توثيق API (اختياري)" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"></textarea>
+            <button class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-2xl text-xs">حفظ إعدادات مزوّد الأرقام</button>
+        </form>
+        <div class="space-y-2">{% for provider in sms_number_providers %}<div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-800 bg-gray-950 p-3"><div class="min-w-0"><p class="text-xs font-bold text-white">{{ provider.name }}</p><p class="break-all text-[10px] text-gray-500">{{ provider.api_url }} · {{ provider.protocol }}</p><p class="text-[10px] text-amber-300">إعدادات محفوظة — بانتظار توصيل عمليات API</p></div><form action="/admin/delete_sms_number_provider/{{ provider.id }}" method="POST" onsubmit="return confirm('حذف إعدادات مزوّد الأرقام؟')"><button class="rounded-lg bg-rose-600 px-3 py-2 text-[11px] font-black text-white">حذف</button></form></div>{% else %}<p class="text-xs text-gray-500">لم تتم إضافة مزوّد أرقام بعد.</p>{% endfor %}</div>
     </div>
 
     <!-- إدارة الوكلاء المعتمدين مع رقم واتساب ورابط محادثة مباشرة -->
@@ -192,7 +235,7 @@
             <input type="text" name="category_name" placeholder="القسم الرئيسي" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
             
             <div class="grid grid-cols-3 gap-2">
-                <input type="number" step="0.01" min="0.01" name="price_per_1000" placeholder="السعر الثابت للمنتج اليدوي / لكل 1000 للتلقائي ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
+                <input type="number" step="0.01" min="0.00" name="price_per_1000" placeholder="السعر الثابت أو السعر لكل 1000 ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
                 <input type="number" name="min_quantity" placeholder="الحد الأدنى" value="10" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
                 <input type="number" name="max_quantity" placeholder="الحد الأقصى" value="10000" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
             </div>
@@ -202,10 +245,11 @@
             <div class="space-y-1">
                 <label class="block text-[11px] font-bold text-gray-300">نوع الخدمة</label>
                 <select name="service_type" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
-                    <option value="manual">يدوي / شحن ألعاب</option>
+                    <option value="manual">يدوي بسعر ثابت لكل طلب</option>
+                    <option value="manual_quantity">يدوي بالكمية (سعر لكل 1000 نقطة/عملة)</option>
                     <option value="smm">تلقائي SMM (ربط API)</option>
                 </select>
-                <p class="text-[10px] leading-5 text-gray-500">اليدوي / شحن الألعاب: السعر ثابت لكل طلب ولا يحتاج كمية. التلقائي: السعر لكل 1000 مع حدود كمية.</p>
+                <p class="text-[10px] leading-5 text-gray-500">اليدوي بالكمية مناسب لجواكر والنقاط والعملات: ضع السعر لكل 1000، وحدد الحد الأدنى والأقصى؛ الزبون يختار الكمية ويُحسب السعر تلقائياً، ثم تستلم الطلب وتنفذه يدوياً. اليدوي الثابت يبقى بسعر لكل طلب.</p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label class="block text-[11px] font-bold text-gray-300 mb-1">مزوّد API للخدمة</label>
@@ -223,10 +267,45 @@
             <input type="url" name="category_image_url" placeholder="أو رابط صورة القسم" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
             <p class="text-[11px] text-gray-500">الصور المرفوعة: PNG أو JPG أو WEBP أو GIF، بحد أقصى 5 ميغابايت.</p>
             
+            <label class="block text-[11px] font-bold text-gray-300">حالة المنتج</label><select name="is_available" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="1">متوفر</option><option value="0">غير متوفر</option></select>
             <textarea name="description" placeholder="تفاصيل الخدمة..." rows="2" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none"></textarea>
             <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-2xl text-xs">حفظ وإضافة الخدمة</button>
         </form>
     </div>
+
+    <!-- تعديل المنتجات الحالية وتغيير التوفر -->
+    <section class="bg-gray-900 border border-gray-800 rounded-3xl p-5 shadow-xl space-y-4">
+        <h2 class="text-sm font-black text-white">تعديل المنتجات وتغيير التوفر</h2>
+        <p class="text-[11px] text-gray-400">يمكنك تعديل السعر والحدود والوصف ونوع المنتج، أو إيقافه مؤقتاً ليظهر للزبون كغير متوفر.</p>
+        {% for s in services %}
+        <details class="rounded-2xl border border-gray-800 bg-gray-950 p-3">
+            <summary class="cursor-pointer flex items-center justify-between gap-3 text-xs font-bold text-white"><span>{{ s.name }}</span><span class="text-[10px] {% if s.is_available %}text-emerald-400{% else %}text-rose-400{% endif %}">{% if s.is_available %}متوفر{% else %}غير متوفر{% endif %}</span></summary>
+            <form action="/admin/update_service/{{ s.id }}" method="POST" enctype="multipart/form-data" class="mt-4 space-y-3">
+                <input name="name" value="{{ s.name }}" required placeholder="اسم المنتج" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                <input name="category_name" value="{{ s.category.name }}" required placeholder="القسم" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                <div class="grid grid-cols-3 gap-2">
+                    <input type="number" step="0.01" min="0" name="price_per_1000" value="{{ s.price_per_1000 if s.service_type in ['smm','manual_quantity'] else s.price }}" required placeholder="السعر" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
+                    <input type="number" min="1" name="min_quantity" value="{{ s.min_quantity or 1 }}" required placeholder="الأدنى" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
+                    <input type="number" min="1" name="max_quantity" value="{{ s.max_quantity or 10000 }}" required placeholder="الأقصى" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
+                </div>
+                <select name="service_type" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                    <option value="manual" {% if s.service_type == 'manual' %}selected{% endif %}>يدوي بسعر ثابت لكل طلب</option>
+                    <option value="manual_quantity" {% if s.service_type == 'manual_quantity' %}selected{% endif %}>يدوي بالكمية (لكل 1000)</option>
+                    <option value="smm" {% if s.service_type == 'smm' %}selected{% endif %}>تلقائي SMM عبر API</option>
+                </select>
+                <input name="input_label" value="{{ s.input_label }}" required placeholder="حقل بيانات الزبون" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                <textarea name="description" rows="2" placeholder="الوصف / التنبيه الأحمر" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">{{ s.description or '' }}</textarea>
+                <select name="api_provider_id" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">-- مزوّد API (للتلقائي فقط) --</option>{% for provider in smm_providers %}<option value="{{ provider.id }}" {% if s.api_provider_id == provider.id %}selected{% endif %}>{{ provider.name }}</option>{% endfor %}</select>
+                <input name="api_service_id" value="{{ s.api_service_id or '' }}" placeholder="Service ID لدى مزوّد API" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                <label class="block text-[11px] font-bold text-gray-300">توفّر المنتج</label>
+                <select name="is_available" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="1" {% if s.is_available %}selected{% endif %}>متوفر</option><option value="0" {% if not s.is_available %}selected{% endif %}>غير متوفر</option></select>
+                <label class="block text-[11px] font-bold text-gray-300">تغيير صورة المنتج (اختياري)</label><input type="file" name="image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full text-xs text-gray-300">
+                <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-xl text-xs">حفظ تعديلات {{ s.name }}</button>
+            </form>
+            <form action="/admin/toggle_service/{{ s.id }}" method="POST" class="mt-2"><button type="submit" class="w-full {% if s.is_available %}bg-rose-600{% else %}bg-emerald-600{% endif %} text-white font-bold py-2 rounded-xl text-xs">{% if s.is_available %}إيقاف المنتج وجعله غير متوفر{% else %}إعادة توفير المنتج{% endif %}</button></form>
+        </details>
+        {% else %}<p class="text-xs text-gray-500">لا توجد منتجات بعد.</p>{% endfor %}
+    </section>
 
 </div>
 {% endblock %}

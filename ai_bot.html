@@ -1,49 +1,16 @@
 {% extends "base.html" %}
-{% block title %}المساعد الذكي{% endblock %}
+{% block title %}المساعد الذكي | أوج ميديا{% endblock %}
 {% block content %}
-<div class="max-w-lg mx-auto px-4 py-6 space-y-4">
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl text-center space-y-2">
-        <h1 class="text-base font-black text-white">المساعد الذكي لأوج ميديا</h1>
-        <p class="text-xs text-gray-400">اسأل عن الخدمات، الأسعار، أو طريقة الشحن وسيجيبك النظام فوراً</p>
-    </div>
-
-    <!-- صندوق المحادثة بارتفاع ثابت وتمرير تلقائي للأسفل -->
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl h-80 overflow-y-auto space-y-3 flex flex-col" id="chatBox">
-        <div class="bg-gray-950 border border-gray-800 p-3 rounded-2xl text-xs text-gray-200 max-w-[85%]">
-            أهلاً بك يا {{ user_name }}! كيف يمكنني مساعدتك اليوم في منصة أوج ميديا؟
-        </div>
-    </div>
-
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-3 flex gap-2">
-        <input type="text" id="userInput" placeholder="اكتب رسالتك هنا..." class="flex-1 bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
-        <button onclick="sendMessage()" class="bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black px-5 rounded-2xl text-xs transition">إرسال</button>
-    </div>
+<style>
+.ai-page{max-width:760px;margin:auto;padding:24px 16px 36px}.ai-shell{background:#111126;border:1px solid #51477d;border-radius:28px;overflow:hidden;box-shadow:0 18px 55px rgba(49,30,100,.25)}.ai-head{background:linear-gradient(115deg,#312e81,#6b21a8);padding:22px}.ai-feed{background:radial-gradient(ellipse at top,#24204a,#141329 70%,#101020);height: min(58vh,560px);min-height:340px;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:14px}.ai-msg{max-width:88%;padding:13px 15px;border-radius:18px;line-height:1.9;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.ai-msg.bot{background:#272449;border:1px solid #484078;color:#f1edff;border-top-right-radius:5px}.ai-msg.user{background:linear-gradient(135deg,#6d28d9,#4f46e5);border:1px solid #8b5cf6;color:#fff;border-top-left-radius:5px;align-self:flex-end}.ai-form{background:#17152f;border-top:1px solid #39335f;padding:14px;display:flex;gap:9px}.ai-form input{background:#242143;border:1px solid #51477d;color:white;border-radius:14px;padding:13px;min-width:0;flex:1;font-size:14px}.ai-form button{background:linear-gradient(135deg,#8b5cf6,#6366f1);color:white;border-radius:14px;padding:0 20px;font-weight:900}.ai-quick{background:#30285b;border:1px solid #6d5ca8;color:#ddd6fe;border-radius:12px;padding:9px 12px;font-size:12px}</style>
+<div class="ai-page" dir="rtl">
+ <div class="mb-4 text-center"><div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/40 bg-violet-500/15 text-violet-300 font-black">OWJ</div><h1 class="text-xl font-black text-white">المساعد الذكي لأوج ميديا</h1><p class="mt-2 text-sm text-gray-400">أهلاً {{ user_name }}، اسألنا عن الخدمات والطلبات وشحن المحفظة</p></div>
+ <section class="ai-shell"><header class="ai-head flex items-center justify-between"><div><h2 class="font-black text-white">محادثة الدعم السريع</h2><p class="mt-1 text-xs text-violet-200">متصل وجاهز للمساعدة</p></div><span class="rounded-full bg-emerald-400/15 px-3 py-1 text-xs text-emerald-300">● متاح</span></header>
+ <div id="fullChat" class="ai-feed" aria-live="polite"><div class="ai-msg bot">أهلاً بك في أوج ميديا 👋 كيف يمكنني مساعدتك اليوم؟<div class="mt-3 flex flex-wrap gap-2"><button class="ai-quick" data-q="كيف أطلب خدمة؟">طريقة الطلب</button><button class="ai-quick" data-q="كيف أشحن رصيدي؟">شحن الرصيد</button><button class="ai-quick" data-q="كيف أتابع طلباتي؟">متابعة الطلبات</button></div></div></div>
+ <form id="fullChatForm" class="ai-form"><input id="fullChatInput" maxlength="1000" required autocomplete="off" placeholder="اكتب رسالتك هنا..."><button id="fullChatSend">إرسال</button></form></section>
+ <p class="mt-3 text-center text-xs text-gray-500">المساعد يقدّم إرشادات فورية؛ للطلبات الخاصة يمكنك التواصل مع فريق الدعم.</p>
 </div>
-
 <script>
-    async function sendMessage() {
-        const input = document.getElementById('userInput');
-        const box = document.getElementById('chatBox');
-        if(!input.value.trim()) return;
-        
-        const userText = input.value;
-        box.innerHTML += `<div class="bg-cyan-950 border border-cyan-500/30 p-3 rounded-2xl text-xs text-cyan-200 max-w-[85%] ml-auto">${userText}</div>`;
-        input.value = '';
-        
-        // التمرير للأسفل فور إرسال رسالة المستخدم
-        box.scrollTop = box.scrollHeight;
-        
-        const res = await fetch('/api/ai_chat', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({message: userText})
-        });
-        const data = await res.json();
-        
-        box.innerHTML += `<div class="bg-gray-950 border border-gray-800 p-3 rounded-2xl text-xs text-gray-200 max-w-[85%]">${data.reply}</div>`;
-        
-        // التمرير التلقائي للأسفل فور وصول رد البوت لتبقى الشاشة ثابتة في الأسفل
-        box.scrollTop = box.scrollHeight;
-    }
+(()=>{const feed=document.getElementById('fullChat'),form=document.getElementById('fullChatForm'),input=document.getElementById('fullChatInput'),send=document.getElementById('fullChatSend');function add(t,c){const d=document.createElement('div');d.className='ai-msg '+c;d.textContent=t;feed.appendChild(d);feed.scrollTop=feed.scrollHeight;return d;}async function ask(q){if(!q.trim()||send.disabled)return;add(q,'user');send.disabled=true;input.disabled=true;const wait=add('عم حضّرلك الرد...','bot');try{const r=await fetch('/api/ai_chat',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',body:JSON.stringify({message:q})});const d=await r.json();wait.textContent=d.reply||'تعذّر الحصول على رد.';}catch(e){wait.textContent='تعذّر الاتصال بالمساعد. حاول مرة ثانية.';}finally{send.disabled=false;input.disabled=false;input.focus();feed.scrollTop=feed.scrollHeight;}}form.addEventListener('submit',e=>{e.preventDefault();const q=input.value.trim();input.value='';ask(q);});feed.addEventListener('click',e=>{const b=e.target.closest('[data-q]');if(b)ask(b.dataset.q);});})();
 </script>
 {% endblock %}

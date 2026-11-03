@@ -2,7 +2,7 @@ import os
 import base64
 import mimetypes
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
@@ -10,7 +10,14 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-this-secret-key-before-deployment')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'owj-media-change-this-to-a-long-random-secret-before-production')
+# Keep users signed in across browser restarts for 30 days. The SECRET_KEY must
+# remain unchanged in Render Environment or existing login cookies will be invalidated.
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('RENDER', '').lower() == 'true'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///owj_media.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
@@ -309,7 +316,7 @@ def login():
     if request.method == 'POST':
         user = User.query.filter_by(username=request.form.get('username','').strip()).first()
         if user and user.check_password(request.form.get('password','')):
-            session.clear(); session['user_id'] = user.id
+            session.clear(); session.permanent = True; session['user_id'] = user.id
             flash('تم تسجيل الدخول بنجاح.', 'success')
             return redirect(url_for('index'))
         flash('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error')
@@ -327,6 +334,7 @@ def register():
         else:
             user = User(username=username, full_name=request.form.get('full_name','').strip(), email=request.form.get('email','').strip(), phone=request.form.get('phone','').strip())
             user.set_password(password); db.session.add(user); db.session.commit()
+            session.permanent = True
             session['user_id'] = user.id
             flash('تم إنشاء الحساب بنجاح.', 'success')
             return redirect(url_for('index'))
@@ -632,7 +640,7 @@ def service_worker():
 @app.route('/admin')
 @admin_required
 def admin():
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count())
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count())
 
 
 @app.route('/admin/handle_deposit/<int:deposit_id>', methods=['POST'])

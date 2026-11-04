@@ -2,13 +2,25 @@
 {% block title %}لوحة التحكم الإدارية{% endblock %}
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
-    
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl flex items-center justify-between">
+    <!-- بطاقة إدارة الحسابات: مستقلة وبأعلى الصفحة لتظهر بوضوح على الهاتف -->
+    <a href="/admin/accounts" class="group block w-full rounded-3xl border-2 border-violet-400 bg-gradient-to-l from-violet-800 to-indigo-700 p-5 text-white shadow-xl transition hover:from-violet-700 hover:to-indigo-600 focus:outline-none focus:ring-4 focus:ring-violet-300/40">
+        <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+                <span class="mb-2 inline-flex rounded-full bg-white/15 px-3 py-1 text-[11px] font-black">قسم الإدارة</span>
+                <h2 class="text-lg font-black leading-relaxed">إدارة الحسابات واسترجاعها والحظر</h2>
+                <p class="mt-1 text-xs leading-6 text-violet-100">ابحث عن الزبون باستخدام ID، غيّر كلمة مروره، راجع الاعتراضات أو احظر الحساب.</p>
+            </div>
+            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-2xl font-black text-violet-700" aria-hidden="true">›</span>
+        </div>
+        <div class="mt-4 rounded-xl bg-white px-4 py-3 text-center text-sm font-black text-violet-800">فتح إدارة الحسابات الآن</div>
+    </a>
+
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl flex flex-col gap-4">
         <div>
             <h1 class="text-base font-black text-white mb-1">لوحة التحكم الإدارية</h1>
             <p class="text-xs text-gray-400">إدارة الحسابات والطلبات والمحافظ والخدمات والوكلاء والدعم والنسخ الاحتياطي.</p>
         </div>
-        <div class="flex flex-col sm:flex-row gap-2">
+        <div class="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
             <a href="/admin/export_backup" class="bg-cyan-500 hover:bg-cyan-400 text-gray-950 px-4 py-2.5 rounded-2xl text-xs font-black transition shadow text-center">
                 تنزيل نسخة احتياطية كاملة (CSV)
             </a>
@@ -17,8 +29,7 @@
                 <button type="submit" onclick="return confirm('تحذير: ستستبدل هذه العملية بيانات قاعدة الموقع الحالية بالكامل بالبيانات الموجودة في النسخة الاحتياطية، بما فيها الحسابات والأرصدة والطلبات والخدمات والوكلاء والشكاوى. خذ نسخة احتياطية حالية أولاً. هل تريد المتابعة؟')" class="bg-amber-400 hover:bg-amber-300 text-gray-950 px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap">استعادة النسخة الكاملة</button>
             </form>
         </div>
-        <div class="flex flex-wrap gap-2">
-            <a href="/admin/accounts" class="bg-violet-600 hover:bg-violet-500 border border-violet-400/40 text-white px-5 py-3 rounded-2xl text-sm font-black text-center shadow-lg">إدارة الحسابات واسترجاعها والحظر</a>
+        <div class="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
             <a href="/admin/support" class="bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-2xl text-xs font-black text-center">الشكاوى ورسائل الدعم</a>
         </div>
     </div>

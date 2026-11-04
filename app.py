@@ -86,6 +86,10 @@ class User(db.Model):
     role = db.Column(db.String(20), default='user')
     balance_usd = db.Column(db.Float, default=0.0)
     is_verified = db.Column(db.Boolean, default=False)
+    is_banned = db.Column(db.Boolean, default=False)
+    ban_reason = db.Column(db.String(500), default='')
+    ban_appeal = db.Column(db.Text, default='')
+    appeal_status = db.Column(db.String(30), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     @property
     def is_authenticated(self): return True
@@ -280,6 +284,13 @@ def login_required(fn):
         if not session.get('user_id'):
             flash('سجّل الدخول أولاً للمتابعة.', 'error')
             return redirect(url_for('login'))
+        user = db.session.get(User, session.get('user_id'))
+        if not user:
+            session.clear()
+            return redirect(url_for('login'))
+        if user.is_banned:
+            session.clear()
+            return redirect(url_for('banned_account', user_id=user.id))
         return fn(*args, **kwargs)
     return wrapped
 
@@ -293,6 +304,17 @@ def admin_required(fn):
 
 def current_user():
     return db.session.get(User, session.get('user_id')) if session.get('user_id') else None
+
+@app.before_request
+def enforce_account_ban():
+    user_id = session.get('user_id')
+    if not user_id:
+        return None
+    user = db.session.get(User, user_id)
+    if user and user.is_banned and request.endpoint not in {'banned_account', 'submit_ban_appeal', 'logout', 'static'}:
+        session.clear()
+        return redirect(url_for('banned_account', user_id=user.id))
+    return None
 
 @app.route('/')
 def index():
@@ -316,6 +338,8 @@ def login():
     if request.method == 'POST':
         user = User.query.filter_by(username=request.form.get('username','').strip()).first()
         if user and user.check_password(request.form.get('password','')):
+            if user.is_banned:
+                return redirect(url_for('banned_account', user_id=user.id))
             session.clear(); session.permanent = True; session['user_id'] = user.id
             flash('تم تسجيل الدخول بنجاح.', 'success')
             return redirect(url_for('index'))
@@ -640,8 +664,72 @@ def service_worker():
 @app.route('/admin')
 @admin_required
 def admin():
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count())
+    account_lookup_id = request.args.get('account_id', type=int)
+    account_lookup = db.session.get(User, account_lookup_id) if account_lookup_id else None
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id)
 
+
+@app.route('/account-banned/<int:user_id>', methods=['GET'])
+def banned_account(user_id):
+    user = db.session.get(User, user_id)
+    if not user or not user.is_banned:
+        return redirect(url_for('login'))
+    return render_template('account_banned.html', user=user)
+
+@app.route('/account-banned/<int:user_id>/appeal', methods=['POST'])
+def submit_ban_appeal(user_id):
+    user = db.session.get(User, user_id)
+    if not user or not user.is_banned:
+        return redirect(url_for('login'))
+    appeal = request.form.get('appeal', '').strip()
+    if len(appeal) < 10:
+        flash('اكتب تفاصيل الاعتراض بشكل أوضح (10 أحرف على الأقل).', 'error')
+    else:
+        user.ban_appeal = appeal[:3000]
+        user.appeal_status = 'قيد المراجعة'
+        db.session.commit()
+        flash('تم إرسال اعتراضك للإدارة بنجاح.', 'success')
+    return redirect(url_for('banned_account', user_id=user.id))
+
+@app.route('/admin/account_action', methods=['POST'])
+@admin_required
+def admin_account_action():
+    user_id = request.form.get('user_id', type=int)
+    user = db.session.get(User, user_id) if user_id else None
+    if not user:
+        flash('لم يتم العثور على حساب بهذا المعرف.', 'error')
+        return redirect(url_for('admin'))
+    action = request.form.get('action', '')
+    if action == 'reset_password':
+        new_password = request.form.get('new_password', '')
+        if len(new_password) < 8:
+            flash('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.', 'error')
+        else:
+            user.set_password(new_password)
+            db.session.commit()
+            flash(f'تم تغيير كلمة مرور الحساب #{user.id}. أرسل كلمة المرور الجديدة لصاحب الحساب بشكل آمن.', 'success')
+    elif action == 'ban':
+        if user.role == 'admin':
+            flash('لا يمكن حظر حساب مدير.', 'error')
+        else:
+            user.is_banned = True
+            user.ban_reason = request.form.get('ban_reason', '').strip()[:500] or 'مخالفة شروط الاستخدام'
+            user.ban_appeal = ''
+            user.appeal_status = ''
+            db.session.commit()
+            flash(f'تم حظر الحساب #{user.id}.', 'success')
+    elif action == 'unban':
+        user.is_banned = False
+        user.ban_reason = ''
+        user.ban_appeal = ''
+        user.appeal_status = ''
+        db.session.commit()
+        flash(f'تم رفع الحظر عن الحساب #{user.id}.', 'success')
+    elif action == 'appeal_reviewed':
+        user.appeal_status = 'تمت المراجعة'
+        db.session.commit()
+        flash('تم تحديث حالة الاعتراض.', 'success')
+    return redirect(url_for('admin', account_id=user.id))
 
 @app.route('/admin/handle_deposit/<int:deposit_id>', methods=['POST'])
 @admin_required
@@ -1043,6 +1131,17 @@ def import_backup():
 
 with app.app_context():
     db.create_all()
+    # Safe additive migration: preserve all existing user accounts and data.
+    try:
+        from sqlalchemy import inspect
+        user_columns = {column['name'] for column in inspect(db.engine).get_columns('user')}
+        additions = [('is_banned', 'BOOLEAN DEFAULT FALSE'), ('ban_reason', "VARCHAR(500) DEFAULT ''"), ('ban_appeal', "TEXT DEFAULT ''"), ('appeal_status', "VARCHAR(30) DEFAULT ''")]
+        for column_name, definition in additions:
+            if column_name not in user_columns:
+                db.session.execute(db.text(f'ALTER TABLE "user" ADD COLUMN {column_name} {definition}'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     # Add fields to existing databases without deleting user data.
     try:
         from sqlalchemy import inspect

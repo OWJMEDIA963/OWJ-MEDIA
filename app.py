@@ -661,6 +661,14 @@ def service_worker():
     return Response(js, mimetype='application/javascript', headers={'Service-Worker-Allowed': '/'})
 
 
+@app.route('/admin/accounts')
+@admin_required
+def admin_accounts():
+    account_lookup_id = request.args.get('account_id', type=int)
+    account_lookup = db.session.get(User, account_lookup_id) if account_lookup_id else None
+    return render_template('admin_accounts.html', account_lookup=account_lookup, account_lookup_id=account_lookup_id)
+
+
 @app.route('/admin')
 @admin_required
 def admin():
@@ -729,7 +737,7 @@ def admin_account_action():
         user.appeal_status = 'تمت المراجعة'
         db.session.commit()
         flash('تم تحديث حالة الاعتراض.', 'success')
-    return redirect(url_for('admin', account_id=user.id))
+    return redirect(url_for('admin_accounts', account_id=user.id))
 
 @app.route('/admin/handle_deposit/<int:deposit_id>', methods=['POST'])
 @admin_required

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}إدارة الحسابات واسترجاعها{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-3xl space-y-5 px-4 py-6" dir="rtl">
+  <div class="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-violet-500/40 bg-gray-900 p-5 shadow-xl">
+    <div><p class="mb-1 text-xs font-bold text-violet-300">لوحة المدير</p><h1 class="text-xl font-black text-white">إدارة الحسابات واسترجاعها والحظر</h1><p class="mt-2 text-sm text-gray-300">ابحث عن الزبون باستخدام رقم ID الموجود في صفحة حسابه الشخصية.</p></div>
+    <a href="/admin" class="rounded-xl border border-gray-600 px-4 py-2 text-sm font-bold text-white">العودة للوحة الأدمن</a>
+  </div>
+  <section class="space-y-4 rounded-3xl border border-violet-500/40 bg-gray-900 p-5 shadow-xl">
+    <h2 class="text-base font-black text-white">البحث عن حساب زبون</h2>
+    <form method="get" action="/admin/accounts" class="flex flex-col gap-3 sm:flex-row">
+      <input type="number" min="1" name="account_id" value="{{ account_lookup_id or '' }}" required placeholder="اكتب رقم ID الخاص بالزبون" class="min-w-0 flex-1 rounded-xl border border-gray-700 bg-gray-950 p-4 text-base text-white">
+      <button class="rounded-xl bg-violet-600 px-7 py-4 text-sm font-black text-white">بحث عن الحساب</button>
+    </form>
+    {% if account_lookup %}
+    <div class="space-y-4 rounded-2xl border border-gray-700 bg-gray-950 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2"><h3 class="text-lg font-black text-white">{{ account_lookup.username }} — ID: #{{ account_lookup.id }}</h3><span class="rounded-lg px-3 py-2 text-xs font-black {% if account_lookup.is_banned %}bg-rose-500/20 text-rose-300{% else %}bg-emerald-500/20 text-emerald-300{% endif %}">{% if account_lookup.is_banned %}الحساب محظور{% else %}الحساب نشط{% endif %}</span></div>
+      <div class="grid grid-cols-1 gap-3 rounded-xl bg-gray-900 p-4 text-sm text-gray-200 sm:grid-cols-2">
+        <p>رقم الحساب: <b class="text-white">#{{ account_lookup.id }}</b></p><p>اسم المستخدم: <b class="text-white">{{ account_lookup.username }}</b></p>
+        <p>الاسم الكامل: <b class="text-white">{{ account_lookup.full_name or 'غير محدد' }}</b></p><p>البريد: <b class="text-white">{{ account_lookup.email or 'غير محدد' }}</b></p>
+        <p>الهاتف: <b class="text-white">{{ account_lookup.phone or 'غير محدد' }}</b></p><p>الرصيد: <b class="text-emerald-300">${{ account_lookup.balance_usd|money }}</b></p>
+        <p>تاريخ التسجيل: <b class="text-white">{{ account_lookup.created_at.strftime('%Y-%m-%d') if account_lookup.created_at else '-' }}</b></p><p>نوع الحساب: <b class="text-white">{{ account_lookup.role }}</b></p>
+      </div>
+      <div class="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 text-sm text-cyan-200">إذا نسي الزبون كلمة المرور، لا يمكن معرفة القديمة لأنها مشفّرة. عيّن له كلمة مرور جديدة وأرسلها له بشكل خاص.</div>
+      <form action="/admin/account_action" method="post" class="space-y-2 rounded-xl border border-cyan-500/30 p-4">
+        <input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="reset_password">
+        <label class="block text-sm font-bold text-white">تعيين كلمة مرور جديدة</label><input type="password" name="new_password" minlength="8" required autocomplete="new-password" placeholder="كلمة المرور الجديدة — 8 أحرف على الأقل" class="w-full rounded-xl border border-gray-700 bg-gray-900 p-3 text-sm text-white">
+        <button class="w-full rounded-xl bg-cyan-600 p-3 text-sm font-black text-white">حفظ كلمة المرور الجديدة</button>
+      </form>
+      {% if account_lookup.is_banned %}
+        <div class="space-y-3 rounded-xl border border-rose-500/30 bg-rose-500/5 p-4"><h4 class="font-black text-rose-300">تفاصيل الحظر</h4><p class="text-sm text-gray-200">سبب الحظر: {{ account_lookup.ban_reason or 'لم يتم تحديد سبب' }}</p>
+        {% if account_lookup.ban_appeal %}<div class="rounded-xl bg-gray-950 p-3"><p class="mb-2 text-sm font-bold text-amber-300">اعتراض الزبون — {{ account_lookup.appeal_status or 'جديد' }}</p><p class="whitespace-pre-wrap text-sm text-gray-200">{{ account_lookup.ban_appeal }}</p><form action="/admin/account_action" method="post" class="mt-3"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="appeal_reviewed"><button class="rounded-xl bg-amber-600 px-4 py-3 text-sm font-black text-white">تحديد الاعتراض كمراجع</button></form></div>{% else %}<p class="text-sm text-gray-400">لم يرسل الزبون اعتراضاً بعد.</p>{% endif %}
+        <form action="/admin/account_action" method="post" onsubmit="return confirm('هل تريد رفع الحظر عن هذا الحساب؟')"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="unban"><button class="w-full rounded-xl bg-emerald-600 p-3 text-sm font-black text-white">رفع الحظر عن الحساب</button></form></div>
+      {% elif account_lookup.role != 'admin' %}
+        <form action="/admin/account_action" method="post" class="space-y-3 rounded-xl border border-rose-500/30 p-4" onsubmit="return confirm('تأكيد حظر هذا الحساب؟')"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="ban"><label class="block text-sm font-bold text-rose-300">حظر الحساب</label><input name="ban_reason" maxlength="500" placeholder="اكتب سبب الحظر الذي سيظهر للزبون" class="w-full rounded-xl border border-gray-700 bg-gray-900 p-3 text-sm text-white"><button class="w-full rounded-xl bg-rose-600 p-3 text-sm font-black text-white">تأكيد حظر الحساب</button></form>
+      {% else %}<p class="rounded-xl bg-amber-500/10 p-3 text-sm text-amber-300">هذا حساب مدير ولا يمكن حظره.</p>{% endif %}
+    </div>
+    {% elif account_lookup_id %}<p class="rounded-xl bg-rose-500/10 p-4 text-sm text-rose-300">لم يتم العثور على حساب بهذا الرقم. تأكد من ID وأعد البحث.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,5 +1,7 @@
 import os
 import base64
+import smtplib
+from email.message import EmailMessage
 import mimetypes
 import math
 import requests
@@ -270,10 +272,40 @@ def send_user_notification(user_id, title, message, url='/notifications'):
             app.logger.exception('Unable to send push notification')
 
 
+def send_admin_email_notification(title, message, url='/admin'):
+    """Send admin event alerts by email when SMTP environment settings are configured."""
+    recipient = os.environ.get('ADMIN_NOTIFICATION_EMAIL', 'yagha191@gmail.com').strip()
+    smtp_host = os.environ.get('SMTP_HOST', 'smtp.gmail.com').strip()
+    smtp_port = int(os.environ.get('SMTP_PORT', '587'))
+    smtp_username = os.environ.get('SMTP_USERNAME', '').strip()
+    smtp_password = os.environ.get('SMTP_PASSWORD', '').strip()
+    from_email = os.environ.get('SMTP_FROM_EMAIL', smtp_username).strip()
+    if not (recipient and smtp_username and smtp_password and from_email):
+        app.logger.info('Admin email alerts are not configured; skipping email notification.')
+        return False
+    try:
+        msg = EmailMessage()
+        msg['Subject'] = f'أوج ميديا | {title}'
+        msg['From'] = from_email
+        msg['To'] = recipient
+        msg.set_content(f'{title}\n\n{message}\n\nرابط لوحة الإدارة: {os.environ.get("SITE_URL", "").rstrip("/")}{url}')
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(smtp_username, smtp_password)
+            server.send_message(msg)
+        return True
+    except Exception:
+        app.logger.exception('Unable to send admin email notification')
+        return False
+
+
 def notify_admins(title, message, url='/admin'):
-    """Send an in-site and phone push notification to every administrator."""
+    """Send in-site, phone push, and configured email notifications to administrators."""
     for admin_user in User.query.filter_by(role='admin').all():
         send_user_notification(admin_user.id, title, message, url)
+    send_admin_email_notification(title, message, url)
 
 
 def get_or_create_single_support_ticket(user_id):

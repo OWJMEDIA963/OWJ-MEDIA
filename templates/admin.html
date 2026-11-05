@@ -251,18 +251,18 @@
     <!-- مزودو SMM API -->
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إعدادات مزوّدي SMM API</h2>
-        <p class="text-xs text-gray-400 leading-6">أضف رابط API ومفتاحه من لوحة مزوّد SMM الذي تملك حساباً لديه. المفتاح يُحفظ في قاعدة بيانات الموقع ولا يظهر للزوار.</p>
+        <p class="text-xs text-gray-400 leading-6">قسم مستقل لإدارة API: أدخل مفتاح التجربة والمفتاح الفعلي، اختبر الاتصال، ثم اجلب كتالوج الخدمات وأدرج الخدمة المطلوبة في المنتج. المفاتيح تحفظ مشفّرة ولا تظهر للزوار.</p>
         <form action="/admin/add_smm_provider" method="POST" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input name="provider_name" required placeholder="اسم المزوّد (مثلاً: مزوّد SMM 1)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
             <input name="api_url" type="url" required placeholder="رابط API مثل https://provider.com/api/v2" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
-            <input name="api_key" type="password" required autocomplete="new-password" placeholder="مفتاح API السري" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white sm:col-span-2">
+            <input name="test_api_key" type="password" autocomplete="new-password" placeholder="مفتاح التجربة (اختياري)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><input name="live_api_key" type="password" required autocomplete="new-password" placeholder="المفتاح الفعلي (Live)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
             <button class="sm:col-span-2 bg-cyan-500 text-gray-950 font-black py-3 rounded-xl text-xs">حفظ مزوّد API</button>
         </form>
         {% if smm_providers %}
         <div class="space-y-2">
             {% for provider in smm_providers %}
             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950 p-3">
-                <div><p class="text-xs font-bold text-white">{{ provider.name }}</p><p dir="ltr" class="text-[10px] text-gray-500 break-all">{{ provider.api_url }}</p><p class="text-[10px] text-emerald-400">مفتاح API محفوظ</p></div>
+                <div><p class="text-xs font-bold text-white">{{ provider.name }}</p><p dir="ltr" class="text-[10px] text-gray-500 break-all">{{ provider.api_url }}</p><p class="text-[10px] text-emerald-400">المفاتيح محفوظة بشكل مشفّر · الخدمات المحفوظة: {{ provider.catalog_services|length }}</p></div>
                 <div class="flex flex-wrap gap-2">
                 <form action="/admin/test_smm_provider/{{ provider.id }}" method="POST"><button class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-[10px]">اختبار API / الرصيد</button></form>
                 <form action="/admin/fetch_smm_services/{{ provider.id }}" method="POST"><button class="rounded-lg bg-sky-600 text-white px-3 py-2 text-[10px]">جلب الخدمات</button></form>
@@ -302,9 +302,9 @@
             <select name="category_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none"><option value="">اختر القسم الرئيسي أو الفرعي الذي ستوضع الخدمة بداخله</option>{% for cat in categories %}<option value="{{ cat.id }}">{% if cat.parent_id %}↳ قسم فرعي: {{ cat.parent.name }} / {% else %}قسم رئيسي: {% endif %}{{ cat.name }}</option>{% endfor %}</select>
             
             <div class="grid grid-cols-3 gap-2">
-                <input type="number" step="0.01" min="0.00" name="price_per_1000" placeholder="السعر الثابت أو السعر لكل 1000 ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
-                <input type="number" name="min_quantity" placeholder="الحد الأدنى" value="10" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
-                <input type="number" name="max_quantity" placeholder="الحد الأقصى" value="10000" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
+                <input id="productApiRate" type="number" step="0.01" min="0.00" name="price_per_1000" placeholder="السعر الثابت أو السعر لكل 1000 ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
+                <input id="productApiMin" type="number" name="min_quantity" placeholder="الحد الأدنى" value="10" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
+                <input id="productApiMax" type="number" name="max_quantity" placeholder="الحد الأقصى" value="10000" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
             </div>
 
             <input type="text" name="input_label" placeholder="النص المطلوب للعميل (مثال: ضع رابط انستغرام أو آيدي ببجي)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
@@ -320,9 +320,10 @@
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label class="block text-[11px] font-bold text-gray-300 mb-1">مزوّد API للخدمة</label>
-                    <select name="api_provider_id" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">-- اختر مزوّد API --</option>{% for provider in smm_providers %}<option value="{{ provider.id }}">{{ provider.name }}</option>{% endfor %}</select>
+                    <select id="apiProviderSelect" name="api_provider_id" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">-- اختر مزوّد API --</option>{% for provider in smm_providers %}<option value="{{ provider.id }}">{{ provider.name }}</option>{% endfor %}</select>
                 </div>
-                <div><label class="block text-[11px] font-bold text-gray-300 mb-1">رقم الخدمة لدى مزوّد SMM</label><input name="api_service_id" placeholder="Service ID من لوحة المزوّد" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"></div>
+                <div class="sm:col-span-2 rounded-xl border border-sky-500/30 bg-sky-950/20 p-3 space-y-2"><label class="block text-[11px] font-bold text-sky-300">اختيار خدمة جُلبت من API (اختياري)</label><select id="apiCatalogPicker" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">اختر خدمة من الكتالوج المحفوظ</option>{% for item in smm_catalog_services %}<option value="{{ item.service_code }}" data-provider="{{ item.provider_id }}" data-name="{{ item.name|e }}" data-rate="{{ item.rate }}" data-min="{{ item.min_quantity }}" data-max="{{ item.max_quantity }}">{{ item.provider.name }} · #{{ item.service_code }} · {{ item.name }} · {{ item.rate }}$ / 1000</option>{% endfor %}</select><button type="button" id="useApiCatalogService" class="rounded-lg bg-sky-500 px-4 py-2 text-xs font-black text-gray-950">استخدام رقم الخدمة في نموذج المنتج</button><p class="text-[10px] text-gray-400">عند الاختيار يتم تعبئة رقم الخدمة والمزوّد والسعر والحدود تلقائياً.</p></div>
+                <div><label class="block text-[11px] font-bold text-gray-300 mb-1">رقم الخدمة لدى مزوّد SMM</label><input id="apiServiceIdInput" name="api_service_id" placeholder="Service ID من لوحة المزوّد" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"></div>
             </div>
             <p class="text-[10px] text-amber-300 leading-5">يجب اختيار المزوّد وإدخال رقم الخدمة عند اختيار النوع التلقائي SMM. الربط يستخدم واجهة API المتوافقة مع صيغة action=add / service / link / quantity.</p>
 
@@ -375,4 +376,17 @@
     </section>
 
 </div>
+<script>
+(() => {
+ const picker=document.getElementById('apiCatalogPicker'), useBtn=document.getElementById('useApiCatalogService');
+ if(!picker||!useBtn)return;
+ useBtn.addEventListener('click',()=>{
+  const opt=picker.options[picker.selectedIndex]; if(!opt||!opt.value){alert('اختر خدمة من الكتالوج أولاً');return;}
+  const form=picker.closest('form'), id=document.getElementById('apiServiceIdInput'), provider=document.getElementById('apiProviderSelect'), rate=document.getElementById('productApiRate'), min=document.getElementById('productApiMin'), max=document.getElementById('productApiMax'), name=form?form.querySelector('input[name="name"]'):null;
+  if(id)id.value=opt.value;if(provider)provider.value=opt.dataset.provider;if(rate)rate.value=opt.dataset.rate;if(min)min.value=opt.dataset.min;if(max)max.value=opt.dataset.max;if(name&&!name.value)name.value=opt.dataset.name;
+  const type=document.querySelector('form[action="/admin/add_service"] select[name="service_type"]');if(type)type.value='smm';
+  alert('تم تعبئة رقم الخدمة والمزوّد والسعر والحدود في نموذج المنتج.');
+ });
+})();
+</script>
 {% endblock %}

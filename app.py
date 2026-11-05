@@ -1,5 +1,6 @@
 import os
 import base64
+import hashlib
 import smtplib
 from email.message import EmailMessage
 import mimetypes
@@ -11,6 +12,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from cryptography.fernet import Fernet, InvalidToken
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'owj-media-change-this-to-a-long-random-secret-before-production')
@@ -25,6 +27,22 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:/
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
 
+
+def _api_cipher():
+    raw = hashlib.sha256(app.config['SECRET_KEY'].encode('utf-8')).digest()
+    return Fernet(base64.urlsafe_b64encode(raw))
+
+def protect_api_key(value):
+    value = (value or '').strip()
+    return _api_cipher().encrypt(value.encode()).decode() if value else ''
+
+def reveal_api_key(value):
+    value = value or ''
+    try:
+        return _api_cipher().decrypt(value.encode()).decode()
+    except (InvalidToken, ValueError):
+        # Backward compatibility for API keys saved before encryption.
+        return value
 
 def format_money(value):
     try:
@@ -129,9 +147,23 @@ class SMMProvider(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     api_url = db.Column(db.String(500), nullable=False)
-    api_key = db.Column(db.Text, nullable=False)
+    api_key = db.Column(db.Text, nullable=False)  # encrypted live key (legacy field)
+    test_api_key = db.Column(db.Text, default='')
+    live_api_key = db.Column(db.Text, default='')
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class SMMCatalogService(db.Model):
+    __tablename__ = 'smm_catalog_service'
+    id = db.Column(db.Integer, primary_key=True)
+    provider_id = db.Column(db.Integer, db.ForeignKey('smm_provider.id'), nullable=False, index=True)
+    service_code = db.Column(db.String(80), nullable=False)
+    name = db.Column(db.String(240), default='')
+    category_name = db.Column(db.String(160), default='')
+    rate = db.Column(db.Float, default=0)
+    min_quantity = db.Column(db.Integer, default=1)
+    max_quantity = db.Column(db.Integer, default=10000)
+    provider = db.relationship('SMMProvider', backref=db.backref('catalog_services', cascade='all, delete-orphan'))
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -757,7 +789,7 @@ def admin_accounts():
 def admin():
     account_lookup_id = request.args.get('account_id', type=int)
     account_lookup = db.session.get(User, account_lookup_id) if account_lookup_id else None
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id)
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id)
 
 
 @app.route('/account-banned/<int:user_id>', methods=['GET'])
@@ -985,11 +1017,12 @@ def add_agent():
 def add_smm_provider():
     name = request.form.get('provider_name', '').strip()
     api_url = request.form.get('api_url', '').strip()
-    api_key = request.form.get('api_key', '').strip()
-    if not name or not api_url.startswith(('https://', 'http://')) or not api_key:
-        flash('أدخل اسم المزوّد ورابط API صحيحاً ومفتاح API.', 'error')
+    test_key = request.form.get('test_api_key', '').strip()
+    live_key = request.form.get('live_api_key', '').strip() or request.form.get('api_key', '').strip()
+    if not name or not api_url.startswith(('https://', 'http://')) or not live_key:
+        flash('أدخل اسم المزوّد ورابط API والمفتاح الفعلي.', 'error')
     else:
-        db.session.add(SMMProvider(name=name, api_url=api_url, api_key=api_key))
+        db.session.add(SMMProvider(name=name, api_url=api_url, api_key=protect_api_key(live_key), test_api_key=protect_api_key(test_key), live_api_key=protect_api_key(live_key)))
         db.session.commit()
         flash('تم حفظ مزوّد API. احتفظ بالمفتاح سرياً.', 'success')
     return redirect(url_for('admin'))
@@ -1000,7 +1033,7 @@ def add_smm_provider():
 def test_smm_provider(provider_id):
     provider = SMMProvider.query.get_or_404(provider_id)
     try:
-        response = requests.post(provider.api_url, data={'key': provider.api_key, 'action': 'balance'}, timeout=15)
+        response = requests.post(provider.api_url, data={'key': reveal_api_key(provider.test_api_key or provider.api_key), 'action': 'balance'}, timeout=15)
         response.raise_for_status()
         data = response.json()
         if data.get('error'):
@@ -1017,17 +1050,31 @@ def test_smm_provider(provider_id):
 def fetch_smm_services(provider_id):
     provider = SMMProvider.query.get_or_404(provider_id)
     try:
-        response = requests.post(provider.api_url, data={'key': provider.api_key, 'action': 'services'}, timeout=20)
+        response = requests.post(provider.api_url, data={'key': reveal_api_key(provider.api_key), 'action': 'services'}, timeout=20)
         response.raise_for_status()
         data = response.json()
         if isinstance(data, dict) and data.get('error'):
             raise ValueError(str(data['error']))
         if not isinstance(data, list):
             raise ValueError('استجابة API غير متوقعة؛ يجب أن تكون قائمة خدمات.')
-        # Show a safe preview/count without automatically importing products.
-        preview = ', '.join(str(item.get('name') or item.get('service') or item.get('id') or 'خدمة') for item in data[:3] if isinstance(item, dict))
-        flash(f'تم جلب {len(data)} خدمة من {provider.name}. معاينة: {preview or "لا توجد أسماء للعرض"}. لم تتم إضافتها تلقائياً.', 'success')
+        # Refresh provider catalog, keeping product creation under admin control.
+        SMMCatalogService.query.filter_by(provider_id=provider.id).delete()
+        for item in data:
+            if not isinstance(item, dict) or item.get('service') is None:
+                continue
+            try:
+                rate = float(item.get('rate') or 0)
+                min_q = max(1, int(item.get('min') or 1))
+                max_q = max(min_q, int(item.get('max') or 10000))
+            except (TypeError, ValueError):
+                rate, min_q, max_q = 0, 1, 10000
+            db.session.add(SMMCatalogService(provider_id=provider.id, service_code=str(item.get('service')),
+                name=str(item.get('name') or item.get('service')), category_name=str(item.get('category') or ''),
+                rate=rate, min_quantity=min_q, max_quantity=max_q))
+        db.session.commit()
+        flash(f'تم جلب وحفظ {len(SMMCatalogService.query.filter_by(provider_id=provider.id).all())} خدمة من {provider.name}. يمكنك اختيار رقمها عند إضافة المنتج.', 'success')
     except Exception as exc:
+        db.session.rollback()
         flash(f'تعذر جلب خدمات API: {str(exc)[:220]}', 'error')
     return redirect(url_for('admin'))
 
@@ -1370,6 +1417,15 @@ with app.app_context():
         category_columns = {column['name'] for column in inspect(db.engine).get_columns('category')}
         if 'parent_id' not in category_columns:
             db.session.execute(db.text('ALTER TABLE category ADD COLUMN parent_id INTEGER'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    try:
+        from sqlalchemy import inspect
+        provider_columns = {column['name'] for column in inspect(db.engine).get_columns('smm_provider')}
+        for col in ('test_api_key', 'live_api_key'):
+            if col not in provider_columns:
+                db.session.execute(db.text(f"ALTER TABLE smm_provider ADD COLUMN {col} TEXT DEFAULT ''"))
         db.session.commit()
     except Exception:
         db.session.rollback()

@@ -3,3 +3,4 @@ Flask-SQLAlchemy
 requests
 gunicorn
 pywebpush
+cryptography

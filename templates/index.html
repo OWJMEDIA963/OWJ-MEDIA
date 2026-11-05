@@ -42,7 +42,7 @@
   </div>
   <div id="owjSearchResults" class="hidden space-y-2" aria-live="polite"></div>
  </section>
- <section><div class="mb-4 flex items-center justify-between"><h2 class="text-base font-black text-white">الأقسام الرئيسية</h2><span class="text-xs text-gray-500">{{ categories|length }} أقسام</span></div><div class="owj-category-grid">{% for cat in categories %}<a href="/category/{{ cat.id }}" class="owj-category-card transition duration-200 hover:opacity-95"><span class="owj-category-image-wrap">{% if cat.image_url %}<img src="{{ cat.image_url }}" alt="{{ cat.name }}" loading="lazy" class="owj-category-image">{% else %}<span class="owj-category-image owj-category-placeholder">{{ cat.name[:1] }}</span>{% endif %}</span><h3 class="owj-category-name">{{ cat.name }}</h3><p class="owj-category-count">{{ cat.services|length }} خدمات</p></a>{% else %}<p class="col-span-full rounded-2xl border border-gray-800 bg-gray-900 p-5 text-center text-sm text-gray-400">ستظهر الأقسام هنا بعد إضافتها من لوحة الإدارة.</p>{% endfor %}</div></section>
+ <section><div class="mb-4 flex items-center justify-between"><h2 class="text-base font-black text-white">الأقسام الرئيسية</h2><span class="text-xs text-gray-500">{{ categories|length }} أقسام</span></div><div class="owj-category-grid">{% for cat in categories %}<a href="/category/{{ cat.id }}" class="owj-category-card transition duration-200 hover:opacity-95"><span class="owj-category-image-wrap">{% if cat.image_url %}<img src="{{ cat.image_url }}" alt="{{ cat.name }}" loading="lazy" class="owj-category-image">{% else %}<span class="owj-category-image owj-category-placeholder">{{ cat.name[:1] }}</span>{% endif %}</span><h3 class="owj-category-name">{{ cat.name }}</h3><p class="owj-category-count">{{ cat.subcategories|length }} أقسام فرعية · {{ cat.services|length }} منتجات مباشرة</p></a>{% else %}<p class="col-span-full rounded-2xl border border-gray-800 bg-gray-900 p-5 text-center text-sm text-gray-400">ستظهر الأقسام هنا بعد إضافتها من لوحة الإدارة.</p>{% endfor %}</div></section>
 
 </div>
 <script>
@@ -53,7 +53,7 @@
  if(!input||!results||!clear)return;
  const services=[
  {% for service in services %}
- {id:{{ service.id|tojson }},name:{{ service.name|tojson }},category:{{ (service.category.name if service.category else '')|tojson }},categoryId:{{ service.category_id|tojson }},price:{{ service.price|tojson }},image:{{ (service.image_url or '')|tojson }},available:{{ service.is_available|tojson }}}{% if not loop.last %},{% endif %}
+ {id:{{ service.id|tojson }},name:{{ service.name|tojson }},category:{{ (service.category.name if service.category else '')|tojson }},categoryId:{{ service.category_id|tojson }},subcategoryId:{{ service.subcategory_id|tojson }},price:{{ service.price|tojson }},image:{{ (service.image_url or '')|tojson }},available:{{ service.is_available|tojson }}}{% if not loop.last %},{% endif %}
  {% endfor %}
  ];
  const norm=v=>String(v||'').toLocaleLowerCase('ar').normalize('NFD').replace(/[\u064B-\u065F\u0670]/g,'').trim();
@@ -64,7 +64,7 @@
   results.classList.remove('hidden');
   if(!found.length){const empty=document.createElement('div');empty.className='rounded-2xl border border-gray-800 bg-gray-900 px-4 py-5 text-center text-sm text-gray-400';empty.textContent='ما لقينا خدمة مطابقة. جرّب كلمة ثانية.';results.appendChild(empty);return;}
   const heading=document.createElement('p');heading.className='px-1 text-xs text-gray-400';heading.textContent='نتائج البحث ('+found.length+(found.length===12?'+':'')+')';results.appendChild(heading);
-  found.forEach(s=>{const a=document.createElement('a');a.className='owj-search-result';a.href='/category/'+encodeURIComponent(s.categoryId)+'#service-'+encodeURIComponent(s.id);
+  found.forEach(s=>{const a=document.createElement('a');a.className='owj-search-result';a.href=(s.subcategoryId?'/subcategory/'+encodeURIComponent(s.subcategoryId):'/category/'+encodeURIComponent(s.categoryId))+'#service-'+encodeURIComponent(s.id);
    if(s.image){const img=document.createElement('img');img.className='owj-search-thumb';img.src=s.image;img.alt='';img.loading='lazy';img.onerror=()=>img.remove();a.appendChild(img);}
    const body=document.createElement('div');body.className='min-w-0 flex-1';const name=document.createElement('div');name.className='text-sm font-black text-white';name.textContent=s.name;const cat=document.createElement('div');cat.className='mt-1 text-[11px] text-gray-400';cat.textContent=s.category||'قسم الخدمات';body.append(name,cat);a.appendChild(body);
    const side=document.createElement('div');side.className='text-left shrink-0';const price=document.createElement('div');price.className='text-xs font-black text-cyan-400';const p=Number(s.price);price.textContent='$'+(Number.isFinite(p)?p.toFixed(2).replace(/\.?0+$/,''):'0');const status=document.createElement('div');status.className='mt-1 text-[10px] '+(s.available?'text-emerald-400':'text-rose-400');status.textContent=s.available?'متوفرة':'غير متوفرة';side.append(price,status);a.appendChild(side);results.appendChild(a);

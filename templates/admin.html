@@ -18,6 +18,7 @@
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl flex flex-col gap-4">
         <div>
             <h1 class="text-base font-black text-white mb-1">لوحة التحكم الإدارية</h1>
+            <a href="/notifications" class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-3 text-xs font-black text-cyan-300">🔔 تفعيل إشعارات الإدارة على هاتفي</a>
             <p class="text-xs text-gray-400">إدارة الحسابات والطلبات والمحافظ والخدمات والوكلاء والدعم والنسخ الاحتياطي.</p>
         </div>
         <div class="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -150,9 +151,20 @@
         </form>
     </div>
 
+    <!-- سحب رصيد من حساب مستخدم مع إشعار وسبب -->
+    <div class="rounded-3xl border border-rose-500/30 bg-gray-900 p-6 shadow-xl space-y-4">
+        <div><h2 class="text-sm font-black text-white">سحب رصيد من حساب زبون عبر ID</h2><p class="mt-1 text-xs text-gray-400">سيتم خصم المبلغ من المحفظة وحفظ سجل للعملية وإرسال إشعار للزبون يتضمن السبب.</p></div>
+        <form action="/admin/withdraw_balance" method="POST" class="space-y-3" onsubmit="return confirm('تأكيد خصم المبلغ من محفظة هذا المستخدم؟')">
+            <input type="number" min="1" name="user_id" placeholder="معرّف المستخدم ID" required class="w-full rounded-2xl border border-gray-800 bg-gray-950 px-4 py-3 text-xs text-white">
+            <input type="number" min="0.01" step="0.01" name="amount" placeholder="المبلغ المراد سحبه ($)" required class="w-full rounded-2xl border border-gray-800 bg-gray-950 px-4 py-3 text-xs text-white">
+            <textarea name="reason" maxlength="500" rows="3" placeholder="سبب سحب الرصيد — سيصل للزبون في الإشعارات" required class="w-full rounded-2xl border border-gray-800 bg-gray-950 px-4 py-3 text-xs text-white"></textarea>
+            <button type="submit" class="w-full rounded-2xl bg-rose-600 py-3 text-xs font-black text-white">تأكيد سحب الرصيد وإرسال الإشعار</button>
+        </form>
+    </div>
+
     <!-- إدارة حسابات التجار -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <h2 class="text-sm font-black text-white">إدارة حسابات التجار</h2>
+        <h2 class="text-sm font-black text-white">إدارة حسابات التجار الموثوقين</h2><p class="text-xs text-gray-400">أي حساب تنشئه من هنا سيحصل تلقائياً على شارة تاجر موثوق ✓.</p>
         <form action="/admin/add_merchant" method="POST" class="space-y-3">
             <input type="text" name="username" placeholder="اسم المستخدم" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
             <input type="password" name="password" placeholder="كلمة المرور" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
@@ -236,51 +248,6 @@
         </div>
     </div>
 
-    <!-- تكامل Serva API -->
-    <section id="serva-api" class="bg-gray-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-            <div><h2 class="text-sm font-black text-white">ربط Serva API</h2><p class="mt-1 text-xs text-gray-400 leading-6">إدارة مفاتيح Serva، اختبار الاتصال، وجلب قائمة الخدمات وأرقامها تلقائياً.</p></div>
-            <span class="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-[10px] font-black text-emerald-300">https://serva-s.com/api/v1</span>
-        </div>
-        <div class="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3 text-[11px] leading-6 text-amber-200">ابدأ بمفتاح التجربة فقط. اختبار الاتصال وجلب الخدمات لا ينشئان طلبات شراء ولا يخصمان رصيداً. لا تضع المفتاح في رابط الموقع أو في وصف المنتج.</div>
-        <form action="/admin/serva/save" method="POST" class="grid grid-cols-1 gap-3">
-            <div><label class="mb-1 block text-[11px] font-bold text-emerald-300">مفتاح التجربة (srv_test_)</label><input name="test_api_key" type="password" autocomplete="new-password" placeholder="{% if serva_config and serva_config.test_key_encrypted %}مفتاح التجربة محفوظ — أدخل قيمة جديدة للاستبدال{% else %}الصق مفتاح التجربة هنا{% endif %}" class="w-full rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-xs text-white"></div>
-            <div><label class="mb-1 block text-[11px] font-bold text-gray-300">المفتاح الفعلي (srv_live_) — اختياري حالياً</label><input name="live_api_key" type="password" autocomplete="new-password" placeholder="{% if serva_config and serva_config.live_key_encrypted %}المفتاح الفعلي محفوظ — أدخل قيمة جديدة للاستبدال{% else %}اتركه فارغاً حتى ننتهي من الاختبار{% endif %}" class="w-full rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-xs text-white"></div>
-            <button class="w-full rounded-xl bg-emerald-500 py-3 text-xs font-black text-gray-950">حفظ مفاتيح Serva بشكل مشفّر</button>
-        </form>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <form action="/admin/serva/test" method="POST"><button class="w-full rounded-xl border border-cyan-400/30 bg-cyan-500/15 py-3 text-xs font-black text-cyan-200">اختبار الاتصال بمفتاح التجربة</button></form>
-            <form action="/admin/serva/services" method="POST"><button class="w-full rounded-xl border border-violet-400/30 bg-violet-500/15 py-3 text-xs font-black text-violet-200">جلب الخدمات من Serva</button></form>
-        </div>
-        {% if serva_config and serva_config.last_services_sync %}<p class="text-[10px] text-gray-500">آخر تحديث لقائمة الخدمات: {{ serva_config.last_services_sync.strftime('%Y-%m-%d %H:%M UTC') }}</p>{% endif %}
-        {% if serva_services %}
-        <div class="space-y-2 pt-2 border-t border-gray-800">
-            <div class="flex flex-wrap items-center justify-between gap-2"><h3 class="text-xs font-black text-white">الخدمات المستوردة ({{ serva_services|length }})</h3><span class="text-[10px] text-gray-500">اضغط «استخدام الرقم» لنسخ Service ID إلى نموذج إضافة المنتج</span></div>
-            <div class="max-h-[520px] overflow-y-auto space-y-2">
-                {% for item in serva_services %}
-                <div class="rounded-xl border border-gray-800 bg-gray-950 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div class="min-w-0"><p class="text-xs font-bold text-white">{{ item.name_ar or item.name or item.name_en or 'خدمة بدون اسم' }}</p><p class="text-[10px] text-gray-400">{{ item.category or 'بدون تصنيف' }} · {{ item.type or '-' }} · السعر: {{ item.rate or '-' }} {{ item.pricing_type or '' }}</p><p dir="ltr" class="text-[10px] text-emerald-300">Service ID: {{ item.service }} · Min: {{ item.min or '-' }} · Max: {{ item.max or '-' }}</p></div>
-                    <button type="button" data-service-id="{{ item.service }}" class="serva-use-id shrink-0 rounded-lg bg-emerald-500 px-3 py-2 text-[10px] font-black text-gray-950">استخدام الرقم</button>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% else %}<p class="rounded-xl border border-gray-800 bg-gray-950 p-3 text-center text-[11px] text-gray-500">لم يتم جلب الخدمات بعد. احفظ مفتاح التجربة ثم اختبر الاتصال واجلب الخدمات.</p>{% endif %}
-        <p class="text-[10px] leading-5 text-gray-500">مفاتيح API لا تُعرض بعد الحفظ، وتُخزّن مشفّرة باستخدام SECRET_KEY. حافظ على ثبات SECRET_KEY في Render ولا تغيّره حتى لا تفقد القدرة على فك تشفير المفاتيح المحفوظة.</p>
-    </section>
-    <script>
-    document.querySelectorAll('.serva-use-id').forEach(button => button.addEventListener('click', () => {
-        const field = document.querySelector('form[action="/admin/add_service"] input[name="api_service_id"]');
-        if (field) {
-            field.value = button.dataset.serviceId || '';
-            field.scrollIntoView({behavior:'smooth', block:'center'});
-            field.focus();
-            const old = button.textContent; button.textContent = 'تم نسخ الرقم إلى النموذج';
-            setTimeout(() => button.textContent = old, 1800);
-        }
-    }));
-    </script>
-
     <!-- مزودو SMM API -->
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إعدادات مزوّدي SMM API</h2>
@@ -303,14 +270,15 @@
         {% endif %}
     </section>
 
+    <!-- إنشاء قسم فرعي -->
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4"><h2 class="text-sm font-black text-white">إضافة قسم فرعي</h2><form action="/admin/add_subcategory" method="POST" class="space-y-3"><select name="parent_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي</option>{% for cat in categories if not cat.parent_id %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select><input name="subcategory_name" required placeholder="اسم القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><button class="w-full rounded-2xl bg-cyan-500 py-3 text-xs font-black text-gray-950">إنشاء القسم الفرعي</button></form></div>
+
     <!-- إضافة خدمة مع رابط صورة القسم وصورة المنتج -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إضافة وتعديل الخدمات وتخصيص حقول الإدخال</h2>
         <form action="/admin/add_service" method="POST" enctype="multipart/form-data" class="space-y-3">
             <input type="text" name="name" placeholder="اسم الخدمة أو المنتج" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
-            <input type="text" name="category_name" placeholder="القسم الرئيسي (مثال: خدمات سوشيال ميديا)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
-            <input type="text" name="subcategory_name" placeholder="القسم الفرعي (مثال: إنستغرام أو تيك توك) — اختياري" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
-            <label class="block text-[11px] text-gray-300">صورة القسم الفرعي (اختياري)</label><input type="file" name="subcategory_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full text-xs text-gray-300"><input type="url" name="subcategory_image_url" placeholder="أو رابط صورة القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+            <input type="text" name="category_name" placeholder="القسم الرئيسي" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
             
             <div class="grid grid-cols-3 gap-2">
                 <input type="number" step="0.01" min="0.00" name="price_per_1000" placeholder="السعر الثابت أو السعر لكل 1000 ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
@@ -360,8 +328,7 @@
             <summary class="cursor-pointer flex items-center justify-between gap-3 text-xs font-bold text-white"><span>{{ s.name }}</span><span class="text-[10px] {% if s.is_available %}text-emerald-400{% else %}text-rose-400{% endif %}">{% if s.is_available %}متوفر{% else %}غير متوفر{% endif %}</span></summary>
             <form action="/admin/update_service/{{ s.id }}" method="POST" enctype="multipart/form-data" class="mt-4 space-y-3">
                 <input name="name" value="{{ s.name }}" required placeholder="اسم المنتج" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
-                <input name="category_name" value="{{ s.category.name }}" required placeholder="القسم الرئيسي" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
-                <input name="subcategory_name" value="{{ s.subcategory.name if s.subcategory else '' }}" placeholder="القسم الفرعي (اختياري)" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                <input name="category_name" value="{{ s.category.name }}" required placeholder="القسم" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
                 <div class="grid grid-cols-3 gap-2">
                     <input type="number" step="0.01" min="0" name="price_per_1000" value="{{ s.price_per_1000 if s.service_type in ['smm','manual_quantity'] else s.price }}" required placeholder="السعر" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
                     <input type="number" min="1" name="min_quantity" value="{{ s.min_quantity or 1 }}" required placeholder="الأدنى" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">

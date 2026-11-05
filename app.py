@@ -1,11 +1,10 @@
 import os
 import base64
+import smtplib
+from email.message import EmailMessage
 import mimetypes
+import math
 import requests
-import json
-import hashlib
-import base64
-from cryptography.fernet import Fernet, InvalidToken
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort
@@ -90,6 +89,7 @@ class User(db.Model):
     role = db.Column(db.String(20), default='user')
     balance_usd = db.Column(db.Float, default=0.0)
     is_verified = db.Column(db.Boolean, default=False)
+    is_trusted_merchant = db.Column(db.Boolean, default=False)
     is_banned = db.Column(db.Boolean, default=False)
     ban_reason = db.Column(db.String(500), default='')
     ban_appeal = db.Column(db.Text, default='')
@@ -102,22 +102,15 @@ class User(db.Model):
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), unique=True, nullable=False)
-    image_url = db.Column(db.String(500), default='')
-
-class Subcategory(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     image_url = db.Column(db.String(500), default='')
-    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
-    category = db.relationship('Category', backref=db.backref('subcategories', lazy=True, cascade='all, delete-orphan'))
+    parent_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
+    parent = db.relationship('Category', remote_side=[id], backref=db.backref('subcategories', lazy=True))
 
 class Service(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(160), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
-    subcategory_id = db.Column(db.Integer, db.ForeignKey('subcategory.id'), nullable=True)
-    subcategory = db.relationship('Subcategory', backref=db.backref('services', lazy=True))
     price = db.Column(db.Float, default=1.0) # price per 1000 for SMM, fixed price for manual
     price_per_1000 = db.Column(db.Float, default=1.0)
     min_quantity = db.Column(db.Integer, default=10)
@@ -130,15 +123,6 @@ class Service(db.Model):
     description = db.Column(db.Text, default='')
     is_available = db.Column(db.Boolean, default=True)
     category = db.relationship('Category', backref=db.backref('services', lazy=True))
-
-class ServaAPIConfig(db.Model):
-    __tablename__ = 'serva_api_config'
-    id = db.Column(db.Integer, primary_key=True)
-    test_key_encrypted = db.Column(db.Text, default='')
-    live_key_encrypted = db.Column(db.Text, default='')
-    services_json = db.Column(db.Text, default='[]')
-    last_services_sync = db.Column(db.DateTime, nullable=True)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class SMMProvider(db.Model):
     __tablename__ = 'smm_provider'
@@ -233,6 +217,18 @@ class SupportMessage(db.Model):
     sender = db.relationship('User')
 
 
+class WalletTransaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    transaction_type = db.Column(db.String(30), nullable=False, default='withdrawal')
+    amount = db.Column(db.Float, nullable=False)
+    reason = db.Column(db.String(500), nullable=False, default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    user = db.relationship('User', foreign_keys=[user_id])
+    admin = db.relationship('User', foreign_keys=[admin_id])
+
+
 class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
@@ -276,6 +272,42 @@ def send_user_notification(user_id, title, message, url='/notifications'):
             app.logger.warning('pywebpush is not installed; saved in-app notification only')
         except Exception:
             app.logger.exception('Unable to send push notification')
+
+
+def send_admin_email_notification(title, message, url='/admin'):
+    """Send admin event alerts by email when SMTP environment settings are configured."""
+    recipient = os.environ.get('ADMIN_NOTIFICATION_EMAIL', 'yagha191@gmail.com').strip()
+    smtp_host = os.environ.get('SMTP_HOST', 'smtp.gmail.com').strip()
+    smtp_port = int(os.environ.get('SMTP_PORT', '587'))
+    smtp_username = os.environ.get('SMTP_USERNAME', '').strip()
+    smtp_password = os.environ.get('SMTP_PASSWORD', '').strip()
+    from_email = os.environ.get('SMTP_FROM_EMAIL', smtp_username).strip()
+    if not (recipient and smtp_username and smtp_password and from_email):
+        app.logger.info('Admin email alerts are not configured; skipping email notification.')
+        return False
+    try:
+        msg = EmailMessage()
+        msg['Subject'] = f'أوج ميديا | {title}'
+        msg['From'] = from_email
+        msg['To'] = recipient
+        msg.set_content(f'{title}\n\n{message}\n\nرابط لوحة الإدارة: {os.environ.get("SITE_URL", "").rstrip("/")}{url}')
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(smtp_username, smtp_password)
+            server.send_message(msg)
+        return True
+    except Exception:
+        app.logger.exception('Unable to send admin email notification')
+        return False
+
+
+def notify_admins(title, message, url='/admin'):
+    """Send in-site, phone push, and configured email notifications to administrators."""
+    for admin_user in User.query.filter_by(role='admin').all():
+        send_user_notification(admin_user.id, title, message, url)
+    send_admin_email_notification(title, message, url)
 
 
 def get_or_create_single_support_ticket(user_id):
@@ -327,39 +359,6 @@ def admin_required(fn):
 def current_user():
     return db.session.get(User, session.get('user_id')) if session.get('user_id') else None
 
-def serva_fernet():
-    # Derive an encryption key from the persistent Flask SECRET_KEY. The secret
-    # must remain stable in Render or previously stored API credentials cannot be decrypted.
-    digest = hashlib.sha256((app.config['SECRET_KEY'] + '|owj-serva-api-v1').encode('utf-8')).digest()
-    return Fernet(base64.urlsafe_b64encode(digest))
-
-def serva_encrypt(value):
-    return serva_fernet().encrypt(value.encode('utf-8')).decode('ascii') if value else ''
-
-def serva_decrypt(value):
-    if not value:
-        return ''
-    try:
-        return serva_fernet().decrypt(value.encode('ascii')).decode('utf-8')
-    except (InvalidToken, ValueError):
-        raise RuntimeError('تعذّر فك تشفير المفتاح. تأكد أن SECRET_KEY في Render لم يتغير.')
-
-def serva_api_call(api_key, action):
-    response = requests.post('https://serva-s.com/api/v1', data={'action': action, 'key': api_key}, timeout=25)
-    response.raise_for_status()
-    data = response.json()
-    if isinstance(data, dict) and data.get('error'):
-        raise ValueError(str(data.get('error')) + (f" ({data.get('error_code')})" if data.get('error_code') else ''))
-    return data
-
-def get_serva_config():
-    config = ServaAPIConfig.query.first()
-    if not config:
-        config = ServaAPIConfig()
-        db.session.add(config)
-        db.session.commit()
-    return config
-
 @app.before_request
 def enforce_account_ban():
     user_id = session.get('user_id')
@@ -373,7 +372,7 @@ def enforce_account_ban():
 
 @app.route('/')
 def index():
-    categories = Category.query.order_by(Category.id).all()
+    categories = Category.query.filter_by(parent_id=None).order_by(Category.id).all()
     services = Service.query.order_by(Service.id.desc()).all()
     return render_template('index.html', categories=categories, services=services)
 
@@ -385,15 +384,9 @@ def accounts():
 @app.route('/category/<int:category_id>')
 def category_services(category_id):
     category = Category.query.get_or_404(category_id)
-    subcategories = Subcategory.query.filter_by(category_id=category_id).order_by(Subcategory.id).all()
-    services = Service.query.filter_by(category_id=category_id, subcategory_id=None).order_by(Service.id.desc()).all()
-    return render_template('category_services.html', category=category, services=services, subcategories=subcategories, page_title=category.name)
-
-@app.route('/subcategory/<int:subcategory_id>')
-def subcategory_services(subcategory_id):
-    subcategory = Subcategory.query.get_or_404(subcategory_id)
-    services = Service.query.filter_by(subcategory_id=subcategory_id).order_by(Service.id.desc()).all()
-    return render_template('category_services.html', category=subcategory, services=services, subcategories=[], page_title=subcategory.name)
+    services = Service.query.filter_by(category_id=category_id).order_by(Service.id.desc()).all()
+    subcategories = Category.query.filter_by(parent_id=category_id).order_by(Category.id).all()
+    return render_template('category_services.html', category=category, services=services, subcategories=subcategories)
 
 @app.route('/login', methods=['GET','POST'])
 def login():
@@ -420,6 +413,8 @@ def register():
         else:
             user = User(username=username, full_name=request.form.get('full_name','').strip(), email=request.form.get('email','').strip(), phone=request.form.get('phone','').strip())
             user.set_password(password); db.session.add(user); db.session.commit()
+            notify_admins('تسجيل حساب جديد', f'تم إنشاء حساب جديد باسم {user.username} ومعرّفه #{user.id}.', url_for('admin_accounts', account_id=user.id))
+            db.session.commit()
             session.permanent = True
             session['user_id'] = user.id
             flash('تم إنشاء الحساب بنجاح.', 'success')
@@ -440,6 +435,23 @@ def profile():
         user.phone = request.form.get('phone', user.phone).strip()
         db.session.commit(); flash('تم تحديث بياناتك.', 'success'); return redirect(url_for('profile'))
     return render_template('profile.html', user=user)
+
+@app.route('/profile/change_password', methods=['POST'])
+@login_required
+def change_profile_password():
+    user = current_user()
+    current = request.form.get('current_password', '')
+    new = request.form.get('new_password', '')
+    confirm = request.form.get('confirm_password', '')
+    if not user.check_password(current):
+        flash('كلمة المرور الحالية غير صحيحة.', 'error')
+    elif len(new) < 8:
+        flash('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.', 'error')
+    elif new != confirm:
+        flash('تأكيد كلمة المرور غير مطابق.', 'error')
+    else:
+        user.set_password(new); db.session.commit(); flash('تم تغيير كلمة المرور بنجاح.', 'success')
+    return redirect(url_for('profile'))
 
 @app.route('/verification', methods=['GET', 'POST'])
 @login_required
@@ -463,6 +475,8 @@ def verification():
         req = VerificationRequest(user_id=user.id, full_name=user.full_name or user.username, email=email, phone=phone, gender=gender, age=age, status='pending')
         db.session.add(req)
         user.email = email; user.phone = phone
+        db.session.commit()
+        notify_admins('طلب توثيق جديد', f'أرسل {user.username} طلب توثيق حساب للمراجعة.', url_for('admin'))
         db.session.commit()
         flash('تم إرسال طلب التوثيق للإدارة للمراجعة.', 'success')
         return redirect(url_for('verification'))
@@ -528,6 +542,9 @@ def place_order(service_id):
     user.balance_usd -= total
     order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type == 'smm' else 'قيد المراجعة'))
     db.session.add(order); db.session.commit()
+    order_kind = 'تلقائي عبر API' if service.service_type == 'smm' else ('يدوي' if service.service_type == 'manual' else 'طلب خدمة')
+    notify_admins(f'طلب جديد {order_kind} #{order.id}', f'المستخدم {user.username} (#{user.id}) أرسل طلب {service.name} بقيمة ${format_money(total)}. الحالة: {order.status}.', url_for('admin'))
+    db.session.commit()
     flash(('تم إرسال طلبك إلى مزوّد الخدمة. رقم الطلب: ' + provider_order_id) if provider_order_id else 'تم استلام طلبك بنجاح.', 'success'); return redirect(url_for('my_orders'))
 
 @app.errorhandler(413)
@@ -556,19 +573,22 @@ def deposit():
             except ValueError as exc:
                 flash(str(exc), 'error')
                 return redirect(url_for('deposit'))
-            db.session.add(DepositRequest(
+            deposit_request = DepositRequest(
                 user_id=current_user().id,
                 amount=amount,
                 proof=request.form.get('proof', '').strip(),
                 proof_image=proof_image,
                 payment_method_name=selected_payment.name
-            ))
+            )
+            db.session.add(deposit_request)
+            db.session.commit()
+            notify_admins(f'طلب شحن رصيد جديد #{deposit_request.id}', f'المستخدم {current_user().username} (#{current_user().id}) طلب شحن ${format_money(amount)} عبر {selected_payment.name}.', url_for('admin'))
             db.session.commit()
             flash('تم إرسال طلب الشحن للمراجعة.', 'success')
             return redirect(url_for('deposit'))
     user = current_user() if session.get('user_id') else None
     my_deposits = DepositRequest.query.filter_by(user_id=user.id).order_by(DepositRequest.id.desc()).all() if user else []
-    return render_template('deposit.html', payments=payments, my_deposits=my_deposits)
+    return render_template('deposit.html', payments=payments, my_deposits=my_deposits, agents=Agent.query.order_by(Agent.id.desc()).all())
 
 @app.route('/agents')
 def agents(): return render_template('agents.html', agents=Agent.query.order_by(Agent.id.desc()).all())
@@ -627,6 +647,7 @@ def support_ticket(ticket_id):
             ticket.updated_at = datetime.utcnow()
             if role == 'user':
                 ticket.status = 'بانتظار الدعم'
+                notify_admins('رسالة دعم جديدة', f'أرسل {user.username} رسالة جديدة في محادثة الدعم #{ticket.id}.', url_for('admin_support_ticket', ticket_id=ticket.id))
             else:
                 ticket.status = 'تم الرد'
                 send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق أوج ميديا بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
@@ -686,7 +707,7 @@ def admin_support_ticket(ticket_id):
 @login_required
 def notifications_page():
     items = Notification.query.filter_by(user_id=current_user().id).order_by(Notification.created_at.desc()).limit(100).all()
-    return render_template('notifications.html', notifications=items, vapid_public_key=os.environ.get('VAPID_PUBLIC_KEY', ''))
+    return render_template('notifications.html', notifications=items, vapid_public_key=os.environ.get('VAPID_PUBLIC_KEY', ''), is_admin=(current_user().role == 'admin'))
 
 
 @app.route('/notifications/read/<int:notification_id>', methods=['POST'])
@@ -736,13 +757,7 @@ def admin_accounts():
 def admin():
     account_lookup_id = request.args.get('account_id', type=int)
     account_lookup = db.session.get(User, account_lookup_id) if account_lookup_id else None
-    config = ServaAPIConfig.query.first()
-    try:
-        serva_services = json.loads(config.services_json or '[]') if config else []
-        if not isinstance(serva_services, list): serva_services = []
-    except (ValueError, TypeError):
-        serva_services = []
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, serva_config=config, serva_services=serva_services)
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id)
 
 
 @app.route('/account-banned/<int:user_id>', methods=['GET'])
@@ -805,6 +820,20 @@ def admin_account_action():
         user.appeal_status = 'تمت المراجعة'
         db.session.commit()
         flash('تم تحديث حالة الاعتراض.', 'success')
+    elif action == 'make_trusted_merchant':
+        if user.role == 'admin':
+            flash('لا يمكن تغيير نوع حساب المدير.', 'error')
+        else:
+            user.role = 'merchant'
+            user.is_trusted_merchant = True
+            db.session.commit()
+            flash(f'تم تحويل الحساب #{user.id} إلى تاجر موثوق.', 'success')
+    elif action == 'remove_merchant':
+        if user.role == 'merchant':
+            user.role = 'user'
+            user.is_trusted_merchant = False
+            db.session.commit()
+            flash(f'تم إلغاء صفة التاجر عن الحساب #{user.id}.', 'success')
     return redirect(url_for('admin_accounts', account_id=user.id))
 
 @app.route('/admin/handle_deposit/<int:deposit_id>', methods=['POST'])
@@ -858,6 +887,33 @@ def handle_verification(req_id):
         req.status='rejected'; req.rejection_reason=reason
     db.session.commit(); flash('تم تحديث طلب التوثيق.', 'success'); return redirect(url_for('admin'))
 
+@app.route('/admin/withdraw_balance', methods=['POST'])
+@admin_required
+def withdraw_balance():
+    user_id = request.form.get('user_id', type=int)
+    amount = request.form.get('amount', type=float)
+    reason = request.form.get('reason', '').strip()
+    user = User.query.filter_by(id=user_id).with_for_update().first() if user_id else None
+    if not user:
+        flash('لم يتم العثور على حساب بهذا المعرف.', 'error')
+    elif amount is None or not math.isfinite(amount) or amount <= 0 or round(amount, 2) != amount:
+        flash('أدخل مبلغاً صحيحاً أكبر من صفر وبحد أقصى منزلتين عشريتين.', 'error')
+    elif not reason:
+        flash('اكتب سبب سحب الرصيد ليصل إلى إشعارات الزبون.', 'error')
+    elif amount > (user.balance_usd or 0):
+        flash(f'الرصيد غير كافٍ. الرصيد الحالي ${format_money(user.balance_usd)}.', 'error')
+    else:
+        # Keep a durable audit record and the balance change in one transaction.
+        user.balance_usd = round((user.balance_usd or 0) - amount, 2)
+        db.session.add(WalletTransaction(user_id=user.id, admin_id=current_user().id,
+                                         transaction_type='withdrawal', amount=amount, reason=reason[:500]))
+        send_user_notification(user.id, 'تم سحب مبلغ من محفظتك',
+            f'تم سحب ${format_money(amount)} من رصيدك. السبب: {reason[:350]}', url_for('profile'))
+        db.session.commit()
+        flash(f'تم سحب ${format_money(amount)} من حساب #{user.id} وإرسال إشعار له.', 'success')
+    return redirect(url_for('admin'))
+
+
 @app.route('/admin/send_balance', methods=['POST'])
 @admin_required
 def send_balance():
@@ -872,7 +928,7 @@ def add_merchant():
     username=request.form.get('username','').strip(); password=request.form.get('password','')
     if not username or len(password)<8 or User.query.filter_by(username=username).first(): flash('تعذر إنشاء التاجر: تحقق من البيانات وكلمة المرور (8 أحرف على الأقل).', 'error')
     else:
-        user=User(username=username, role='merchant', balance_usd=max(0, request.form.get('bonus',type=float) or 0)); user.set_password(password); db.session.add(user); db.session.commit(); flash('تم إنشاء حساب التاجر.', 'success')
+        user=User(username=username, role='merchant', is_trusted_merchant=True, balance_usd=max(0, request.form.get('bonus',type=float) or 0)); user.set_password(password); db.session.add(user); db.session.commit(); flash('تم إنشاء حساب التاجر.', 'success')
     return redirect(url_for('admin'))
 
 @app.route('/admin/add_payment', methods=['POST'])
@@ -924,72 +980,6 @@ def delete_sms_number_provider(provider_id):
 def add_agent():
     db.session.add(Agent(name=request.form.get('name','').strip(), city=request.form.get('city','').strip(), phone=request.form.get('phone','').strip(), details=request.form.get('address','').strip())); db.session.commit(); flash('تمت إضافة الوكيل.', 'success'); return redirect(url_for('admin'))
 
-@app.route('/admin/serva/save', methods=['POST'])
-@admin_required
-def save_serva_settings():
-    config = get_serva_config()
-    test_key = request.form.get('test_api_key', '').strip()
-    live_key = request.form.get('live_api_key', '').strip()
-    try:
-        if test_key:
-            if not test_key.startswith('srv_test_'):
-                raise ValueError('مفتاح التجربة يجب أن يبدأ بـ srv_test_.')
-            config.test_key_encrypted = serva_encrypt(test_key)
-        if live_key:
-            if not live_key.startswith('srv_live_'):
-                raise ValueError('المفتاح الفعلي يجب أن يبدأ بـ srv_live_.')
-            config.live_key_encrypted = serva_encrypt(live_key)
-        db.session.commit()
-        flash('تم حفظ إعدادات Serva بشكل مشفّر. ترك الحقل فارغاً يُبقي المفتاح المحفوظ كما هو.', 'success')
-    except Exception as exc:
-        db.session.rollback()
-        flash(str(exc), 'error')
-    return redirect(url_for('admin') + '#serva-api')
-
-@app.route('/admin/serva/test', methods=['POST'])
-@admin_required
-def test_serva_connection():
-    config = get_serva_config()
-    try:
-        key = serva_decrypt(config.test_key_encrypted)
-        if not key:
-            raise ValueError('احفظ مفتاح التجربة أولاً.')
-        result = serva_api_call(key, 'balance')
-        if not isinstance(result, dict) or 'balance' not in result:
-            raise ValueError('وصل رد غير متوقع من Serva.')
-        flash(f"الاتصال ناجح بمفتاح التجربة. الرصيد الظاهر: ${result.get('balance')} {result.get('currency', 'USD')} — لم يتم تنفيذ أي شراء.", 'success')
-    except Exception as exc:
-        flash('فشل اختبار الاتصال: ' + str(exc), 'error')
-    return redirect(url_for('admin') + '#serva-api')
-
-@app.route('/admin/serva/services', methods=['POST'])
-@admin_required
-def fetch_serva_services():
-    config = get_serva_config()
-    try:
-        key = serva_decrypt(config.test_key_encrypted)
-        if not key:
-            raise ValueError('احفظ مفتاح التجربة أولاً قبل جلب الخدمات.')
-        result = serva_api_call(key, 'services')
-        if isinstance(result, dict) and result.get('services') is not None:
-            result = result['services']
-        if not isinstance(result, list):
-            raise ValueError('صيغة قائمة الخدمات التي أعادها Serva غير متوقعة.')
-        # Keep only safe fields needed by the admin catalogue; never store or expose API keys.
-        clean = []
-        for item in result:
-            if not isinstance(item, dict) or not item.get('service'):
-                continue
-            clean.append({k: item.get(k) for k in ('service','name','name_ar','name_en','category','type','rate','min','max','refill','cancel','pricing_type','has_quantity','link_required','fields','reseller_discount_percent')})
-        config.services_json = json.dumps(clean, ensure_ascii=False)
-        config.last_services_sync = datetime.utcnow()
-        db.session.commit()
-        flash(f'تم جلب {len(clean)} خدمة من Serva بنجاح. اختر رقم الخدمة لنسخه إلى نموذج المنتج.', 'success')
-    except Exception as exc:
-        db.session.rollback()
-        flash('تعذّر جلب الخدمات: ' + str(exc), 'error')
-    return redirect(url_for('admin') + '#serva-api')
-
 @app.route('/admin/add_smm_provider', methods=['POST'])
 @admin_required
 def add_smm_provider():
@@ -1012,6 +1002,21 @@ def delete_smm_provider(provider_id):
         service.api_provider_id = None
     db.session.delete(provider); db.session.commit()
     flash('تم حذف مزوّد API وفصل الخدمات المرتبطة به.', 'success')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/add_subcategory', methods=['POST'])
+@admin_required
+def add_subcategory():
+    name = request.form.get('subcategory_name', '').strip()
+    parent_id = request.form.get('parent_id', type=int)
+    parent = Category.query.filter_by(id=parent_id, parent_id=None).first() if parent_id else None
+    if not name or not parent:
+        flash('اختر قسماً رئيسياً وأدخل اسم القسم الفرعي.', 'error')
+    elif Category.query.filter_by(name=name, parent_id=parent.id).first():
+        flash('القسم الفرعي موجود مسبقاً.', 'error')
+    else:
+        db.session.add(Category(name=name, parent_id=parent.id)); db.session.commit()
+        flash('تم إنشاء القسم الفرعي بنجاح.', 'success')
     return redirect(url_for('admin'))
 
 @app.route('/admin/add_service', methods=['POST'])
@@ -1041,17 +1046,7 @@ def add_service():
     api_service_id = request.form.get('api_service_id', '').strip() if typ == 'smm' else ''
     if typ == 'smm' and (not provider_id or not api_service_id):
         flash('لخدمة SMM تلقائية، اختر مزوّد API وأدخل رقم الخدمة لدى المزوّد.', 'error'); return redirect(url_for('admin'))
-    subcategory_name=request.form.get('subcategory_name','').strip()
-    subcategory=None
-    if subcategory_name:
-        subcategory=Subcategory.query.filter_by(name=subcategory_name, category_id=cat.id).first()
-        sub_image = save_uploaded_image('subcategory_image_file') or request.form.get('subcategory_image_url','').strip()
-        if not subcategory:
-            subcategory=Subcategory(name=subcategory_name, category_id=cat.id, image_url=sub_image)
-        elif sub_image:
-            subcategory.image_url=sub_image
-            db.session.add(subcategory); db.session.flush()
-    service=Service(name=name, category_id=cat.id, subcategory_id=(subcategory.id if subcategory else None), price=price, price_per_1000=price, min_quantity=(minimum if typ in ('smm', 'manual_quantity') else 1), max_quantity=(maximum if typ in ('smm', 'manual_quantity') else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, api_provider_id=provider_id, api_service_id=api_service_id, image_url=product_image, description=request.form.get('description','').strip(), is_available=(request.form.get('is_available', '1') == '1'))
+    service=Service(name=name, category_id=cat.id, price=price, price_per_1000=price, min_quantity=(minimum if typ in ('smm', 'manual_quantity') else 1), max_quantity=(maximum if typ in ('smm', 'manual_quantity') else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, api_provider_id=provider_id, api_service_id=api_service_id, image_url=product_image, description=request.form.get('description','').strip(), is_available=(request.form.get('is_available', '1') == '1'))
     db.session.add(service); db.session.commit(); flash('تمت إضافة الخدمة.', 'success'); return redirect(url_for('admin'))
 
 @app.route('/admin/update_service/<int:service_id>', methods=['POST'])
@@ -1087,14 +1082,6 @@ def update_service(service_id):
         return redirect(url_for('admin'))
     service.name = name
     service.category_id = category.id
-    subcategory_name=request.form.get('subcategory_name','').strip()
-    subcategory=Subcategory.query.filter_by(name=subcategory_name, category_id=category.id).first() if subcategory_name else None
-    if subcategory_name and not subcategory:
-        subcategory=Subcategory(name=subcategory_name, category_id=category.id); db.session.add(subcategory); db.session.flush()
-    if subcategory:
-        sub_image=save_uploaded_image('subcategory_image_file') or request.form.get('subcategory_image_url','').strip()
-        if sub_image: subcategory.image_url=sub_image
-    service.subcategory_id=subcategory.id if subcategory else None
     service.price = price
     service.price_per_1000 = price
     service.min_quantity = minimum if typ in ('smm', 'manual_quantity') else 1
@@ -1295,7 +1282,7 @@ with app.app_context():
     try:
         from sqlalchemy import inspect
         user_columns = {column['name'] for column in inspect(db.engine).get_columns('user')}
-        additions = [('is_banned', 'BOOLEAN DEFAULT FALSE'), ('ban_reason', "VARCHAR(500) DEFAULT ''"), ('ban_appeal', "TEXT DEFAULT ''"), ('appeal_status', "VARCHAR(30) DEFAULT ''")]
+        additions = [('is_banned', 'BOOLEAN DEFAULT FALSE'), ('ban_reason', "VARCHAR(500) DEFAULT ''"), ('ban_appeal', "TEXT DEFAULT ''"), ('appeal_status', "VARCHAR(30) DEFAULT ''"), ('is_trusted_merchant', 'BOOLEAN DEFAULT FALSE')]
         for column_name, definition in additions:
             if column_name not in user_columns:
                 db.session.execute(db.text(f'ALTER TABLE "user" ADD COLUMN {column_name} {definition}'))
@@ -1333,8 +1320,14 @@ with app.app_context():
             db.session.execute(db.text('ALTER TABLE service ADD COLUMN api_provider_id INTEGER'))
         if 'api_service_id' not in service_columns:
             db.session.execute(db.text("ALTER TABLE service ADD COLUMN api_service_id VARCHAR(80) DEFAULT ''"))
-        if 'subcategory_id' not in service_columns:
-            db.session.execute(db.text('ALTER TABLE service ADD COLUMN subcategory_id INTEGER'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    try:
+        from sqlalchemy import inspect
+        category_columns = {column['name'] for column in inspect(db.engine).get_columns('category')}
+        if 'parent_id' not in category_columns:
+            db.session.execute(db.text('ALTER TABLE category ADD COLUMN parent_id INTEGER'))
         db.session.commit()
     except Exception:
         db.session.rollback()

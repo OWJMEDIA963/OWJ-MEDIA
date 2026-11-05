@@ -19,25 +19,14 @@
 </style>
 <div class="max-w-4xl mx-auto px-3 py-4 space-y-4">
     <div class="bg-gray-900 border border-gray-800 rounded-2xl py-3 px-4 text-center shadow">
-        <h1 class="text-xs font-black text-white">قسم: {{ page_title or category.name }}</h1>
+        <h1 class="text-xs font-black text-white">قسم: {{ category.name }}</h1>
     </div>
 
     {% if subcategories %}
-    <section class="space-y-3">
-      <h2 class="text-sm font-black text-white">اختر القسم الفرعي</h2>
-      <div class="grid grid-cols-3 gap-3">
-      {% for sub in subcategories %}
-        <a href="/subcategory/{{ sub.id }}" class="overflow-hidden rounded-2xl border border-cyan-500/20 bg-gray-900 text-center shadow-lg">
-          {% if sub.image_url %}<img src="{{ sub.image_url }}" alt="{{ sub.name }}" class="w-full aspect-square object-cover">{% else %}<div class="w-full aspect-square flex items-center justify-center bg-gradient-to-br from-cyan-950 to-gray-900 text-3xl font-black text-cyan-300">{{ sub.name[:1] }}</div>{% endif %}
-          <div class="p-2 text-xs font-black text-white">{{ sub.name }}</div>
-          <div class="pb-2 text-[10px] text-cyan-300">{{ sub.services|length }} منتجات</div>
-        </a>
-      {% endfor %}
-      </div>
-    </section>
+    <section class="space-y-3"><h2 class="text-sm font-black text-white">الأقسام الفرعية</h2><div class="grid grid-cols-2 sm:grid-cols-3 gap-3">{% for sub in subcategories %}<a href="/category/{{ sub.id }}" class="rounded-2xl border border-cyan-500/20 bg-gray-900 p-4 text-center text-sm font-black text-white hover:border-cyan-400">{{ sub.name }}<p class="mt-2 text-xs font-normal text-cyan-300">{{ sub.services|length }} منتجات</p></a>{% endfor %}</div></section>
     {% endif %}
-
-    <div class="grid grid-cols-3 gap-2 sm:gap-4" style="display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;grid-auto-rows:1fr;align-items:stretch;width:100%;">
+    {% if services %}<h2 class="text-sm font-black text-white">{% if category.parent_id %}المنتجات{% else %}المنتجات والخدمات{% endif %}</h2>{% endif %}
+    {% if services %}<div class="grid grid-cols-3 gap-2 sm:gap-4" style="display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;grid-auto-rows:1fr;align-items:stretch;width:100%;">
         {% for service in services %}
         <div id="service-{{ service.id }}" class="owj-service-card min-w-0 bg-gray-900 border border-gray-800 rounded-xl sm:rounded-3xl p-1.5 sm:p-3 shadow-xl flex flex-col justify-between text-center group transition relative {% if not service.is_available %} opacity-90 {% endif %}" style="display:flex;flex-direction:column;width:100%;height:auto;min-width:0;min-height:0;box-sizing:border-box;overflow:hidden;position:relative;isolation:isolate;">
             <div class="owj-service-media">
@@ -70,7 +59,8 @@
             </div>
         </div>
         {% endfor %}
-    </div>
+    </div>{% endif %}
+    {% if not subcategories and not services %}<p class="rounded-xl bg-gray-900 p-4 text-center text-xs text-gray-400">لا توجد منتجات في هذا القسم حالياً.</p>{% endif %}
 </div>
 
 <!-- نافذة الطلب المنبثقة مع تغبيش الخلفية (Modal) والتوجيه التلقائي لطلباتي -->

@@ -4,8 +4,8 @@
 <div class="mx-auto max-w-3xl space-y-4 px-4 py-6">
   <div class="rounded-3xl border border-cyan-500/20 bg-gray-900 p-5">
     <h1 class="text-lg font-black text-white">الإشعارات</h1>
-    <p class="mt-2 text-xs leading-6 text-gray-400">ستظهر هنا تحديثات الدعم وشحن المحفظة. فعّل إشعارات الهاتف لتصلك حتى عندما لا تكون الصفحة مفتوحة.</p>
-    {% if vapid_public_key %}<button id="enablePush" type="button" class="mt-3 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black text-gray-950">تفعيل إشعارات الهاتف</button><p id="pushStatus" class="mt-2 text-[11px] text-gray-400"></p>{% else %}<p class="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-6 text-amber-200">الإشعارات داخل الموقع تعمل. لتفعيل الإشعارات على الهاتف حتى عند إغلاق الموقع، يجب ضبط مفاتيح VAPID في إعدادات Render أولاً.</p>{% endif %}
+    <p class="mt-2 text-xs leading-6 text-gray-400">{% if is_admin %}فعّل إشعارات الهاتف لتصلك تنبيهات فورية عند وصول طلب يدوي أو تلقائي، طلب شحن رصيد، تسجيل حساب جديد، طلب توثيق، أو رسالة دعم — حتى عندما لا تكون الصفحة مفتوحة.{% else %}ستظهر هنا تحديثات الدعم وشحن المحفظة. فعّل إشعارات الهاتف لتصلك حتى عندما لا تكون الصفحة مفتوحة.{% endif %}</p>
+    {% if vapid_public_key %}<button id="enablePush" type="button" class="mt-3 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black text-gray-950">تفعيل إشعارات الهاتف</button><p id="pushStatus" class="mt-2 text-[11px] text-gray-400"></p>{% endif %}
   </div>
   {% for item in notifications %}
   <div class="rounded-2xl border {% if item.is_read %}border-gray-800 bg-gray-900{% else %}border-cyan-500/30 bg-cyan-950/30{% endif %} p-4">

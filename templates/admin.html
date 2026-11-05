@@ -301,7 +301,7 @@
             <input name="name" required placeholder="اسم المنتج" class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white">
             <select name="category_id" required class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white"><option value="">اختر القسم الفرعي للمنتج</option>{% for cat in categories if cat.parent_id %}<option value="{{ cat.id }}">{{ cat.parent.name }} ← {{ cat.name }}</option>{% endfor %}</select>
             <input type="number" step="0.01" min="0" name="price_per_1000" required placeholder="السعر ($)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
-            <select name="service_type" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white"><option value="manual">يدوي بسعر ثابت</option><option value="manual_quantity">يدوي بالكمية</option><option value="smm">تلقائي API</option></select>
+            <select name="service_type" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white"><option value="manual">يدوي بسعر ثابت</option><option value="manual_quantity">يدوي بالكمية</option><option value="smm">تلقائي API بسعر لكل 1000</option><option value="smm_fixed">تلقائي API بسعر ثابت لكل طلب</option></select>
             <input type="number" name="min_quantity" value="1" min="1" required placeholder="الحد الأدنى" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
             <input type="number" name="max_quantity" value="10000" min="1" required placeholder="الحد الأقصى" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
             <input name="input_label" required placeholder="المطلوب من العميل (رابط/آيدي)" class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
@@ -331,7 +331,7 @@
                 <select name="service_type" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
                     <option value="manual">يدوي بسعر ثابت لكل طلب</option>
                     <option value="manual_quantity">يدوي بالكمية (سعر لكل 1000 نقطة/عملة)</option>
-                    <option value="smm">تلقائي SMM (ربط API)</option>
+                    <option value="smm">تلقائي API بسعر لكل 1000</option><option value="smm_fixed">تلقائي API بسعر ثابت لكل طلب</option>
                 </select>
                 <p class="text-[10px] leading-5 text-gray-500">اليدوي بالكمية مناسب لجواكر والنقاط والعملات: ضع السعر لكل 1000، وحدد الحد الأدنى والأقصى؛ الزبون يختار الكمية ويُحسب السعر تلقائياً، ثم تستلم الطلب وتنفذه يدوياً. اليدوي الثابت يبقى بسعر لكل طلب.</p>
             </div>
@@ -342,7 +342,7 @@
                 <div class="sm:col-span-2 rounded-xl border border-sky-500/30 bg-sky-950/20 p-3 space-y-2"><label class="block text-[11px] font-bold text-sky-300">اختيار خدمة جُلبت من API (اختياري)</label><select id="apiCatalogPicker" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">اختر خدمة من الكتالوج المحفوظ</option>{% for item in smm_catalog_services %}<option value="{{ item.service_code }}" data-provider="{{ item.provider_id }}" data-name="{{ item.name|e }}" data-rate="{{ item.rate }}" data-min="{{ item.min_quantity }}" data-max="{{ item.max_quantity }}">{{ item.provider.name }} · #{{ item.service_code }} · {{ item.name }} · {{ item.rate }}$ / 1000</option>{% endfor %}</select><button type="button" id="useApiCatalogService" class="rounded-lg bg-sky-500 px-4 py-2 text-xs font-black text-gray-950">استخدام رقم الخدمة في نموذج المنتج</button><p class="text-[10px] text-gray-400">عند الاختيار يتم تعبئة رقم الخدمة والمزوّد والسعر والحدود تلقائياً.</p></div>
                 <div><label class="block text-[11px] font-bold text-gray-300 mb-1">رقم الخدمة لدى مزوّد SMM</label><input id="apiServiceIdInput" name="api_service_id" placeholder="Service ID من لوحة المزوّد" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"></div>
             </div>
-            <p class="text-[10px] text-amber-300 leading-5">يجب اختيار المزوّد وإدخال رقم الخدمة عند اختيار النوع التلقائي SMM. الربط يستخدم واجهة API المتوافقة مع صيغة action=add / service / link / quantity.</p>
+            <p class="text-[10px] text-amber-300 leading-5">عند اختيار التلقائي API اختر المزوّد ورقم الخدمة. النوع بسعر ثابت يحاسب العميل مرة واحدة لكل طلب ويرسل كمية 1 للمزوّد. الربط يستخدم واجهة API المتوافقة مع صيغة action=add / service / link / quantity.</p>
 
             <label class="block text-xs font-bold text-gray-300">صورة المنتج / الخدمة (اختياري)</label>
             <input type="file" name="image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
@@ -376,7 +376,8 @@
                 <select name="service_type" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
                     <option value="manual" {% if s.service_type == 'manual' %}selected{% endif %}>يدوي بسعر ثابت لكل طلب</option>
                     <option value="manual_quantity" {% if s.service_type == 'manual_quantity' %}selected{% endif %}>يدوي بالكمية (لكل 1000)</option>
-                    <option value="smm" {% if s.service_type == 'smm' %}selected{% endif %}>تلقائي SMM عبر API</option>
+                    <option value="smm" {% if s.service_type == 'smm' %}selected{% endif %}>تلقائي API بسعر لكل 1000</option>
+                    <option value="smm_fixed" {% if s.service_type == 'smm_fixed' %}selected{% endif %}>تلقائي API بسعر ثابت لكل طلب</option>
                 </select>
                 <input name="input_label" value="{{ s.input_label }}" required placeholder="حقل بيانات الزبون" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
                 <textarea name="description" rows="2" placeholder="الوصف / التنبيه الأحمر" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">{{ s.description or '' }}</textarea>

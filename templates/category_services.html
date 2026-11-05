@@ -3,12 +3,12 @@
 {% block content %}
 <style>
 /* Force all service text and controls below the image, never on top of it */
-.owj-service-card{display:flex!important;flex-direction:column!important;justify-content:flex-start!important;align-items:stretch!important;position:relative!important;isolation:isolate;min-width:0;min-height:0!important;height:auto!important;aspect-ratio:auto!important;padding:0!important;overflow:hidden!important;background:#111827!important;border:1px solid rgba(34,211,238,.28)!important;}
-.owj-service-media{position:relative!important;display:block!important;flex:0 0 auto!important;width:100%!important;aspect-ratio:3/4!important;overflow:hidden!important;background:#030712;order:0!important;}
-.owj-service-background{position:absolute!important;inset:0!important;z-index:0!important;width:100%!important;height:100%!important;object-fit:cover!important;object-position:center!important;opacity:1!important;border-radius:0!important;}
+.owj-service-card{display:flex!important;flex-direction:column!important;justify-content:flex-start!important;align-items:stretch!important;position:relative!important;isolation:isolate;min-width:0;min-height:0!important;height:auto!important;aspect-ratio:auto!important;padding:0!important;overflow:hidden!important;background:linear-gradient(155deg,#1b293b,#0c1423)!important;border:1px solid rgba(34,211,238,.34)!important;border-radius:18px!important;box-shadow:0 9px 24px rgba(0,0,0,.25)!important;}
+.owj-service-media{position:relative!important;display:block!important;flex:0 0 auto!important;width:100%!important;aspect-ratio:4/3!important;overflow:hidden!important;background:radial-gradient(circle at 50% 40%,#263449,#080f1d 78%);order:0!important;padding:9px!important;box-sizing:border-box!important;}
+.owj-service-background{position:absolute!important;inset:0!important;z-index:0!important;width:100%!important;height:100%!important;object-fit:contain!important;object-position:center!important;opacity:1!important;border-radius:12px!important;filter:drop-shadow(0 6px 12px rgba(0,0,0,.28));}
 .owj-service-media:after{content:"";position:absolute;inset:0;z-index:1;background:transparent!important;pointer-events:none;}
-.owj-service-placeholder{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(6,182,212,.28),rgba(17,24,39,.9));color:#67e8f9;font-size:30px;font-weight:900;}
-.owj-service-content{position:relative!important;inset:auto!important;z-index:2!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;flex:0 0 auto!important;width:100%!important;min-height:0!important;box-sizing:border-box!important;order:1!important;padding:11px 8px 8px!important;background:rgba(15,23,42,.98)!important;}
+.owj-service-placeholder{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(6,182,212,.28),rgba(17,24,39,.9));border-radius:12px;color:#67e8f9;font-size:30px;font-weight:900;}
+.owj-service-content{position:relative!important;inset:auto!important;z-index:2!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;flex:0 0 auto!important;width:100%!important;min-height:0!important;box-sizing:border-box!important;order:1!important;padding:13px 10px 10px!important;background:linear-gradient(180deg,#111d30,#0f172a)!important;}
 .owj-service-content h3,.owj-service-content p,.owj-service-content span{position:static!important;text-shadow:none!important;}
 .owj-service-content h3{font-size:clamp(11px,2.6vw,14px);line-height:1.35;overflow-wrap:anywhere;color:#fff!important;}
 .owj-service-content p{font-size:clamp(12px,2.8vw,15px)!important;line-height:1.4!important;color:#67e8f9!important;margin:3px 0!important;font-weight:900!important;}
@@ -24,7 +24,7 @@
     </div>
 
     {% if subcategories %}
-    <section class="space-y-3"><h2 class="text-sm font-black text-white">الأقسام الفرعية</h2><div class="grid grid-cols-3 gap-2.5 sm:gap-3.5">{% for sub in subcategories %}<a href="/category/{{ sub.id }}" class="min-w-0 overflow-hidden rounded-xl sm:rounded-2xl border border-cyan-500/20 bg-gray-900 text-center text-xs sm:text-sm font-black text-white hover:border-cyan-400 transition">{% if sub.image_url %}<img src="{{ sub.image_url }}" alt="{{ sub.name }}" loading="lazy" class="block w-full aspect-[3/4] object-cover bg-gray-950">{% else %}<div class="flex w-full aspect-[3/4] items-center justify-center bg-gradient-to-br from-cyan-950 to-gray-900 text-2xl font-black text-cyan-300">{{ sub.name[:1] }}</div>{% endif %}<div class="p-2.5"><div class="line-clamp-2">{{ sub.name }}</div><p class="mt-1 text-[10px] font-normal text-cyan-300">{{ sub.services|length }} منتجات</p></div></a>{% endfor %}</div></section>
+    <section class="space-y-3"><h2 class="text-sm font-black text-white">الأقسام الفرعية</h2><div class="grid grid-cols-3 gap-2.5 sm:gap-3.5">{% for sub in subcategories %}<a href="/category/{{ sub.id }}" class="min-w-0 overflow-hidden rounded-xl sm:rounded-2xl border border-cyan-500/20 bg-gray-900 text-center text-xs sm:text-sm font-black text-white hover:border-cyan-400 transition">{% if sub.image_url %}<img src="{{ sub.image_url }}" alt="{{ sub.name }}" loading="lazy" class="block w-full aspect-[4/3] object-contain p-2 bg-gradient-to-br from-slate-800 to-gray-950">{% else %}<div class="flex w-full aspect-[4/3] items-center justify-center bg-gradient-to-br from-cyan-950 to-gray-900 text-2xl font-black text-cyan-300">{{ sub.name[:1] }}</div>{% endif %}<div class="p-2.5"><div class="line-clamp-2">{{ sub.name }}</div><p class="mt-1 text-[10px] font-normal text-cyan-300">{{ sub.services|length }} منتجات</p></div></a>{% endfor %}</div></section>
     {% endif %}
     {% if services %}<h2 class="text-sm font-black text-white">{% if category.parent_id %}المنتجات{% else %}المنتجات والخدمات{% endif %}</h2>{% endif %}
     {% if services %}<div class="owj-products-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5" style="display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;grid-auto-rows:1fr;align-items:stretch;width:100%;">
@@ -39,7 +39,7 @@
             </div>
             <div class="owj-service-content">
                 <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
-                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">${{ (service.price_per_1000 or service.price if service.service_type in ['smm', 'manual_quantity'] else service.price)|money }}</p>
+                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">${{ (service.price_per_1000 or service.price if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price)|money }}</p>
                 {% if service.is_available %}
                 <span class="text-[8px] sm:text-[9px] text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded-full border border-emerald-500/30">متوفرة</span>
                 {% else %}
@@ -49,7 +49,7 @@
 
             <div class="mt-1 sm:mt-2">
                 {% if service.is_available %}
-                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.price_per_1000 if service.service_type in ['smm', 'manual_quantity'] else service.price }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}">
+                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.price_per_1000 if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}">
                     اطلب الآن
                 </button>
                 {% else %}

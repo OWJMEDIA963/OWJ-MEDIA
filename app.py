@@ -528,8 +528,8 @@ def place_order(service_id):
     if not service.is_available:
         flash('هذه الخدمة غير متوفرة حالياً.', 'error'); return redirect(url_for('category_services', category_id=service.category_id))
     link = request.form.get('link','').strip()
-    if service.service_type == 'manual':
-        # طلب يدوي بسعر ثابت لكل طلب.
+    if service.service_type in ('manual', 'smm_fixed'):
+        # manual أو API بسعر ثابت لكل طلب: لا توجد كمية يحددها العميل.
         quantity = 1
         if not link:
             flash('أدخل الآيدي أو البيانات المطلوبة.', 'error'); return redirect(url_for('category_services', category_id=service.category_id))
@@ -552,7 +552,9 @@ def place_order(service_id):
     if user.balance_usd < total:
         flash('رصيدك غير كافٍ. يرجى شحن المحفظة أولاً.', 'error'); return redirect(url_for('deposit'))
     provider_order_id = ''
-    if service.service_type == 'smm':
+    if service.service_type in ('smm', 'smm_fixed'):
+        if service.service_type == 'smm_fixed':
+            quantity = 1
         provider = SMMProvider.query.filter_by(id=service.api_provider_id, is_active=True).first() if service.api_provider_id else None
         if not provider or not service.api_service_id:
             flash('هذه الخدمة التلقائية غير مربوطة بمزوّد API بشكل صحيح. تواصل مع الإدارة.', 'error')
@@ -572,9 +574,9 @@ def place_order(service_id):
             flash('لم يقبل مزوّد الخدمة الطلب. لم يتم خصم رصيدك؛ تحقق من إعدادات API وحاول لاحقاً.', 'error')
             return redirect(url_for('category_services', category_id=service.category_id))
     user.balance_usd -= total
-    order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type == 'smm' else 'قيد المراجعة'))
+    order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type in ('smm', 'smm_fixed') else 'قيد المراجعة'))
     db.session.add(order); db.session.commit()
-    order_kind = 'تلقائي عبر API' if service.service_type == 'smm' else ('يدوي' if service.service_type == 'manual' else 'طلب خدمة')
+    order_kind = 'تلقائي عبر API' if service.service_type in ('smm', 'smm_fixed') else ('يدوي' if service.service_type == 'manual' else 'طلب خدمة')
     notify_admins(f'طلب جديد {order_kind} #{order.id}', f'المستخدم {user.username} (#{user.id}) أرسل طلب {service.name} بقيمة ${format_money(total)}. الحالة: {order.status}.', url_for('admin'))
     db.session.commit()
     flash(('تم إرسال طلبك إلى مزوّد الخدمة. رقم الطلب: ' + provider_order_id) if provider_order_id else 'تم استلام طلبك بنجاح.', 'success'); return redirect(url_for('my_orders'))
@@ -1141,15 +1143,15 @@ def add_service():
     if category_image: cat.image_url = category_image
     price=request.form.get('price_per_1000',type=float) or 0
     typ=request.form.get('service_type','manual')
-    if typ not in ('manual', 'manual_quantity', 'smm'): typ = 'manual'
+    if typ not in ('manual', 'manual_quantity', 'smm', 'smm_fixed'): typ = 'manual'
     minimum = request.form.get('min_quantity',type=int) or 1
     maximum = request.form.get('max_quantity',type=int) or 10000
     if price < 0 or minimum < 1 or maximum < minimum:
         flash('تحقق من السعر والحد الأدنى والأقصى للكمية.', 'error')
         return redirect(url_for('admin'))
-    provider_id = request.form.get('api_provider_id', type=int) if typ == 'smm' else None
-    api_service_id = request.form.get('api_service_id', '').strip() if typ == 'smm' else ''
-    if typ == 'smm' and (not provider_id or not api_service_id):
+    provider_id = request.form.get('api_provider_id', type=int) if typ in ('smm', 'smm_fixed') else None
+    api_service_id = request.form.get('api_service_id', '').strip() if typ in ('smm', 'smm_fixed') else ''
+    if typ in ('smm', 'smm_fixed') and (not provider_id or not api_service_id):
         flash('لخدمة SMM تلقائية، اختر مزوّد API وأدخل رقم الخدمة لدى المزوّد.', 'error'); return redirect(url_for('admin'))
     service=Service(name=name, category_id=cat.id, price=price, price_per_1000=price, min_quantity=(minimum if typ in ('smm', 'manual_quantity') else 1), max_quantity=(maximum if typ in ('smm', 'manual_quantity') else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, api_provider_id=provider_id, api_service_id=api_service_id, image_url=product_image, description=request.form.get('description','').strip(), is_available=(request.form.get('is_available', '1') == '1'))
     db.session.add(service); db.session.commit(); flash('تمت إضافة الخدمة.', 'success'); return redirect(url_for('admin'))
@@ -1180,13 +1182,13 @@ def update_service(service_id):
         flash('تحقق من السعر والحد الأدنى والأقصى.', 'error')
         return redirect(url_for('admin'))
     typ = request.form.get('service_type', 'manual')
-    if typ not in ('manual', 'manual_quantity', 'smm'): typ = 'manual'
+    if typ not in ('manual', 'manual_quantity', 'smm', 'smm_fixed'): typ = 'manual'
     if price < 0 or minimum < 1 or maximum < minimum:
         flash('السعر يجب أن يكون موجباً، والحد الأقصى أكبر من أو يساوي الحد الأدنى.', 'error')
         return redirect(url_for('admin'))
-    provider_id = request.form.get('api_provider_id', type=int) if typ == 'smm' else None
-    api_service_id = request.form.get('api_service_id', '').strip() if typ == 'smm' else ''
-    if typ == 'smm' and (not provider_id or not api_service_id):
+    provider_id = request.form.get('api_provider_id', type=int) if typ in ('smm', 'smm_fixed') else None
+    api_service_id = request.form.get('api_service_id', '').strip() if typ in ('smm', 'smm_fixed') else ''
+    if typ in ('smm', 'smm_fixed') and (not provider_id or not api_service_id):
         flash('اختر مزوّد API وأدخل رقم الخدمة للتلقائي SMM.', 'error')
         return redirect(url_for('admin'))
     service.name = name

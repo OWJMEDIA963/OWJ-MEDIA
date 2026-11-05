@@ -280,6 +280,16 @@
         {% endif %}
     </section>
 
+    <!-- إنشاء قسم رئيسي -->
+    <section class="bg-gray-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl space-y-4">
+        <h2 class="text-base font-black text-emerald-300">إنشاء قسم رئيسي</h2>
+        <p class="text-xs text-gray-400">أنشئ قسماً رئيسياً جديداً، وبعدها يمكنك إضافة أقسام فرعية ومنتجات بداخله.</p>
+        <form action="/admin/add_category" method="POST" class="flex flex-col sm:flex-row gap-3">
+            <input name="category_name" required maxlength="120" placeholder="اسم القسم الرئيسي الجديد" class="flex-1 bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-400">
+            <button type="submit" class="rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-black text-gray-950">+ إنشاء القسم الرئيسي</button>
+        </form>
+    </section>
+
     <!-- إنشاء قسم فرعي -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4"><h2 class="text-sm font-black text-white">إضافة قسم فرعي</h2><form action="/admin/add_subcategory" method="POST" class="space-y-3"><select name="parent_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي</option>{% for cat in categories if not cat.parent_id %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select><input name="subcategory_name" required placeholder="اسم القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><button class="w-full rounded-2xl bg-cyan-500 py-3 text-xs font-black text-gray-950">إنشاء القسم الفرعي</button></form></div>
 

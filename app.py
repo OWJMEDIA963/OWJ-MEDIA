@@ -1088,6 +1088,21 @@ def delete_smm_provider(provider_id):
     flash('تم حذف مزوّد API وفصل الخدمات المرتبطة به.', 'success')
     return redirect(url_for('admin'))
 
+@app.route('/admin/add_category', methods=['POST'])
+@admin_required
+def add_category():
+    name = request.form.get('category_name', '').strip()
+    if not name:
+        flash('أدخل اسم القسم الرئيسي.', 'error')
+    elif Category.query.filter_by(name=name, parent_id=None).first():
+        flash('القسم الرئيسي موجود مسبقاً.', 'error')
+    else:
+        db.session.add(Category(name=name, parent_id=None))
+        db.session.commit()
+        flash('تم إنشاء القسم الرئيسي بنجاح.', 'success')
+    return redirect(url_for('admin'))
+
+
 @app.route('/admin/add_subcategory', methods=['POST'])
 @admin_required
 def add_subcategory():

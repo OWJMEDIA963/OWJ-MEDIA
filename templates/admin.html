@@ -2,13 +2,25 @@
 {% block title %}لوحة التحكم الإدارية{% endblock %}
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
-    
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl flex items-center justify-between">
+    <!-- بطاقة إدارة الحسابات: مستقلة وبأعلى الصفحة لتظهر بوضوح على الهاتف -->
+    <a href="/admin/accounts" class="group block w-full rounded-3xl border-2 border-violet-400 bg-gradient-to-l from-violet-800 to-indigo-700 p-5 text-white shadow-xl transition hover:from-violet-700 hover:to-indigo-600 focus:outline-none focus:ring-4 focus:ring-violet-300/40">
+        <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+                <span class="mb-2 inline-flex rounded-full bg-white/15 px-3 py-1 text-[11px] font-black">قسم الإدارة</span>
+                <h2 class="text-lg font-black leading-relaxed">إدارة الحسابات واسترجاعها والحظر</h2>
+                <p class="mt-1 text-xs leading-6 text-violet-100">ابحث عن الزبون باستخدام ID، غيّر كلمة مروره، راجع الاعتراضات أو احظر الحساب.</p>
+            </div>
+            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-2xl font-black text-violet-700" aria-hidden="true">›</span>
+        </div>
+        <div class="mt-4 rounded-xl bg-white px-4 py-3 text-center text-sm font-black text-violet-800">فتح إدارة الحسابات الآن</div>
+    </a>
+
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl flex flex-col gap-4">
         <div>
             <h1 class="text-base font-black text-white mb-1">لوحة التحكم الإدارية</h1>
             <p class="text-xs text-gray-400">إدارة الحسابات والطلبات والمحافظ والخدمات والوكلاء والدعم والنسخ الاحتياطي.</p>
         </div>
-        <div class="flex flex-col sm:flex-row gap-2">
+        <div class="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
             <a href="/admin/export_backup" class="bg-cyan-500 hover:bg-cyan-400 text-gray-950 px-4 py-2.5 rounded-2xl text-xs font-black transition shadow text-center">
                 تنزيل نسخة احتياطية كاملة (CSV)
             </a>
@@ -17,10 +29,29 @@
                 <button type="submit" onclick="return confirm('تحذير: ستستبدل هذه العملية بيانات قاعدة الموقع الحالية بالكامل بالبيانات الموجودة في النسخة الاحتياطية، بما فيها الحسابات والأرصدة والطلبات والخدمات والوكلاء والشكاوى. خذ نسخة احتياطية حالية أولاً. هل تريد المتابعة؟')" class="bg-amber-400 hover:bg-amber-300 text-gray-950 px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap">استعادة النسخة الكاملة</button>
             </form>
         </div>
-        <a href="/admin/support" class="bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-2xl text-xs font-black text-center">الشكاوى ورسائل الدعم</a>
+        <div class="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <a href="/admin/support" class="bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-2xl text-xs font-black text-center">الشكاوى ورسائل الدعم</a>
+        </div>
     </div>
 
 
+
+
+    <!-- استرجاع الحسابات وإدارة الحظر -->
+    <section class="rounded-3xl border border-violet-500/30 bg-gray-900 p-6 shadow-xl space-y-4">
+        <div><h2 class="text-sm font-black text-white">استرجاع الحسابات وإدارة الحظر</h2><p class="mt-1 text-xs text-gray-400">ابحث باستخدام معرّف المستخدم الظاهر في صفحة حسابه الشخصية.</p></div>
+        <form method="get" action="/admin" class="flex flex-col sm:flex-row gap-2"><input type="number" min="1" name="account_id" value="{{ account_lookup_id or '' }}" required placeholder="أدخل معرّف الحساب مثال 125" class="min-w-0 flex-1 rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white"><button class="rounded-xl bg-violet-600 px-5 py-3 text-xs font-black text-white">بحث عن الحساب</button></form>
+        {% if account_lookup %}
+        <div class="rounded-2xl border border-gray-700 bg-gray-950 p-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2"><b class="text-white">الحساب #{{ account_lookup.id }} — {{ account_lookup.username }}</b><span class="rounded-lg px-3 py-1 text-xs {% if account_lookup.is_banned %}bg-rose-500/15 text-rose-300{% else %}bg-emerald-500/15 text-emerald-300{% endif %}">{% if account_lookup.is_banned %}محظور{% else %}نشط{% endif %}</span></div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-300"><p>الاسم: {{ account_lookup.full_name or '-' }}</p><p>اسم المستخدم: {{ account_lookup.username }}</p><p>البريد: {{ account_lookup.email or '-' }}</p><p>الهاتف: {{ account_lookup.phone or '-' }}</p><p>الرصيد: ${{ account_lookup.balance_usd|money }}</p><p>تاريخ الإنشاء: {{ account_lookup.created_at.strftime('%Y-%m-%d') if account_lookup.created_at else '-' }}</p></div>
+            <p class="text-[11px] text-amber-300">لا يمكن عرض كلمة المرور القديمة لأنها محفوظة بشكل مشفّر؛ يمكنك تعيين كلمة مرور جديدة لصاحب الحساب.</p>
+            <form action="/admin/account_action" method="post" class="space-y-2"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="reset_password"><input type="password" name="new_password" minlength="8" required placeholder="كلمة مرور جديدة (8 أحرف على الأقل)" class="w-full rounded-xl border border-gray-700 bg-gray-900 p-3 text-xs text-white"><button class="w-full rounded-xl bg-cyan-600 p-3 text-xs font-black text-white">تعيين كلمة مرور جديدة</button></form>
+            {% if account_lookup.is_banned %}<p class="rounded-xl bg-rose-500/10 p-3 text-xs text-rose-300">سبب الحظر: {{ account_lookup.ban_reason or '-' }}</p>{% if account_lookup.ban_appeal %}<div class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-gray-200"><b class="text-amber-300">اعتراض المستخدم ({{ account_lookup.appeal_status or 'جديد' }}):</b><p class="mt-2 whitespace-pre-wrap">{{ account_lookup.ban_appeal }}</p><form action="/admin/account_action" method="post" class="mt-2"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="appeal_reviewed"><button class="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">تحديد الاعتراض كمراجع</button></form></div>{% endif %}<form action="/admin/account_action" method="post"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="unban"><button class="w-full rounded-xl bg-emerald-600 p-3 text-xs font-black text-white">رفع الحظر عن الحساب</button></form>
+            {% else %}<form action="/admin/account_action" method="post" class="space-y-2" onsubmit="return confirm('تأكيد حظر هذا الحساب؟')"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="ban"><input name="ban_reason" maxlength="500" placeholder="سبب الحظر الذي سيظهر للمستخدم" class="w-full rounded-xl border border-rose-500/30 bg-gray-900 p-3 text-xs text-white"><button class="w-full rounded-xl bg-rose-600 p-3 text-xs font-black text-white">حظر الحساب</button></form>{% endif %}
+        </div>
+        {% elif account_lookup_id %}<p class="rounded-xl bg-rose-500/10 p-3 text-xs text-rose-300">لم يتم العثور على حساب بهذا المعرف.</p>{% endif %}
+    </section>
 
     <!-- طلبات شحن المحفظة والتحويلات -->
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
@@ -45,7 +76,7 @@
             </div>
             {% endfor %}
         </div>
-        {% else %}<p class="py-3 text-center text-xs text-gray-500">لا توجد طلبات شحن حتى الآن.</p>{% endif %}
+        {% else %}<p class="py-3 text-center text-xs text-gray-500">لا توجد طلبات شحن قيد المراجعة حالياً.</p>{% endif %}
     </section>
 
     <!-- الطلبات اليدوية والواردة للموقع -->
@@ -119,9 +150,20 @@
         </form>
     </div>
 
+    <!-- سحب رصيد من حساب مستخدم مع إشعار وسبب -->
+    <div class="rounded-3xl border border-rose-500/30 bg-gray-900 p-6 shadow-xl space-y-4">
+        <div><h2 class="text-sm font-black text-white">سحب رصيد من حساب زبون عبر ID</h2><p class="mt-1 text-xs text-gray-400">سيتم خصم المبلغ من المحفظة وحفظ سجل للعملية وإرسال إشعار للزبون يتضمن السبب.</p></div>
+        <form action="/admin/withdraw_balance" method="POST" class="space-y-3" onsubmit="return confirm('تأكيد خصم المبلغ من محفظة هذا المستخدم؟')">
+            <input type="number" min="1" name="user_id" placeholder="معرّف المستخدم ID" required class="w-full rounded-2xl border border-gray-800 bg-gray-950 px-4 py-3 text-xs text-white">
+            <input type="number" min="0.01" step="0.01" name="amount" placeholder="المبلغ المراد سحبه ($)" required class="w-full rounded-2xl border border-gray-800 bg-gray-950 px-4 py-3 text-xs text-white">
+            <textarea name="reason" maxlength="500" rows="3" placeholder="سبب سحب الرصيد — سيصل للزبون في الإشعارات" required class="w-full rounded-2xl border border-gray-800 bg-gray-950 px-4 py-3 text-xs text-white"></textarea>
+            <button type="submit" class="w-full rounded-2xl bg-rose-600 py-3 text-xs font-black text-white">تأكيد سحب الرصيد وإرسال الإشعار</button>
+        </form>
+    </div>
+
     <!-- إدارة حسابات التجار -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <h2 class="text-sm font-black text-white">إدارة حسابات التجار</h2>
+        <h2 class="text-sm font-black text-white">إدارة حسابات التجار الموثوقين</h2><p class="text-xs text-gray-400">أي حساب تنشئه من هنا سيحصل تلقائياً على شارة تاجر موثوق ✓.</p>
         <form action="/admin/add_merchant" method="POST" class="space-y-3">
             <input type="text" name="username" placeholder="اسم المستخدم" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
             <input type="password" name="password" placeholder="كلمة المرور" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">

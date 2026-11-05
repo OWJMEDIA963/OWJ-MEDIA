@@ -1,6 +1,7 @@
 import os
 import base64
 import mimetypes
+import math
 import requests
 from datetime import datetime, timedelta
 from functools import wraps
@@ -86,6 +87,7 @@ class User(db.Model):
     role = db.Column(db.String(20), default='user')
     balance_usd = db.Column(db.Float, default=0.0)
     is_verified = db.Column(db.Boolean, default=False)
+    is_trusted_merchant = db.Column(db.Boolean, default=False)
     is_banned = db.Column(db.Boolean, default=False)
     ban_reason = db.Column(db.String(500), default='')
     ban_appeal = db.Column(db.Text, default='')
@@ -209,6 +211,18 @@ class SupportMessage(db.Model):
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     sender = db.relationship('User')
+
+
+class WalletTransaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    transaction_type = db.Column(db.String(30), nullable=False, default='withdrawal')
+    amount = db.Column(db.Float, nullable=False)
+    reason = db.Column(db.String(500), nullable=False, default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    user = db.relationship('User', foreign_keys=[user_id])
+    admin = db.relationship('User', foreign_keys=[admin_id])
 
 
 class Notification(db.Model):
@@ -737,6 +751,20 @@ def admin_account_action():
         user.appeal_status = 'تمت المراجعة'
         db.session.commit()
         flash('تم تحديث حالة الاعتراض.', 'success')
+    elif action == 'make_trusted_merchant':
+        if user.role == 'admin':
+            flash('لا يمكن تغيير نوع حساب المدير.', 'error')
+        else:
+            user.role = 'merchant'
+            user.is_trusted_merchant = True
+            db.session.commit()
+            flash(f'تم تحويل الحساب #{user.id} إلى تاجر موثوق.', 'success')
+    elif action == 'remove_merchant':
+        if user.role == 'merchant':
+            user.role = 'user'
+            user.is_trusted_merchant = False
+            db.session.commit()
+            flash(f'تم إلغاء صفة التاجر عن الحساب #{user.id}.', 'success')
     return redirect(url_for('admin_accounts', account_id=user.id))
 
 @app.route('/admin/handle_deposit/<int:deposit_id>', methods=['POST'])
@@ -790,6 +818,33 @@ def handle_verification(req_id):
         req.status='rejected'; req.rejection_reason=reason
     db.session.commit(); flash('تم تحديث طلب التوثيق.', 'success'); return redirect(url_for('admin'))
 
+@app.route('/admin/withdraw_balance', methods=['POST'])
+@admin_required
+def withdraw_balance():
+    user_id = request.form.get('user_id', type=int)
+    amount = request.form.get('amount', type=float)
+    reason = request.form.get('reason', '').strip()
+    user = User.query.filter_by(id=user_id).with_for_update().first() if user_id else None
+    if not user:
+        flash('لم يتم العثور على حساب بهذا المعرف.', 'error')
+    elif amount is None or not math.isfinite(amount) or amount <= 0 or round(amount, 2) != amount:
+        flash('أدخل مبلغاً صحيحاً أكبر من صفر وبحد أقصى منزلتين عشريتين.', 'error')
+    elif not reason:
+        flash('اكتب سبب سحب الرصيد ليصل إلى إشعارات الزبون.', 'error')
+    elif amount > (user.balance_usd or 0):
+        flash(f'الرصيد غير كافٍ. الرصيد الحالي ${format_money(user.balance_usd)}.', 'error')
+    else:
+        # Keep a durable audit record and the balance change in one transaction.
+        user.balance_usd = round((user.balance_usd or 0) - amount, 2)
+        db.session.add(WalletTransaction(user_id=user.id, admin_id=current_user().id,
+                                         transaction_type='withdrawal', amount=amount, reason=reason[:500]))
+        send_user_notification(user.id, 'تم سحب مبلغ من محفظتك',
+            f'تم سحب ${format_money(amount)} من رصيدك. السبب: {reason[:350]}', url_for('profile'))
+        db.session.commit()
+        flash(f'تم سحب ${format_money(amount)} من حساب #{user.id} وإرسال إشعار له.', 'success')
+    return redirect(url_for('admin'))
+
+
 @app.route('/admin/send_balance', methods=['POST'])
 @admin_required
 def send_balance():
@@ -804,7 +859,7 @@ def add_merchant():
     username=request.form.get('username','').strip(); password=request.form.get('password','')
     if not username or len(password)<8 or User.query.filter_by(username=username).first(): flash('تعذر إنشاء التاجر: تحقق من البيانات وكلمة المرور (8 أحرف على الأقل).', 'error')
     else:
-        user=User(username=username, role='merchant', balance_usd=max(0, request.form.get('bonus',type=float) or 0)); user.set_password(password); db.session.add(user); db.session.commit(); flash('تم إنشاء حساب التاجر.', 'success')
+        user=User(username=username, role='merchant', is_trusted_merchant=True, balance_usd=max(0, request.form.get('bonus',type=float) or 0)); user.set_password(password); db.session.add(user); db.session.commit(); flash('تم إنشاء حساب التاجر.', 'success')
     return redirect(url_for('admin'))
 
 @app.route('/admin/add_payment', methods=['POST'])
@@ -1143,7 +1198,7 @@ with app.app_context():
     try:
         from sqlalchemy import inspect
         user_columns = {column['name'] for column in inspect(db.engine).get_columns('user')}
-        additions = [('is_banned', 'BOOLEAN DEFAULT FALSE'), ('ban_reason', "VARCHAR(500) DEFAULT ''"), ('ban_appeal', "TEXT DEFAULT ''"), ('appeal_status', "VARCHAR(30) DEFAULT ''")]
+        additions = [('is_banned', 'BOOLEAN DEFAULT FALSE'), ('ban_reason', "VARCHAR(500) DEFAULT ''"), ('ban_appeal', "TEXT DEFAULT ''"), ('appeal_status', "VARCHAR(30) DEFAULT ''"), ('is_trusted_merchant', 'BOOLEAN DEFAULT FALSE')]
         for column_name, definition in additions:
             if column_name not in user_columns:
                 db.session.execute(db.text(f'ALTER TABLE "user" ADD COLUMN {column_name} {definition}'))

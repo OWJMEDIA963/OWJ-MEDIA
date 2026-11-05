@@ -4,7 +4,7 @@
 <style>
 /* Force all service text and controls below the image, never on top of it */
 .owj-service-card{display:flex!important;flex-direction:column!important;justify-content:flex-start!important;align-items:stretch!important;position:relative!important;isolation:isolate;min-width:0;min-height:0!important;height:auto!important;aspect-ratio:auto!important;padding:0!important;overflow:hidden!important;background:#111827!important;border:1px solid rgba(34,211,238,.28)!important;}
-.owj-service-media{position:relative!important;display:block!important;flex:0 0 auto!important;width:100%!important;aspect-ratio:1/1!important;overflow:hidden!important;background:#030712;order:0!important;}
+.owj-service-media{position:relative!important;display:block!important;flex:0 0 auto!important;width:100%!important;aspect-ratio:4/3!important;overflow:hidden!important;background:#030712;order:0!important;}
 .owj-service-background{position:absolute!important;inset:0!important;z-index:0!important;width:100%!important;height:100%!important;object-fit:cover!important;object-position:center!important;opacity:1!important;border-radius:0!important;}
 .owj-service-media:after{content:"";position:absolute;inset:0;z-index:1;background:transparent!important;pointer-events:none;}
 .owj-service-placeholder{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(6,182,212,.28),rgba(17,24,39,.9));color:#67e8f9;font-size:30px;font-weight:900;}
@@ -16,7 +16,7 @@
 .owj-service-card button{position:relative!important;inset:auto!important;display:block!important;width:100%!important;margin:4px 0 0!important;box-sizing:border-box!important;background:#22d3ee!important;color:#082f49!important;}
 @media(max-width:420px){.owj-service-content{padding:7px 4px 5px!important}.owj-service-content h3{font-size:clamp(9px,2.7vw,11px);line-height:1.3}.owj-service-content p{font-size:11px!important}.owj-service-card button{font-size:9px;padding-top:6px;padding-bottom:6px;margin-top:4px!important}}
 @media(min-width:640px){.owj-service-card{border-radius:18px}.owj-service-content{padding:10px 8px 6px!important}.owj-service-card>div:last-child{padding:0 9px 9px!important}}
-@media(min-width:640px){.owj-products-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}@media(min-width:1024px){.owj-products-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
+@media(min-width:640px){.owj-products-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
 </style>
 <div class="max-w-7xl mx-auto px-3 sm:px-5 py-5 sm:py-7 space-y-6">
     <div class="bg-gray-900 border border-gray-800 rounded-2xl py-3 px-4 text-center shadow">
@@ -24,10 +24,10 @@
     </div>
 
     {% if subcategories %}
-    <section class="space-y-3"><h2 class="text-sm font-black text-white">الأقسام الفرعية</h2><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">{% for sub in subcategories %}<a href="/category/{{ sub.id }}" class="rounded-2xl sm:rounded-3xl border border-cyan-500/20 bg-gray-900 p-6 sm:p-7 text-center text-base sm:text-lg font-black text-white hover:border-cyan-400 transition">{{ sub.name }}<p class="mt-2 text-xs font-normal text-cyan-300">{{ sub.services|length }} منتجات</p></a>{% endfor %}</div></section>
+    <section class="space-y-3"><h2 class="text-sm font-black text-white">الأقسام الفرعية</h2><div class="grid grid-cols-3 gap-2 sm:gap-3">{% for sub in subcategories %}<a href="/category/{{ sub.id }}" class="min-w-0 overflow-hidden rounded-xl sm:rounded-2xl border border-cyan-500/20 bg-gray-900 text-center text-xs sm:text-sm font-black text-white hover:border-cyan-400 transition">{% if sub.image_url %}<img src="{{ sub.image_url }}" alt="{{ sub.name }}" loading="lazy" class="block w-full aspect-[4/3] object-cover bg-gray-950">{% else %}<div class="flex w-full aspect-[4/3] items-center justify-center bg-gradient-to-br from-cyan-950 to-gray-900 text-2xl font-black text-cyan-300">{{ sub.name[:1] }}</div>{% endif %}<div class="p-2"><div class="line-clamp-2">{{ sub.name }}</div><p class="mt-1 text-[10px] font-normal text-cyan-300">{{ sub.services|length }} منتجات</p></div></a>{% endfor %}</div></section>
     {% endif %}
     {% if services %}<h2 class="text-sm font-black text-white">{% if category.parent_id %}المنتجات{% else %}المنتجات والخدمات{% endif %}</h2>{% endif %}
-    {% if services %}<div class="owj-products-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5" style="display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr)) !important;grid-auto-rows:1fr;align-items:stretch;width:100%;">
+    {% if services %}<div class="owj-products-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5" style="display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;grid-auto-rows:1fr;align-items:stretch;width:100%;">
         {% for service in services %}
         <div id="service-{{ service.id }}" class="owj-service-card min-w-0 bg-gray-900 border border-gray-800 rounded-xl sm:rounded-3xl p-1.5 sm:p-3 shadow-xl flex flex-col justify-between text-center group transition relative {% if not service.is_available %} opacity-90 {% endif %}" style="display:flex;flex-direction:column;width:100%;height:auto;min-width:0;min-height:0;box-sizing:border-box;overflow:hidden;position:relative;isolation:isolate;">
             <div class="owj-service-media">

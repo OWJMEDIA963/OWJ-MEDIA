@@ -273,7 +273,7 @@
         {% endif %}
         {% if smm_catalog_services %}
         <div class="rounded-2xl border border-sky-500/30 bg-gray-950 p-4 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-2"><h3 class="text-sm font-black text-sky-300">كتالوج الخدمات المستوردة ({{ smm_catalog_services|length }} خدمة)</h3><input id="apiServicesSearch" type="search" placeholder="ابحث بالرقم أو الاسم..." class="rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-xs text-white"></div>
+          <div class="flex flex-wrap items-center justify-between gap-2"><h3 class="text-sm font-black text-sky-300">كتالوج الخدمات المستوردة ({{ smm_catalog_services|length }} خدمة)</h3><div class="flex w-full sm:w-auto gap-2"><input id="apiServicesSearch" type="search" placeholder="رقم الخدمة أو اسمها..." class="min-w-0 flex-1 rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-xs text-white"><button type="button" id="apiServicesSearchBtn" class="rounded-xl bg-cyan-500 px-4 py-2 text-xs font-black text-gray-950">بحث</button></div></div>
           <p class="text-[10px] text-gray-400">كل خدمة ظاهرة برقمها وسعرها وحدود الكمية. اضغط «ربط بمنتج» لتعبئة نموذج إضافة المنتج تلقائياً.</p>
           <div class="max-h-[560px] overflow-auto rounded-xl border border-gray-800"><table class="w-full min-w-[700px] text-right text-xs"><thead class="sticky top-0 bg-gray-800 text-gray-300"><tr><th class="p-3">رقم الخدمة</th><th class="p-3">اسم الخدمة</th><th class="p-3">السعر / 1000</th><th class="p-3">أقل كمية</th><th class="p-3">أقصى كمية</th><th class="p-3">ربط</th></tr></thead><tbody id="apiServicesRows" class="divide-y divide-gray-800">{% for item in smm_catalog_services %}<tr class="api-service-row hover:bg-gray-900" data-search="{{ item.service_code }} {{ item.name|lower }} {{ item.provider.name|lower }}"><td class="p-3 font-black text-cyan-300">#{{ item.service_code }}</td><td class="p-3 text-white"><div>{{ item.name }}</div><small class="text-gray-500">{{ item.provider.name }}</small></td><td class="p-3 text-emerald-300">{{ item.rate }}</td><td class="p-3">{{ item.min_quantity }}</td><td class="p-3">{{ item.max_quantity }}</td><td class="p-3"><button type="button" class="api-service-link whitespace-nowrap rounded-lg bg-sky-600 px-3 py-2 text-[10px] font-bold text-white" data-code="{{ item.service_code }}">ربط بمنتج</button></td></tr>{% endfor %}</tbody></table></div>
         </div>
@@ -291,7 +291,7 @@
     </section>
 
     <!-- إنشاء قسم فرعي -->
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4"><h2 class="text-sm font-black text-white">إضافة قسم فرعي</h2><form action="/admin/add_subcategory" method="POST" class="space-y-3"><select name="parent_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي</option>{% for cat in categories if not cat.parent_id %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select><input name="subcategory_name" required placeholder="اسم القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><button class="w-full rounded-2xl bg-cyan-500 py-3 text-xs font-black text-gray-950">إنشاء القسم الفرعي</button></form></div>
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4"><h2 class="text-sm font-black text-white">إضافة قسم فرعي</h2><form action="/admin/add_subcategory" method="POST" enctype="multipart/form-data" class="space-y-3"><select name="parent_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي</option>{% for cat in categories if not cat.parent_id %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select><input name="subcategory_name" required placeholder="اسم القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><label class="block text-[11px] font-bold text-gray-300">صورة القسم الفرعي (اختياري)</label><input type="file" name="subcategory_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><input type="url" name="subcategory_image_url" placeholder="أو رابط صورة القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><button class="w-full rounded-2xl bg-cyan-500 py-3 text-xs font-black text-gray-950">إنشاء القسم الفرعي</button></form></div>
 
     <!-- إضافة منتج مباشرة إلى قسم فرعي -->
     <section class="bg-gray-900 border border-cyan-500/30 rounded-3xl p-6 shadow-xl space-y-4">
@@ -404,8 +404,10 @@
   const type=document.querySelector('form[action="/admin/add_service"] select[name="service_type"]');if(type)type.value='smm';
   alert('تم تعبئة رقم الخدمة والمزوّد والسعر والحدود في نموذج المنتج.');
  });
- const search=document.getElementById('apiServicesSearch');
- if(search)search.addEventListener('input',()=>{const q=search.value.trim().toLowerCase();document.querySelectorAll('.api-service-row').forEach(row=>row.hidden=!row.dataset.search.toLowerCase().includes(q));});
+ const search=document.getElementById('apiServicesSearch'), searchBtn=document.getElementById('apiServicesSearchBtn');
+ const filterApiServices=()=>{if(!search)return;const q=search.value.trim().toLowerCase();document.querySelectorAll('.api-service-row').forEach(row=>row.hidden=!row.dataset.search.toLowerCase().includes(q));};
+ if(search){search.addEventListener('input',filterApiServices);search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();filterApiServices();}});}
+ if(searchBtn)searchBtn.addEventListener('click',filterApiServices);
  document.querySelectorAll('.api-service-link').forEach(btn=>btn.addEventListener('click',()=>{if(!picker)return;picker.value=btn.dataset.code;picker.dispatchEvent(new Event('change'));if(useBtn)useBtn.click();document.getElementById('apiServiceIdInput')?.scrollIntoView({behavior:'smooth',block:'center'});}));
 })();
 </script>

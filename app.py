@@ -1114,8 +1114,13 @@ def add_subcategory():
     elif Category.query.filter_by(name=name, parent_id=parent.id).first():
         flash('القسم الفرعي موجود مسبقاً.', 'error')
     else:
-        db.session.add(Category(name=name, parent_id=parent.id)); db.session.commit()
-        flash('تم إنشاء القسم الفرعي بنجاح.', 'success')
+        try:
+            image_url = save_uploaded_image('subcategory_image_file') or request.form.get('subcategory_image_url', '').strip()
+        except ValueError as exc:
+            flash(str(exc), 'error')
+            return redirect(url_for('admin'))
+        db.session.add(Category(name=name, parent_id=parent.id, image_url=image_url)); db.session.commit()
+        flash('تم إنشاء القسم الفرعي بنجاح مع الصورة.', 'success')
     return redirect(url_for('admin'))
 
 @app.route('/admin/add_service', methods=['POST'])

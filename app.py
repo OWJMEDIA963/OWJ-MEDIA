@@ -270,6 +270,12 @@ def send_user_notification(user_id, title, message, url='/notifications'):
             app.logger.exception('Unable to send push notification')
 
 
+def notify_admins(title, message, url='/admin'):
+    """Send an in-site and phone push notification to every administrator."""
+    for admin_user in User.query.filter_by(role='admin').all():
+        send_user_notification(admin_user.id, title, message, url)
+
+
 def get_or_create_single_support_ticket(user_id):
     # Merge legacy tickets into one ongoing customer-service conversation.
     tickets = SupportTicket.query.filter_by(user_id=user_id).order_by(SupportTicket.updated_at.desc(), SupportTicket.id.desc()).all()
@@ -372,6 +378,8 @@ def register():
         else:
             user = User(username=username, full_name=request.form.get('full_name','').strip(), email=request.form.get('email','').strip(), phone=request.form.get('phone','').strip())
             user.set_password(password); db.session.add(user); db.session.commit()
+            notify_admins('تسجيل حساب جديد', f'تم إنشاء حساب جديد باسم {user.username} ومعرّفه #{user.id}.', url_for('admin_accounts', account_id=user.id))
+            db.session.commit()
             session.permanent = True
             session['user_id'] = user.id
             flash('تم إنشاء الحساب بنجاح.', 'success')
@@ -415,6 +423,8 @@ def verification():
         req = VerificationRequest(user_id=user.id, full_name=user.full_name or user.username, email=email, phone=phone, gender=gender, age=age, status='pending')
         db.session.add(req)
         user.email = email; user.phone = phone
+        db.session.commit()
+        notify_admins('طلب توثيق جديد', f'أرسل {user.username} طلب توثيق حساب للمراجعة.', url_for('admin'))
         db.session.commit()
         flash('تم إرسال طلب التوثيق للإدارة للمراجعة.', 'success')
         return redirect(url_for('verification'))
@@ -480,6 +490,9 @@ def place_order(service_id):
     user.balance_usd -= total
     order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type == 'smm' else 'قيد المراجعة'))
     db.session.add(order); db.session.commit()
+    order_kind = 'تلقائي عبر API' if service.service_type == 'smm' else ('يدوي' if service.service_type == 'manual' else 'طلب خدمة')
+    notify_admins(f'طلب جديد {order_kind} #{order.id}', f'المستخدم {user.username} (#{user.id}) أرسل طلب {service.name} بقيمة ${format_money(total)}. الحالة: {order.status}.', url_for('admin'))
+    db.session.commit()
     flash(('تم إرسال طلبك إلى مزوّد الخدمة. رقم الطلب: ' + provider_order_id) if provider_order_id else 'تم استلام طلبك بنجاح.', 'success'); return redirect(url_for('my_orders'))
 
 @app.errorhandler(413)
@@ -508,19 +521,22 @@ def deposit():
             except ValueError as exc:
                 flash(str(exc), 'error')
                 return redirect(url_for('deposit'))
-            db.session.add(DepositRequest(
+            deposit_request = DepositRequest(
                 user_id=current_user().id,
                 amount=amount,
                 proof=request.form.get('proof', '').strip(),
                 proof_image=proof_image,
                 payment_method_name=selected_payment.name
-            ))
+            )
+            db.session.add(deposit_request)
+            db.session.commit()
+            notify_admins(f'طلب شحن رصيد جديد #{deposit_request.id}', f'المستخدم {current_user().username} (#{current_user().id}) طلب شحن ${format_money(amount)} عبر {selected_payment.name}.', url_for('admin'))
             db.session.commit()
             flash('تم إرسال طلب الشحن للمراجعة.', 'success')
             return redirect(url_for('deposit'))
     user = current_user() if session.get('user_id') else None
     my_deposits = DepositRequest.query.filter_by(user_id=user.id).order_by(DepositRequest.id.desc()).all() if user else []
-    return render_template('deposit.html', payments=payments, my_deposits=my_deposits)
+    return render_template('deposit.html', payments=payments, my_deposits=my_deposits, agents=Agent.query.order_by(Agent.id.desc()).all())
 
 @app.route('/agents')
 def agents(): return render_template('agents.html', agents=Agent.query.order_by(Agent.id.desc()).all())
@@ -579,6 +595,7 @@ def support_ticket(ticket_id):
             ticket.updated_at = datetime.utcnow()
             if role == 'user':
                 ticket.status = 'بانتظار الدعم'
+                notify_admins('رسالة دعم جديدة', f'أرسل {user.username} رسالة جديدة في محادثة الدعم #{ticket.id}.', url_for('admin_support_ticket', ticket_id=ticket.id))
             else:
                 ticket.status = 'تم الرد'
                 send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق أوج ميديا بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
@@ -638,7 +655,7 @@ def admin_support_ticket(ticket_id):
 @login_required
 def notifications_page():
     items = Notification.query.filter_by(user_id=current_user().id).order_by(Notification.created_at.desc()).limit(100).all()
-    return render_template('notifications.html', notifications=items, vapid_public_key=os.environ.get('VAPID_PUBLIC_KEY', ''))
+    return render_template('notifications.html', notifications=items, vapid_public_key=os.environ.get('VAPID_PUBLIC_KEY', ''), is_admin=(current_user().role == 'admin'))
 
 
 @app.route('/notifications/read/<int:notification_id>', methods=['POST'])

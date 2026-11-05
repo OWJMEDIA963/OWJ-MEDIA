@@ -263,7 +263,10 @@
             {% for provider in smm_providers %}
             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950 p-3">
                 <div><p class="text-xs font-bold text-white">{{ provider.name }}</p><p dir="ltr" class="text-[10px] text-gray-500 break-all">{{ provider.api_url }}</p><p class="text-[10px] text-emerald-400">مفتاح API محفوظ</p></div>
-                <form action="/admin/delete_smm_provider/{{ provider.id }}" method="POST" onsubmit="return confirm('حذف المزوّد؟ سيتم فصل الخدمات المرتبطة به.')"><button class="rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 px-3 py-2 text-[10px]">حذف</button></form>
+                <div class="flex flex-wrap gap-2">
+                <form action="/admin/test_smm_provider/{{ provider.id }}" method="POST"><button class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-[10px]">اختبار API / الرصيد</button></form>
+                <form action="/admin/fetch_smm_services/{{ provider.id }}" method="POST"><button class="rounded-lg bg-sky-600 text-white px-3 py-2 text-[10px]">جلب الخدمات</button></form>
+                <form action="/admin/delete_smm_provider/{{ provider.id }}" method="POST" onsubmit="return confirm('حذف المزوّد؟ سيتم فصل الخدمات المرتبطة به.')"><button class="rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 px-3 py-2 text-[10px]">حذف</button></form></div>
             </div>
             {% endfor %}
         </div>
@@ -273,12 +276,30 @@
     <!-- إنشاء قسم فرعي -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4"><h2 class="text-sm font-black text-white">إضافة قسم فرعي</h2><form action="/admin/add_subcategory" method="POST" class="space-y-3"><select name="parent_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي</option>{% for cat in categories if not cat.parent_id %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select><input name="subcategory_name" required placeholder="اسم القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><button class="w-full rounded-2xl bg-cyan-500 py-3 text-xs font-black text-gray-950">إنشاء القسم الفرعي</button></form></div>
 
+    <!-- إضافة منتج مباشرة إلى قسم فرعي -->
+    <section class="bg-gray-900 border border-cyan-500/30 rounded-3xl p-6 shadow-xl space-y-4">
+        <h2 class="text-base font-black text-cyan-300">إضافة منتج داخل قسم فرعي مباشرة</h2>
+        <p class="text-xs text-gray-400">اختر القسم الفرعي ثم أدخل بيانات المنتج؛ سيظهر المنتج داخل القسم الفرعي المختار.</p>
+        <form action="/admin/add_service" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input name="name" required placeholder="اسم المنتج" class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white">
+            <select name="category_id" required class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white"><option value="">اختر القسم الفرعي للمنتج</option>{% for cat in categories if cat.parent_id %}<option value="{{ cat.id }}">{{ cat.parent.name }} ← {{ cat.name }}</option>{% endfor %}</select>
+            <input type="number" step="0.01" min="0" name="price_per_1000" required placeholder="السعر ($)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <select name="service_type" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white"><option value="manual">يدوي بسعر ثابت</option><option value="manual_quantity">يدوي بالكمية</option><option value="smm">تلقائي API</option></select>
+            <input type="number" name="min_quantity" value="1" min="1" required placeholder="الحد الأدنى" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <input type="number" name="max_quantity" value="10000" min="1" required placeholder="الحد الأقصى" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <input name="input_label" required placeholder="المطلوب من العميل (رابط/آيدي)" class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <input name="image_url" type="url" placeholder="رابط صورة المنتج (اختياري)" class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <textarea name="description" rows="2" placeholder="وصف المنتج (اختياري)" class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white"></textarea>
+            <button class="sm:col-span-2 rounded-xl bg-cyan-400 py-3 font-black text-gray-950">إضافة المنتج للقسم الفرعي</button>
+        </form>
+    </section>
+
     <!-- إضافة خدمة مع رابط صورة القسم وصورة المنتج -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إضافة وتعديل الخدمات وتخصيص حقول الإدخال</h2>
         <form action="/admin/add_service" method="POST" enctype="multipart/form-data" class="space-y-3">
             <input type="text" name="name" placeholder="اسم الخدمة أو المنتج" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
-            <input type="text" name="category_name" placeholder="القسم الرئيسي" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
+            <select name="category_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none"><option value="">اختر القسم الرئيسي أو الفرعي الذي ستوضع الخدمة بداخله</option>{% for cat in categories %}<option value="{{ cat.id }}">{% if cat.parent_id %}↳ قسم فرعي: {{ cat.parent.name }} / {% else %}قسم رئيسي: {% endif %}{{ cat.name }}</option>{% endfor %}</select>
             
             <div class="grid grid-cols-3 gap-2">
                 <input type="number" step="0.01" min="0.00" name="price_per_1000" placeholder="السعر الثابت أو السعر لكل 1000 ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
@@ -328,7 +349,7 @@
             <summary class="cursor-pointer flex items-center justify-between gap-3 text-xs font-bold text-white"><span>{{ s.name }}</span><span class="text-[10px] {% if s.is_available %}text-emerald-400{% else %}text-rose-400{% endif %}">{% if s.is_available %}متوفر{% else %}غير متوفر{% endif %}</span></summary>
             <form action="/admin/update_service/{{ s.id }}" method="POST" enctype="multipart/form-data" class="mt-4 space-y-3">
                 <input name="name" value="{{ s.name }}" required placeholder="اسم المنتج" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
-                <input name="category_name" value="{{ s.category.name }}" required placeholder="القسم" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                <select name="category_id" required class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي أو الفرعي</option>{% for cat in categories %}<option value="{{ cat.id }}" {% if s.category_id == cat.id %}selected{% endif %}>{% if cat.parent_id %}↳ قسم فرعي: {{ cat.parent.name }} / {% else %}قسم رئيسي: {% endif %}{{ cat.name }}</option>{% endfor %}</select>
                 <div class="grid grid-cols-3 gap-2">
                     <input type="number" step="0.01" min="0" name="price_per_1000" value="{{ s.price_per_1000 if s.service_type in ['smm','manual_quantity'] else s.price }}" required placeholder="السعر" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
                     <input type="number" min="1" name="min_quantity" value="{{ s.min_quantity or 1 }}" required placeholder="الأدنى" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">

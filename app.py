@@ -994,6 +994,43 @@ def add_smm_provider():
         flash('تم حفظ مزوّد API. احتفظ بالمفتاح سرياً.', 'success')
     return redirect(url_for('admin'))
 
+
+@app.route('/admin/test_smm_provider/<int:provider_id>', methods=['POST'])
+@admin_required
+def test_smm_provider(provider_id):
+    provider = SMMProvider.query.get_or_404(provider_id)
+    try:
+        response = requests.post(provider.api_url, data={'key': provider.api_key, 'action': 'balance'}, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+        if data.get('error'):
+            raise ValueError(str(data['error']))
+        balance = data.get('balance', 'غير متاح')
+        currency = data.get('currency', '')
+        flash(f'نجح اختبار API للمزوّد {provider.name}. الرصيد: {balance} {currency}', 'success')
+    except Exception as exc:
+        flash(f'فشل اختبار API للمزوّد {provider.name}: {str(exc)[:220]}', 'error')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/fetch_smm_services/<int:provider_id>', methods=['POST'])
+@admin_required
+def fetch_smm_services(provider_id):
+    provider = SMMProvider.query.get_or_404(provider_id)
+    try:
+        response = requests.post(provider.api_url, data={'key': provider.api_key, 'action': 'services'}, timeout=20)
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, dict) and data.get('error'):
+            raise ValueError(str(data['error']))
+        if not isinstance(data, list):
+            raise ValueError('استجابة API غير متوقعة؛ يجب أن تكون قائمة خدمات.')
+        # Show a safe preview/count without automatically importing products.
+        preview = ', '.join(str(item.get('name') or item.get('service') or item.get('id') or 'خدمة') for item in data[:3] if isinstance(item, dict))
+        flash(f'تم جلب {len(data)} خدمة من {provider.name}. معاينة: {preview or "لا توجد أسماء للعرض"}. لم تتم إضافتها تلقائياً.', 'success')
+    except Exception as exc:
+        flash(f'تعذر جلب خدمات API: {str(exc)[:220]}', 'error')
+    return redirect(url_for('admin'))
+
 @app.route('/admin/delete_smm_provider/<int:provider_id>', methods=['POST'])
 @admin_required
 def delete_smm_provider(provider_id):
@@ -1022,18 +1059,19 @@ def add_subcategory():
 @app.route('/admin/add_service', methods=['POST'])
 @admin_required
 def add_service():
-    name=request.form.get('name','').strip(); category_name=request.form.get('category_name','').strip()
-    if not name or not category_name: flash('أدخل اسم الخدمة والقسم.', 'error'); return redirect(url_for('admin'))
+    name=request.form.get('name','').strip(); category_id=request.form.get('category_id', type=int); category_name=request.form.get('category_name','').strip()
+    if not name or (not category_id and not category_name): flash('أدخل اسم الخدمة واختر القسم الرئيسي أو الفرعي.', 'error'); return redirect(url_for('admin'))
     try:
         category_image = save_uploaded_image('category_image_file') or request.form.get('category_image_url','').strip()
         product_image = save_uploaded_image('image_file') or request.form.get('image_url','').strip()
     except ValueError as exc:
         flash(str(exc), 'error'); return redirect(url_for('admin'))
-    cat=Category.query.filter_by(name=category_name).first()
-    if not cat:
+    cat=Category.query.get(category_id) if category_id else Category.query.filter_by(name=category_name).first()
+    if not cat and category_name:
         cat=Category(name=category_name, image_url=category_image); db.session.add(cat); db.session.flush()
-    elif category_image:
-        cat.image_url = category_image
+    if not cat:
+        flash('القسم المحدد غير موجود.', 'error'); return redirect(url_for('admin'))
+    if category_image: cat.image_url = category_image
     price=request.form.get('price_per_1000',type=float) or 0
     typ=request.form.get('service_type','manual')
     if typ not in ('manual', 'manual_quantity', 'smm'): typ = 'manual'
@@ -1054,15 +1092,19 @@ def add_service():
 def update_service(service_id):
     service = Service.query.get_or_404(service_id)
     name = request.form.get('name', '').strip()
+    category_id = request.form.get('category_id', type=int)
     category_name = request.form.get('category_name', '').strip()
-    if not name or not category_name:
-        flash('أدخل اسم المنتج والقسم.', 'error')
+    if not name or (not category_id and not category_name):
+        flash('أدخل اسم المنتج واختر القسم.', 'error')
         return redirect(url_for('admin'))
-    category = Category.query.filter_by(name=category_name).first()
-    if not category:
+    category = Category.query.get(category_id) if category_id else Category.query.filter_by(name=category_name).first()
+    if not category and category_name:
         category = Category(name=category_name)
         db.session.add(category)
         db.session.flush()
+    if not category:
+        flash('القسم المحدد غير موجود.', 'error')
+        return redirect(url_for('admin'))
     try:
         price = float(request.form.get('price_per_1000', '0'))
         minimum = int(request.form.get('min_quantity', '1'))

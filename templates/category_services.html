@@ -16,17 +16,18 @@
 .owj-service-card button{position:relative!important;inset:auto!important;display:block!important;width:100%!important;margin:4px 0 0!important;box-sizing:border-box!important;background:#22d3ee!important;color:#082f49!important;}
 @media(max-width:420px){.owj-service-content{padding:7px 4px 5px!important}.owj-service-content h3{font-size:clamp(9px,2.7vw,11px);line-height:1.3}.owj-service-content p{font-size:11px!important}.owj-service-card button{font-size:9px;padding-top:6px;padding-bottom:6px;margin-top:4px!important}}
 @media(min-width:640px){.owj-service-card{border-radius:18px}.owj-service-content{padding:10px 8px 6px!important}.owj-service-card>div:last-child{padding:0 9px 9px!important}}
+@media(min-width:640px){.owj-products-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}@media(min-width:1024px){.owj-products-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
 </style>
-<div class="max-w-4xl mx-auto px-3 py-4 space-y-4">
+<div class="max-w-7xl mx-auto px-3 sm:px-5 py-5 sm:py-7 space-y-6">
     <div class="bg-gray-900 border border-gray-800 rounded-2xl py-3 px-4 text-center shadow">
         <h1 class="text-xs font-black text-white">قسم: {{ category.name }}</h1>
     </div>
 
     {% if subcategories %}
-    <section class="space-y-3"><h2 class="text-sm font-black text-white">الأقسام الفرعية</h2><div class="grid grid-cols-2 sm:grid-cols-3 gap-3">{% for sub in subcategories %}<a href="/category/{{ sub.id }}" class="rounded-2xl border border-cyan-500/20 bg-gray-900 p-4 text-center text-sm font-black text-white hover:border-cyan-400">{{ sub.name }}<p class="mt-2 text-xs font-normal text-cyan-300">{{ sub.services|length }} منتجات</p></a>{% endfor %}</div></section>
+    <section class="space-y-3"><h2 class="text-sm font-black text-white">الأقسام الفرعية</h2><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">{% for sub in subcategories %}<a href="/category/{{ sub.id }}" class="rounded-2xl sm:rounded-3xl border border-cyan-500/20 bg-gray-900 p-6 sm:p-7 text-center text-base sm:text-lg font-black text-white hover:border-cyan-400 transition">{{ sub.name }}<p class="mt-2 text-xs font-normal text-cyan-300">{{ sub.services|length }} منتجات</p></a>{% endfor %}</div></section>
     {% endif %}
     {% if services %}<h2 class="text-sm font-black text-white">{% if category.parent_id %}المنتجات{% else %}المنتجات والخدمات{% endif %}</h2>{% endif %}
-    {% if services %}<div class="grid grid-cols-3 gap-2 sm:gap-4" style="display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;grid-auto-rows:1fr;align-items:stretch;width:100%;">
+    {% if services %}<div class="owj-products-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5" style="display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr)) !important;grid-auto-rows:1fr;align-items:stretch;width:100%;">
         {% for service in services %}
         <div id="service-{{ service.id }}" class="owj-service-card min-w-0 bg-gray-900 border border-gray-800 rounded-xl sm:rounded-3xl p-1.5 sm:p-3 shadow-xl flex flex-col justify-between text-center group transition relative {% if not service.is_available %} opacity-90 {% endif %}" style="display:flex;flex-direction:column;width:100%;height:auto;min-width:0;min-height:0;box-sizing:border-box;overflow:hidden;position:relative;isolation:isolate;">
             <div class="owj-service-media">

@@ -27,6 +27,12 @@
   .owj-search-thumb{width:44px;height:44px;flex:0 0 44px;object-fit:cover;border-radius:10px;background:#030712;border:1px solid #1f2937;}
   @media(min-width:480px){.owj-category-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:10px}.owj-category-name{font-size:14px}}
   @media(min-width:640px){.owj-category-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px}.owj-category-card{border-radius:18px}.owj-category-image-wrap{aspect-ratio:4/3;padding:6px}.owj-category-name{font-size:15px}}
+  /* Balanced category cards: moderate image height and compact caption */
+  .owj-category-card{border-radius:16px!important;box-shadow:0 7px 18px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.04)!important}
+  .owj-category-image-wrap{aspect-ratio:16/10!important;padding:4px!important}
+  .owj-category-image{border-radius:11px!important;object-fit:cover!important}
+  .owj-category-name{padding:7px 6px 8px!important;font-size:clamp(11px,2.7vw,13px)!important;line-height:1.25!important}
+  @media(min-width:640px){.owj-category-image-wrap{aspect-ratio:16/10!important;padding:5px!important}.owj-category-name{font-size:14px!important;padding:8px!important}}
 </style>
 <div class="max-w-7xl mx-auto px-3 sm:px-5 py-4 sm:py-6 space-y-4 sm:space-y-6">
  <section class="owj-hero-compact relative overflow-hidden border border-cyan-500/20 bg-gradient-to-bl from-cyan-950/60 via-gray-900 to-[#030712] shadow-xl">

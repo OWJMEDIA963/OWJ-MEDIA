@@ -40,8 +40,8 @@
 /* Subcategories use the same image-first card design as main categories */
 .owj-subcategory-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;width:100%!important;align-items:stretch!important;}
 .owj-subcategory-card{display:flex!important;flex-direction:column!important;min-width:0!important;width:100%!important;padding:0!important;border-radius:14px!important;background:#111827!important;box-shadow:0 5px 16px rgba(0,0,0,.18)!important;border:1px solid rgba(34,211,238,.22)!important;overflow:hidden!important;text-align:center!important;color:#fff!important;}
-.owj-subcategory-card img{display:block!important;width:100%!important;aspect-ratio:1/1!important;object-fit:cover!important;object-position:center!important;padding:0!important;background:#030712!important;border-radius:0!important;}
-.owj-subcategory-card>div{padding:8px 5px!important;line-height:1.35!important;background:#111827!important;color:#fff!important;font-weight:900!important;font-size:clamp(10px,2.8vw,14px)!important;}
+.owj-subcategory-card img{display:block!important;width:100%!important;aspect-ratio:0.94/1!important;object-fit:cover!important;object-position:center!important;padding:0!important;background:#030712!important;border-radius:0!important;}
+.owj-subcategory-card>div{padding:10px 5px!important;line-height:1.35!important;background:#111827!important;color:#fff!important;font-weight:900!important;font-size:clamp(11px,2.9vw,15px)!important;}
 .owj-subcategory-card p{font-size:clamp(9px,2.3vw,11px)!important;color:#a5f3fc!important;margin:3px 0 0!important;font-weight:500!important;}
 @media(min-width:640px){
  .owj-products-grid,.owj-subcategory-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:16px!important;}
@@ -103,14 +103,15 @@
   gap:clamp(3px,1vw,8px)!important;width:100%!important;min-width:0!important;
   min-height:31px!important;margin:0!important;padding:5px 3px!important;
   box-sizing:border-box!important;overflow:hidden!important;border-radius:8px!important;
-  background:linear-gradient(105deg,#0891b2 0%,#22d3ee 52%,#0e7490 100%)!important;
-  color:#062033!important;font-size:clamp(9px,2.5vw,12px)!important;
+  background:linear-gradient(180deg,#102b45 0%,#0b1d32 100%)!important;
+  border:1px solid rgba(34,211,238,.55)!important;
+  color:#a5f3fc!important;font-size:clamp(9px,2.5vw,12px)!important;
   line-height:1.2!important;font-weight:900!important;
 }
 .owj-buy-label,.owj-price-value{
   display:inline-block!important;position:static!important;min-width:0!important;
   margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
-  background:transparent!important;color:#062033!important;font-size:inherit!important;
+  background:transparent!important;color:#a5f3fc!important;font-size:inherit!important;
   line-height:inherit!important;font-weight:900!important;white-space:nowrap!important;
 }
 .owj-price-value{overflow:hidden!important;text-overflow:ellipsis!important;}
@@ -134,6 +135,9 @@
   box-shadow:inset 0 1px 0 rgba(255,255,255,.04)!important;
 }
 .owj-service-card button:hover:not(:disabled){background:linear-gradient(180deg,#164e63,#102b45)!important;border-color:#67e8f9!important;color:#fff!important;}
+.owj-service-card .js-open-order{background:linear-gradient(105deg,#0891b2 0%,#22d3ee 52%,#0e7490 100%)!important;color:#062033!important;border-color:rgba(103,232,249,.95)!important;}
+.owj-service-card .js-open-order:hover:not(:disabled){background:linear-gradient(105deg,#22d3ee 0%,#67e8f9 52%,#0891b2 100%)!important;color:#082f49!important;}
+.owj-service-card .js-show-details{margin-top:5px!important;background:linear-gradient(180deg,#102b45 0%,#0b1d32 100%)!important;color:#a5f3fc!important;border-color:rgba(34,211,238,.7)!important;}
 .owj-service-card button:disabled{opacity:.65!important;cursor:not-allowed!important;}
 @media(min-width:640px){
  .owj-products-grid{gap:14px!important;}
@@ -171,7 +175,7 @@
             </div>
             <div class="owj-service-content">
                 <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
-                <div class="owj-service-price-strip" aria-label="شراء، السعر">
+                <div class="owj-service-price-strip" aria-label="السعر">
                     <span class="owj-price-value">${{ (service.price_per_1000 or service.price if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price)|money }}</span>
                 </div>
                 {% if not service.is_available %}
@@ -182,7 +186,10 @@
             <div class="mt-1 sm:mt-2">
                 {% if service.is_available %}
                 <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.price_per_1000 if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}">
-                    شراء
+                    اطلب الآن
+                </button>
+                <button type="button" class="js-show-details w-full font-black rounded-lg text-[8px] sm:text-[10px] transition block" data-service-name="{{ service.name|e }}" data-service-description="{{ (service.description or '')|e }}">
+                    تفاصيل أكثر
                 </button>
                 {% else %}
                 <button disabled class="w-full bg-gray-800 text-gray-500 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] cursor-not-allowed">
@@ -229,6 +236,17 @@
                 تأكيد وإرسال الطلب
             </button>
         </form>
+    </div>
+</div>
+
+<div id="serviceDetailsModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] hidden flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="serviceDetailsTitle">
+    <div class="bg-gray-900 border border-cyan-500/40 rounded-3xl p-5 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl">
+        <div class="flex justify-between items-center border-b border-gray-800 pb-3 gap-3">
+            <h3 id="serviceDetailsTitle" class="text-sm font-black text-white">تفاصيل المنتج</h3>
+            <button type="button" onclick="closeServiceDetails()" class="text-gray-400 hover:text-white p-1" aria-label="إغلاق التفاصيل">✕</button>
+        </div>
+        <div id="serviceDetailsContent" class="text-xs leading-7 text-gray-200 whitespace-pre-line break-words">لا توجد تفاصيل إضافية لهذا المنتج حالياً.</div>
+        <button type="button" onclick="closeServiceDetails()" class="w-full rounded-xl border border-cyan-400/70 bg-slate-800 py-2.5 text-xs font-black text-cyan-200">إغلاق</button>
     </div>
 </div>
 
@@ -300,6 +318,27 @@
         document.body.classList.remove('overflow-hidden');
     }
 
+    document.querySelectorAll('.js-show-details').forEach(function(button) {
+        button.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            document.getElementById('serviceDetailsTitle').textContent = button.dataset.serviceName || 'تفاصيل المنتج';
+            const content = document.getElementById('serviceDetailsContent');
+            const description = (button.dataset.serviceDescription || '').trim();
+            content.textContent = description || 'لا توجد تفاصيل إضافية لهذا المنتج حالياً. يمكنك إضافة التفاصيل من لوحة الإدارة في خانة وصف المنتج.';
+            document.getElementById('serviceDetailsModal').classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        });
+    });
+
+    function closeServiceDetails() {
+        document.getElementById('serviceDetailsModal').classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+    document.getElementById('serviceDetailsModal').addEventListener('click', function(event) {
+        if (event.target === this) closeServiceDetails();
+    });
+
     document.getElementById('modalQuantity').addEventListener('input', clearOrderValidation);
     document.querySelector('#orderForm input[name="link"]').addEventListener('input', clearOrderValidation);
     document.getElementById('orderForm').addEventListener('submit', function(event) {
@@ -331,7 +370,7 @@
         if (event.target === this) closeOrderModal();
     });
     document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape') closeOrderModal();
+        if (event.key === 'Escape') { closeOrderModal(); closeServiceDetails(); }
     });
 </script>
 {% endblock %}

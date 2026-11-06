@@ -52,6 +52,103 @@
  .owj-service-card button{font-size:12px!important;}
 }
 
+
+/* OWJ Media product-card refinement: only product cards; category/subcategory styles remain unchanged */
+.owj-products-grid{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:clamp(6px,1.7vw,12px)!important;
+  width:100%!important;
+  align-items:stretch!important;
+  justify-content:stretch!important;
+  grid-auto-rows:1fr!important;
+  box-sizing:border-box!important;
+}
+.owj-service-card{
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  justify-content:flex-start!important;min-width:0!important;width:100%!important;
+  height:100%!important;min-height:0!important;padding:0!important;gap:0!important;
+  overflow:hidden!important;box-sizing:border-box!important;
+  background:linear-gradient(180deg,#14243a 0%,#0c1729 100%)!important;
+  border:1px solid rgba(34,211,238,.48)!important;border-radius:clamp(9px,2vw,16px)!important;
+  box-shadow:0 5px 16px rgba(0,0,0,.22),inset 0 1px 0 rgba(103,232,249,.08)!important;
+}
+.owj-service-media{
+  position:relative!important;display:block!important;flex:0 0 auto!important;
+  width:100%!important;aspect-ratio:1/1!important;min-width:0!important;
+  overflow:hidden!important;box-sizing:border-box!important;padding:0!important;
+  background:#101d30!important;border-bottom:1px solid rgba(34,211,238,.18)!important;
+}
+.owj-service-background{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  object-fit:cover!important;object-position:center!important;padding:0!important;
+  margin:0!important;border:0!important;border-radius:0!important;filter:none!important;
+}
+.owj-service-content{
+  position:relative!important;display:flex!important;flex:1 0 auto!important;
+  flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;
+  width:100%!important;min-width:0!important;min-height:0!important;gap:5px!important;
+  padding:7px 6px 5px!important;box-sizing:border-box!important;text-align:center!important;
+  background:transparent!important;order:1!important;
+}
+.owj-service-content h3{
+  display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;
+  overflow:hidden!important;min-width:0!important;min-height:2.65em!important;max-height:2.65em!important;
+  margin:0!important;padding:0!important;font-size:clamp(10px,2.7vw,14px)!important;
+  line-height:1.33!important;font-weight:900!important;color:#f8fafc!important;
+  text-align:center!important;overflow-wrap:anywhere!important;text-shadow:none!important;
+}
+.owj-service-price-strip{
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  gap:clamp(3px,1vw,8px)!important;width:100%!important;min-width:0!important;
+  min-height:31px!important;margin:0!important;padding:5px 3px!important;
+  box-sizing:border-box!important;overflow:hidden!important;border-radius:8px!important;
+  background:linear-gradient(105deg,#0891b2 0%,#22d3ee 52%,#0e7490 100%)!important;
+  color:#062033!important;font-size:clamp(9px,2.5vw,12px)!important;
+  line-height:1.2!important;font-weight:900!important;
+}
+.owj-buy-label,.owj-price-value{
+  display:inline-block!important;position:static!important;min-width:0!important;
+  margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
+  background:transparent!important;color:#062033!important;font-size:inherit!important;
+  line-height:inherit!important;font-weight:900!important;white-space:nowrap!important;
+}
+.owj-price-value{overflow:hidden!important;text-overflow:ellipsis!important;}
+.owj-unavailable-label{
+  display:block!important;margin:0!important;padding:2px 3px!important;
+  color:#fda4af!important;font-size:9px!important;line-height:1.2!important;
+}
+.owj-service-card>div:last-child{
+  position:relative!important;inset:auto!important;z-index:3!important;order:2!important;
+  display:block!important;width:100%!important;min-width:0!important;margin:0!important;
+  padding:0 6px 7px!important;box-sizing:border-box!important;background:transparent!important;
+}
+.owj-service-card button{
+  display:block!important;position:relative!important;inset:auto!important;
+  width:100%!important;min-width:0!important;min-height:34px!important;height:auto!important;
+  margin:0!important;padding:6px 2px!important;box-sizing:border-box!important;
+  border:1px solid rgba(34,211,238,.8)!important;border-radius:9px!important;
+  background:linear-gradient(180deg,#102b45 0%,#0b1d32 100%)!important;
+  color:#a5f3fc!important;font-size:clamp(10px,2.6vw,13px)!important;
+  line-height:1.25!important;font-weight:900!important;white-space:normal!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04)!important;
+}
+.owj-service-card button:hover:not(:disabled){background:linear-gradient(180deg,#164e63,#102b45)!important;border-color:#67e8f9!important;color:#fff!important;}
+.owj-service-card button:disabled{opacity:.65!important;cursor:not-allowed!important;}
+@media(min-width:640px){
+ .owj-products-grid{gap:14px!important;}
+ .owj-service-content{padding:10px 9px 7px!important;gap:7px!important;}
+ .owj-service-content h3{font-size:14px!important;min-height:2.65em!important;}
+ .owj-service-price-strip{min-height:37px!important;font-size:13px!important;border-radius:10px!important;}
+ .owj-service-card>div:last-child{padding:0 9px 10px!important;}
+ .owj-service-card button{min-height:39px!important;font-size:13px!important;}
+}
+@media(min-width:1024px){
+ .owj-products-grid{gap:18px!important;}
+ .owj-service-card{border-radius:16px!important;}
+ .owj-service-content{padding:11px 10px 8px!important;}
+}
+
 </style>
 <div class="max-w-7xl mx-auto px-3 sm:px-5 py-5 sm:py-7 space-y-6">
     <div class="bg-gray-900 border border-gray-800 rounded-2xl py-3 px-4 text-center shadow">
@@ -74,18 +171,19 @@
             </div>
             <div class="owj-service-content">
                 <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
-                <p class="text-[10px] sm:text-[11px] text-cyan-400 font-bold mb-0.5">${{ (service.price_per_1000 or service.price if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price)|money }}</p>
-                {% if service.is_available %}
-                <span class="text-[8px] sm:text-[9px] text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded-full border border-emerald-500/30">متوفرة</span>
-                {% else %}
-                <span class="text-[8px] sm:text-[9px] text-rose-400 bg-rose-950/50 px-1.5 py-0.5 rounded-full border border-rose-500/30">غير متوفرة</span>
+                <div class="owj-service-price-strip" aria-label="شراء، السعر">
+                    <span class="owj-buy-label">شراء</span>
+                    <span class="owj-price-value">${{ (service.price_per_1000 or service.price if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price)|money }}</span>
+                </div>
+                {% if not service.is_available %}
+                <span class="owj-unavailable-label">غير متوفرة</span>
                 {% endif %}
             </div>
 
             <div class="mt-1 sm:mt-2">
                 {% if service.is_available %}
                 <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.price_per_1000 if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}">
-                    اطلب الآن
+                    تفاصيل
                 </button>
                 {% else %}
                 <button disabled class="w-full bg-gray-800 text-gray-500 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] cursor-not-allowed">

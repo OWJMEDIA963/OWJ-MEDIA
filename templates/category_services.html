@@ -172,7 +172,6 @@
             <div class="owj-service-content">
                 <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
                 <div class="owj-service-price-strip" aria-label="شراء، السعر">
-                    <span class="owj-buy-label">شراء</span>
                     <span class="owj-price-value">${{ (service.price_per_1000 or service.price if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price)|money }}</span>
                 </div>
                 {% if not service.is_available %}
@@ -183,7 +182,7 @@
             <div class="mt-1 sm:mt-2">
                 {% if service.is_available %}
                 <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.price_per_1000 if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}">
-                    تفاصيل
+                    شراء
                 </button>
                 {% else %}
                 <button disabled class="w-full bg-gray-800 text-gray-500 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] cursor-not-allowed">

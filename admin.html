@@ -224,7 +224,7 @@
             {% for ag in agents %}
             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950 p-3">
                 <div class="min-w-0"><p class="text-xs font-bold text-white">{{ ag.name }}</p><p class="text-[10px] text-gray-400">{{ ag.city }} · {{ ag.phone }}</p></div>
-                <form action="/admin/delete_agent/{{ ag.id }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف هذا الوكيل؟')"><button type="submit" class="shrink-0 rounded-lg bg-rose-600 px-3 py-2 text-[11px] font-black text-white">حذف الوكيل</button></form>
+                {% if is_admin %}<form action="/admin/delete_agent/{{ ag.id }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف هذا الوكيل؟')"><button type="submit" class="shrink-0 rounded-lg bg-rose-600 px-3 py-2 text-[11px] font-black text-white">حذف الوكيل</button></form>{% endif %}
             </div>
             {% else %}<p class="text-xs text-gray-500">لا يوجد وكلاء مضافون حالياً.</p>{% endfor %}
         </div>

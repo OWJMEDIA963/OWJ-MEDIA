@@ -122,7 +122,7 @@
             </div>
             <div class="flex items-center gap-2">
                 {% if current_user %}
-                <a href="/deposit" class="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-3.5 py-1.5 rounded-xl text-xs font-black">{{ currency_symbol }}{{ current_user.balance_usd|money }}</a>
+                <a href="/deposit" class="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-3.5 py-1.5 rounded-xl text-xs font-black">${{ "%.2f"|format(current_user.balance_usd) }}</a>
                 {% if current_user.role == 'admin' %}
                 <a href="/admin" class="bg-amber-500 text-gray-950 px-3 py-1.5 rounded-xl text-xs font-black">لوحة التحكم</a>
                 {% endif %}

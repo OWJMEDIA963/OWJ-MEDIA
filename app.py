@@ -592,7 +592,7 @@ def place_order(service_id):
     order_kind = 'تلقائي عبر API' if service.service_type in ('smm', 'smm_fixed') else ('يدوي' if service.service_type == 'manual' else 'طلب خدمة')
     notify_admins(f'طلب جديد {order_kind} #{order.id}', f'المستخدم {user.username} (#{user.id}) أرسل طلب {service.name} بقيمة ${format_money(total)}. الحالة: {order.status}.', url_for('admin'))
     db.session.commit()
-    flash(('تم إرسال طلبك إلى مزوّد الخدمة. رقم الطلب: ' + provider_order_id) if provider_order_id else 'تم استلام طلبك بنجاح.', 'success'); return redirect(url_for('my_orders'))
+    flash('تم إرسال طلبك بنجاح.', 'success'); return redirect(url_for('my_orders'))
 
 @app.errorhandler(413)
 def uploaded_file_too_large(error):

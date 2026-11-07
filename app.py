@@ -1193,9 +1193,36 @@ def add_category():
     elif Category.query.filter_by(name=name, parent_id=None).first():
         flash('القسم الرئيسي موجود مسبقاً.', 'error')
     else:
-        db.session.add(Category(name=name, parent_id=None))
+        try:
+            image_url = save_uploaded_image('category_image_file') or request.form.get('category_image_url', '').strip()
+        except ValueError as exc:
+            flash(str(exc), 'error')
+            return redirect(url_for('admin'))
+        db.session.add(Category(name=name, parent_id=None, image_url=image_url))
         db.session.commit()
-        flash('تم إنشاء القسم الرئيسي بنجاح.', 'success')
+        flash('تم إنشاء القسم الرئيسي بنجاح' + (' مع الصورة.' if image_url else '.'), 'success')
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/update_category_image', methods=['POST'])
+@admin_required
+def update_category_image():
+    category_id = request.form.get('category_id', type=int)
+    category = Category.query.filter_by(id=category_id, parent_id=None).first() if category_id else None
+    if not category:
+        flash('اختر قسماً رئيسياً صحيحاً.', 'error')
+        return redirect(url_for('admin'))
+    try:
+        image_url = save_uploaded_image('category_image_file') or request.form.get('category_image_url', '').strip()
+    except ValueError as exc:
+        flash(str(exc), 'error')
+        return redirect(url_for('admin'))
+    if not image_url:
+        flash('اختر صورة من جهازك أو أدخل رابط الصورة.', 'error')
+        return redirect(url_for('admin'))
+    category.image_url = image_url
+    db.session.commit()
+    flash('تم حفظ صورة القسم الرئيسي بنجاح.', 'success')
     return redirect(url_for('admin'))
 
 

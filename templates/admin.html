@@ -309,10 +309,25 @@
     <section class="bg-gray-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-base font-black text-emerald-300">إنشاء قسم رئيسي</h2>
         <p class="text-xs text-gray-400">أنشئ قسماً رئيسياً جديداً، وبعدها يمكنك إضافة أقسام فرعية ومنتجات بداخله.</p>
-        <form action="/admin/add_category" method="POST" class="flex flex-col sm:flex-row gap-3">
-            <input name="category_name" required maxlength="120" placeholder="اسم القسم الرئيسي الجديد" class="flex-1 bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-400">
-            <button type="submit" class="rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-black text-gray-950">+ إنشاء القسم الرئيسي</button>
+        <form action="/admin/add_category" method="POST" enctype="multipart/form-data" class="space-y-3">
+            <input name="category_name" required maxlength="120" placeholder="اسم القسم الرئيسي الجديد" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-400">
+            <label class="block text-xs font-bold text-gray-300">صورة القسم الرئيسي (اختياري)</label>
+            <input type="file" name="category_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white">
+            <input type="url" name="category_image_url" placeholder="أو ضع رابط صورة القسم" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-400">
+            <button type="submit" class="w-full rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-black text-gray-950">+ إنشاء القسم الرئيسي</button>
         </form>
+        <div class="border-t border-gray-800 pt-4 space-y-3">
+            <h3 class="text-sm font-black text-white">إضافة أو تغيير صورة قسم رئيسي موجود</h3>
+            <form action="/admin/update_category_image" method="POST" enctype="multipart/form-data" class="space-y-3">
+                <select name="category_id" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white">
+                    <option value="">اختر القسم الرئيسي</option>
+                    {% for cat in categories if not cat.parent_id %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
+                </select>
+                <input type="file" name="category_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white">
+                <input type="url" name="category_image_url" placeholder="أو ضع رابط الصورة" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white outline-none">
+                <button type="submit" class="w-full rounded-2xl bg-cyan-500 px-6 py-3 text-sm font-black text-gray-950">حفظ صورة القسم</button>
+            </form>
+        </div>
     </section>
 
     <!-- إنشاء قسم فرعي -->

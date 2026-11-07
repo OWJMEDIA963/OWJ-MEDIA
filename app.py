@@ -561,18 +561,30 @@ def place_order(service_id):
             flash('هذه الخدمة التلقائية غير مربوطة بمزوّد API بشكل صحيح. تواصل مع الإدارة.', 'error')
             return redirect(url_for('category_services', category_id=service.category_id))
         try:
-            response = requests.post(provider.api_url, data={
-                'key': provider.api_key, 'action': 'add', 'service': service.api_service_id,
-                'link': link, 'quantity': quantity
-            }, timeout=20)
+            # SMM providers commonly expect application/x-www-form-urlencoded.
+            # requests encodes the data dict accordingly; do not send JSON and form data together.
+            response = requests.post(
+                provider.api_url,
+                data={
+                    'key': reveal_api_key(provider.api_key),
+                    'action': 'add',
+                    'service': str(service.api_service_id),
+                    'link': link,
+                    'quantity': str(quantity),
+                },
+                headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                timeout=30,
+            )
             response.raise_for_status()
             api_result = response.json()
-            if api_result.get('error') or not api_result.get('order'):
+            if not isinstance(api_result, dict):
+                raise ValueError('استجابة غير متوقعة من مزوّد الخدمة.')
+            if api_result.get('error') or api_result.get('order') in (None, ''):
                 raise ValueError(str(api_result.get('error') or 'لم يؤكد مزود الخدمة قبول الطلب.'))
             provider_order_id = str(api_result['order'])
         except Exception as exc:
             app.logger.warning('SMM provider order failed: %s', exc)
-            flash('لم يقبل مزوّد الخدمة الطلب. لم يتم خصم رصيدك؛ تحقق من إعدادات API وحاول لاحقاً.', 'error')
+            flash('الخدمة غير متاحة حاليا، حاول بعد 5 دقائق.', 'error')
             return redirect(url_for('category_services', category_id=service.category_id))
     user.balance_usd -= total
     order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type in ('smm', 'smm_fixed') else 'قيد المراجعة'))
@@ -1072,8 +1084,10 @@ def fetch_smm_services(provider_id):
             raise ValueError(str(data['error']))
         if not isinstance(data, list):
             raise ValueError('استجابة API غير متوقعة؛ يجب أن تكون قائمة خدمات.')
-        # Refresh provider catalog, keeping product creation under admin control.
-        SMMCatalogService.query.filter_by(provider_id=provider.id).delete()
+        # Replace the catalog only after a valid list response. The delete and inserts
+        # remain in one transaction, so a failure rolls the previous catalog back.
+        imported_count = 0
+        SMMCatalogService.query.filter_by(provider_id=provider.id).delete(synchronize_session=False)
         for item in data:
             if not isinstance(item, dict) or item.get('service') is None:
                 continue
@@ -1086,8 +1100,11 @@ def fetch_smm_services(provider_id):
             db.session.add(SMMCatalogService(provider_id=provider.id, service_code=str(item.get('service')),
                 name=str(item.get('name') or item.get('service')), category_name=str(item.get('category') or ''),
                 rate=rate, min_quantity=min_q, max_quantity=max_q))
+            imported_count += 1
+        if imported_count == 0:
+            raise ValueError('لم تتضمن استجابة السيرفر أي خدمات صالحة؛ لم يتم تحديث الكتالوج.')
         db.session.commit()
-        flash(f'تم جلب وحفظ {len(SMMCatalogService.query.filter_by(provider_id=provider.id).all())} خدمة من {provider.name}. يمكنك اختيار رقمها عند إضافة المنتج.', 'success')
+        flash(f'تم تحديث وحفظ {imported_count} خدمة من {provider.name}. يمكنك اختيار رقمها عند إضافة المنتج.', 'success')
     except Exception as exc:
         db.session.rollback()
         flash(f'تعذر جلب خدمات API: {str(exc)[:220]}', 'error')

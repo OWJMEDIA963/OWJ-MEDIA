@@ -281,7 +281,7 @@
                 <div><p class="text-xs font-bold text-white">{{ provider.name }}</p><p dir="ltr" class="text-[10px] text-gray-500 break-all">{{ provider.api_url }}</p><p class="text-[10px] text-emerald-400">المفاتيح محفوظة بشكل مشفّر · الخدمات المحفوظة: {{ provider.catalog_services|length }}</p></div>
                 <div class="flex flex-wrap gap-2">
                 <form action="/admin/test_smm_provider/{{ provider.id }}" method="POST"><button class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-[10px]">اختبار API / الرصيد</button></form>
-                <form action="/admin/fetch_smm_services/{{ provider.id }}" method="POST"><button class="rounded-lg bg-sky-600 text-white px-3 py-2 text-[10px]">جلب الخدمات</button></form>
+                <form action="/admin/fetch_smm_services/{{ provider.id }}" method="POST"><button class="rounded-lg bg-sky-600 text-white px-3 py-2 text-[10px]">تحديث الخدمات من السيرفر</button></form>
                 <form action="/admin/delete_smm_provider/{{ provider.id }}" method="POST" onsubmit="return confirm('حذف المزوّد؟ سيتم فصل الخدمات المرتبطة به.')"><button class="rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 px-3 py-2 text-[10px]">حذف</button></form></div>
             </div>
             {% endfor %}

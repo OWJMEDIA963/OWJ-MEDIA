@@ -219,6 +219,22 @@
             <textarea name="address" placeholder="تفاصيل العنوان" rows="2" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none"></textarea>
             <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-2xl text-xs">إضافة وكيل معتمد</button>
         </form>
+        <div class="space-y-2">
+            <h3 class="text-xs font-black text-white">الوكلاء الحاليون</h3>
+            {% for agent in agents %}
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-800 bg-gray-950 p-3">
+                <div class="min-w-0">
+                    <p class="text-xs font-bold text-white">{{ agent.name }}</p>
+                    <p class="text-[11px] text-gray-400">{{ agent.city }}{% if agent.phone %} · {{ agent.phone }}{% endif %}</p>
+                </div>
+                <form action="/admin/delete_agent/{{ agent.id }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف هذا الوكيل؟')">
+                    <button type="submit" class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white hover:bg-rose-500">حذف الوكيل</button>
+                </form>
+            </div>
+            {% else %}
+            <p class="text-xs text-gray-500">لا يوجد وكلاء مضافون حالياً.</p>
+            {% endfor %}
+        </div>
     </div>
 
     <!-- حذف قسم أو خدمة -->

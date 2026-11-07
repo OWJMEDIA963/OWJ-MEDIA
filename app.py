@@ -1,5 +1,6 @@
 import os
 import base64
+import hashlib
 import smtplib
 from email.message import EmailMessage
 import mimetypes
@@ -11,6 +12,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from cryptography.fernet import Fernet, InvalidToken
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'owj-media-change-this-to-a-long-random-secret-before-production')
@@ -25,6 +27,22 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:/
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
 
+
+def _api_cipher():
+    raw = hashlib.sha256(app.config['SECRET_KEY'].encode('utf-8')).digest()
+    return Fernet(base64.urlsafe_b64encode(raw))
+
+def protect_api_key(value):
+    value = (value or '').strip()
+    return _api_cipher().encrypt(value.encode()).decode() if value else ''
+
+def reveal_api_key(value):
+    value = value or ''
+    try:
+        return _api_cipher().decrypt(value.encode()).decode()
+    except (InvalidToken, ValueError):
+        # Backward compatibility for API keys saved before encryption.
+        return value
 
 def format_money(value):
     try:
@@ -102,8 +120,10 @@ class User(db.Model):
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), unique=True, nullable=False)
+    name = db.Column(db.String(120), nullable=False)
     image_url = db.Column(db.String(500), default='')
+    parent_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
+    parent = db.relationship('Category', remote_side=[id], backref=db.backref('subcategories', lazy=True))
 
 class Service(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -119,6 +139,7 @@ class Service(db.Model):
     api_service_id = db.Column(db.String(80), default='')
     image_url = db.Column(db.String(500), default='')
     description = db.Column(db.Text, default='')
+    extra_details = db.Column(db.Text, default='')
     is_available = db.Column(db.Boolean, default=True)
     category = db.relationship('Category', backref=db.backref('services', lazy=True))
 
@@ -127,9 +148,23 @@ class SMMProvider(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     api_url = db.Column(db.String(500), nullable=False)
-    api_key = db.Column(db.Text, nullable=False)
+    api_key = db.Column(db.Text, nullable=False)  # encrypted live key (legacy field)
+    test_api_key = db.Column(db.Text, default='')
+    live_api_key = db.Column(db.Text, default='')
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class SMMCatalogService(db.Model):
+    __tablename__ = 'smm_catalog_service'
+    id = db.Column(db.Integer, primary_key=True)
+    provider_id = db.Column(db.Integer, db.ForeignKey('smm_provider.id'), nullable=False, index=True)
+    service_code = db.Column(db.String(80), nullable=False)
+    name = db.Column(db.String(240), default='')
+    category_name = db.Column(db.String(160), default='')
+    rate = db.Column(db.Float, default=0)
+    min_quantity = db.Column(db.Integer, default=1)
+    max_quantity = db.Column(db.Integer, default=10000)
+    provider = db.relationship('SMMProvider', backref=db.backref('catalog_services', cascade='all, delete-orphan'))
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -370,7 +405,7 @@ def enforce_account_ban():
 
 @app.route('/')
 def index():
-    categories = Category.query.order_by(Category.id).all()
+    categories = Category.query.filter_by(parent_id=None).order_by(Category.id).all()
     services = Service.query.order_by(Service.id.desc()).all()
     return render_template('index.html', categories=categories, services=services)
 
@@ -383,7 +418,8 @@ def accounts():
 def category_services(category_id):
     category = Category.query.get_or_404(category_id)
     services = Service.query.filter_by(category_id=category_id).order_by(Service.id.desc()).all()
-    return render_template('category_services.html', category=category, services=services)
+    subcategories = Category.query.filter_by(parent_id=category_id).order_by(Category.id).all()
+    return render_template('category_services.html', category=category, services=services, subcategories=subcategories)
 
 @app.route('/login', methods=['GET','POST'])
 def login():
@@ -433,6 +469,23 @@ def profile():
         db.session.commit(); flash('تم تحديث بياناتك.', 'success'); return redirect(url_for('profile'))
     return render_template('profile.html', user=user)
 
+@app.route('/profile/change_password', methods=['POST'])
+@login_required
+def change_profile_password():
+    user = current_user()
+    current = request.form.get('current_password', '')
+    new = request.form.get('new_password', '')
+    confirm = request.form.get('confirm_password', '')
+    if not user.check_password(current):
+        flash('كلمة المرور الحالية غير صحيحة.', 'error')
+    elif len(new) < 8:
+        flash('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.', 'error')
+    elif new != confirm:
+        flash('تأكيد كلمة المرور غير مطابق.', 'error')
+    else:
+        user.set_password(new); db.session.commit(); flash('تم تغيير كلمة المرور بنجاح.', 'success')
+    return redirect(url_for('profile'))
+
 @app.route('/verification', methods=['GET', 'POST'])
 @login_required
 def verification():
@@ -476,8 +529,8 @@ def place_order(service_id):
     if not service.is_available:
         flash('هذه الخدمة غير متوفرة حالياً.', 'error'); return redirect(url_for('category_services', category_id=service.category_id))
     link = request.form.get('link','').strip()
-    if service.service_type == 'manual':
-        # طلب يدوي بسعر ثابت لكل طلب.
+    if service.service_type in ('manual', 'smm_fixed'):
+        # manual أو API بسعر ثابت لكل طلب: لا توجد كمية يحددها العميل.
         quantity = 1
         if not link:
             flash('أدخل الآيدي أو البيانات المطلوبة.', 'error'); return redirect(url_for('category_services', category_id=service.category_id))
@@ -500,7 +553,9 @@ def place_order(service_id):
     if user.balance_usd < total:
         flash('رصيدك غير كافٍ. يرجى شحن المحفظة أولاً.', 'error'); return redirect(url_for('deposit'))
     provider_order_id = ''
-    if service.service_type == 'smm':
+    if service.service_type in ('smm', 'smm_fixed'):
+        if service.service_type == 'smm_fixed':
+            quantity = 1
         provider = SMMProvider.query.filter_by(id=service.api_provider_id, is_active=True).first() if service.api_provider_id else None
         if not provider or not service.api_service_id:
             flash('هذه الخدمة التلقائية غير مربوطة بمزوّد API بشكل صحيح. تواصل مع الإدارة.', 'error')
@@ -520,9 +575,9 @@ def place_order(service_id):
             flash('لم يقبل مزوّد الخدمة الطلب. لم يتم خصم رصيدك؛ تحقق من إعدادات API وحاول لاحقاً.', 'error')
             return redirect(url_for('category_services', category_id=service.category_id))
     user.balance_usd -= total
-    order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type == 'smm' else 'قيد المراجعة'))
+    order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type in ('smm', 'smm_fixed') else 'قيد المراجعة'))
     db.session.add(order); db.session.commit()
-    order_kind = 'تلقائي عبر API' if service.service_type == 'smm' else ('يدوي' if service.service_type == 'manual' else 'طلب خدمة')
+    order_kind = 'تلقائي عبر API' if service.service_type in ('smm', 'smm_fixed') else ('يدوي' if service.service_type == 'manual' else 'طلب خدمة')
     notify_admins(f'طلب جديد {order_kind} #{order.id}', f'المستخدم {user.username} (#{user.id}) أرسل طلب {service.name} بقيمة ${format_money(total)}. الحالة: {order.status}.', url_for('admin'))
     db.session.commit()
     flash(('تم إرسال طلبك إلى مزوّد الخدمة. رقم الطلب: ' + provider_order_id) if provider_order_id else 'تم استلام طلبك بنجاح.', 'success'); return redirect(url_for('my_orders'))
@@ -737,7 +792,7 @@ def admin_accounts():
 def admin():
     account_lookup_id = request.args.get('account_id', type=int)
     account_lookup = db.session.get(User, account_lookup_id) if account_lookup_id else None
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, is_admin=True)
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id)
 
 
 @app.route('/account-banned/<int:user_id>', methods=['GET'])
@@ -963,10 +1018,13 @@ def add_agent():
 @app.route('/admin/delete_agent/<int:agent_id>', methods=['POST'])
 @admin_required
 def delete_agent(agent_id):
-    agent = Agent.query.get_or_404(agent_id)
-    db.session.delete(agent)
-    db.session.commit()
-    flash('تم حذف الوكيل بنجاح.', 'success')
+    agent = db.session.get(Agent, agent_id)
+    if not agent:
+        flash('الوكيل غير موجود أو تم حذفه مسبقاً.', 'error')
+    else:
+        db.session.delete(agent)
+        db.session.commit()
+        flash('تم حذف الوكيل بنجاح.', 'success')
     return redirect(url_for('admin'))
 
 @app.route('/admin/add_smm_provider', methods=['POST'])
@@ -974,13 +1032,65 @@ def delete_agent(agent_id):
 def add_smm_provider():
     name = request.form.get('provider_name', '').strip()
     api_url = request.form.get('api_url', '').strip()
-    api_key = request.form.get('api_key', '').strip()
-    if not name or not api_url.startswith(('https://', 'http://')) or not api_key:
-        flash('أدخل اسم المزوّد ورابط API صحيحاً ومفتاح API.', 'error')
+    test_key = request.form.get('test_api_key', '').strip()
+    live_key = request.form.get('live_api_key', '').strip() or request.form.get('api_key', '').strip()
+    if not name or not api_url.startswith(('https://', 'http://')) or not live_key:
+        flash('أدخل اسم المزوّد ورابط API والمفتاح الفعلي.', 'error')
     else:
-        db.session.add(SMMProvider(name=name, api_url=api_url, api_key=api_key))
+        db.session.add(SMMProvider(name=name, api_url=api_url, api_key=protect_api_key(live_key), test_api_key=protect_api_key(test_key), live_api_key=protect_api_key(live_key)))
         db.session.commit()
         flash('تم حفظ مزوّد API. احتفظ بالمفتاح سرياً.', 'success')
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/test_smm_provider/<int:provider_id>', methods=['POST'])
+@admin_required
+def test_smm_provider(provider_id):
+    provider = SMMProvider.query.get_or_404(provider_id)
+    try:
+        response = requests.post(provider.api_url, data={'key': reveal_api_key(provider.test_api_key or provider.api_key), 'action': 'balance'}, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+        if data.get('error'):
+            raise ValueError(str(data['error']))
+        balance = data.get('balance', 'غير متاح')
+        currency = data.get('currency', '')
+        flash(f'نجح اختبار API للمزوّد {provider.name}. الرصيد: {balance} {currency}', 'success')
+    except Exception as exc:
+        flash(f'فشل اختبار API للمزوّد {provider.name}: {str(exc)[:220]}', 'error')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/fetch_smm_services/<int:provider_id>', methods=['POST'])
+@admin_required
+def fetch_smm_services(provider_id):
+    provider = SMMProvider.query.get_or_404(provider_id)
+    try:
+        response = requests.post(provider.api_url, data={'key': reveal_api_key(provider.api_key), 'action': 'services'}, timeout=20)
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, dict) and data.get('error'):
+            raise ValueError(str(data['error']))
+        if not isinstance(data, list):
+            raise ValueError('استجابة API غير متوقعة؛ يجب أن تكون قائمة خدمات.')
+        # Refresh provider catalog, keeping product creation under admin control.
+        SMMCatalogService.query.filter_by(provider_id=provider.id).delete()
+        for item in data:
+            if not isinstance(item, dict) or item.get('service') is None:
+                continue
+            try:
+                rate = float(item.get('rate') or 0)
+                min_q = max(1, int(item.get('min') or 1))
+                max_q = max(min_q, int(item.get('max') or 10000))
+            except (TypeError, ValueError):
+                rate, min_q, max_q = 0, 1, 10000
+            db.session.add(SMMCatalogService(provider_id=provider.id, service_code=str(item.get('service')),
+                name=str(item.get('name') or item.get('service')), category_name=str(item.get('category') or ''),
+                rate=rate, min_quantity=min_q, max_quantity=max_q))
+        db.session.commit()
+        flash(f'تم جلب وحفظ {len(SMMCatalogService.query.filter_by(provider_id=provider.id).all())} خدمة من {provider.name}. يمكنك اختيار رقمها عند إضافة المنتج.', 'success')
+    except Exception as exc:
+        db.session.rollback()
+        flash(f'تعذر جلب خدمات API: {str(exc)[:220]}', 'error')
     return redirect(url_for('admin'))
 
 @app.route('/admin/delete_smm_provider/<int:provider_id>', methods=['POST'])
@@ -993,34 +1103,70 @@ def delete_smm_provider(provider_id):
     flash('تم حذف مزوّد API وفصل الخدمات المرتبطة به.', 'success')
     return redirect(url_for('admin'))
 
+@app.route('/admin/add_category', methods=['POST'])
+@admin_required
+def add_category():
+    name = request.form.get('category_name', '').strip()
+    if not name:
+        flash('أدخل اسم القسم الرئيسي.', 'error')
+    elif Category.query.filter_by(name=name, parent_id=None).first():
+        flash('القسم الرئيسي موجود مسبقاً.', 'error')
+    else:
+        db.session.add(Category(name=name, parent_id=None))
+        db.session.commit()
+        flash('تم إنشاء القسم الرئيسي بنجاح.', 'success')
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/add_subcategory', methods=['POST'])
+@admin_required
+def add_subcategory():
+    name = request.form.get('subcategory_name', '').strip()
+    parent_id = request.form.get('parent_id', type=int)
+    parent = Category.query.filter_by(id=parent_id, parent_id=None).first() if parent_id else None
+    if not name or not parent:
+        flash('اختر قسماً رئيسياً وأدخل اسم القسم الفرعي.', 'error')
+    elif Category.query.filter_by(name=name, parent_id=parent.id).first():
+        flash('القسم الفرعي موجود مسبقاً.', 'error')
+    else:
+        try:
+            image_url = save_uploaded_image('subcategory_image_file') or request.form.get('subcategory_image_url', '').strip()
+        except ValueError as exc:
+            flash(str(exc), 'error')
+            return redirect(url_for('admin'))
+        db.session.add(Category(name=name, parent_id=parent.id, image_url=image_url)); db.session.commit()
+        flash('تم إنشاء القسم الفرعي بنجاح مع الصورة.', 'success')
+    return redirect(url_for('admin'))
+
 @app.route('/admin/add_service', methods=['POST'])
 @admin_required
 def add_service():
-    name=request.form.get('name','').strip(); category_name=request.form.get('category_name','').strip()
-    if not name or not category_name: flash('أدخل اسم الخدمة والقسم.', 'error'); return redirect(url_for('admin'))
+    name=request.form.get('name','').strip(); category_id=request.form.get('category_id', type=int); category_name=request.form.get('category_name','').strip()
+    if not name or (not category_id and not category_name): flash('أدخل اسم الخدمة واختر القسم الرئيسي أو الفرعي.', 'error'); return redirect(url_for('admin'))
     try:
         category_image = save_uploaded_image('category_image_file') or request.form.get('category_image_url','').strip()
         product_image = save_uploaded_image('image_file') or request.form.get('image_url','').strip()
     except ValueError as exc:
         flash(str(exc), 'error'); return redirect(url_for('admin'))
-    cat=Category.query.filter_by(name=category_name).first()
-    if not cat:
+    cat=Category.query.get(category_id) if category_id else Category.query.filter_by(name=category_name).first()
+    if not cat and category_name:
         cat=Category(name=category_name, image_url=category_image); db.session.add(cat); db.session.flush()
-    elif category_image:
-        cat.image_url = category_image
+    if not cat:
+        flash('القسم المحدد غير موجود.', 'error'); return redirect(url_for('admin'))
+    if category_image: cat.image_url = category_image
     price=request.form.get('price_per_1000',type=float) or 0
     typ=request.form.get('service_type','manual')
-    if typ not in ('manual', 'manual_quantity', 'smm'): typ = 'manual'
+    if typ not in ('manual', 'manual_quantity', 'smm', 'smm_fixed'): typ = 'manual'
     minimum = request.form.get('min_quantity',type=int) or 1
     maximum = request.form.get('max_quantity',type=int) or 10000
     if price < 0 or minimum < 1 or maximum < minimum:
         flash('تحقق من السعر والحد الأدنى والأقصى للكمية.', 'error')
         return redirect(url_for('admin'))
-    provider_id = request.form.get('api_provider_id', type=int) if typ == 'smm' else None
-    api_service_id = request.form.get('api_service_id', '').strip() if typ == 'smm' else ''
-    if typ == 'smm' and (not provider_id or not api_service_id):
+    provider_id = request.form.get('api_provider_id', type=int) if typ in ('smm', 'smm_fixed') else None
+    api_service_id = request.form.get('api_service_id', '').strip() if typ in ('smm', 'smm_fixed') else ''
+    if typ in ('smm', 'smm_fixed') and (not provider_id or not api_service_id):
         flash('لخدمة SMM تلقائية، اختر مزوّد API وأدخل رقم الخدمة لدى المزوّد.', 'error'); return redirect(url_for('admin'))
-    service=Service(name=name, category_id=cat.id, price=price, price_per_1000=price, min_quantity=(minimum if typ in ('smm', 'manual_quantity') else 1), max_quantity=(maximum if typ in ('smm', 'manual_quantity') else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, api_provider_id=provider_id, api_service_id=api_service_id, image_url=product_image, description=request.form.get('description','').strip(), is_available=(request.form.get('is_available', '1') == '1'))
+    service=Service(name=name, category_id=cat.id, price=price, price_per_1000=price, min_quantity=(minimum if typ in ('smm', 'manual_quantity') else 1), max_quantity=(maximum if typ in ('smm', 'manual_quantity') else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, api_provider_id=provider_id, api_service_id=api_service_id, image_url=product_image, description=request.form.get('description','').strip(), extra_details=request.form.get('extra_details','').strip(), is_available=(request.form.get('is_available', '1') == '1'))
     db.session.add(service); db.session.commit(); flash('تمت إضافة الخدمة.', 'success'); return redirect(url_for('admin'))
 
 @app.route('/admin/update_service/<int:service_id>', methods=['POST'])
@@ -1028,15 +1174,19 @@ def add_service():
 def update_service(service_id):
     service = Service.query.get_or_404(service_id)
     name = request.form.get('name', '').strip()
+    category_id = request.form.get('category_id', type=int)
     category_name = request.form.get('category_name', '').strip()
-    if not name or not category_name:
-        flash('أدخل اسم المنتج والقسم.', 'error')
+    if not name or (not category_id and not category_name):
+        flash('أدخل اسم المنتج واختر القسم.', 'error')
         return redirect(url_for('admin'))
-    category = Category.query.filter_by(name=category_name).first()
-    if not category:
+    category = Category.query.get(category_id) if category_id else Category.query.filter_by(name=category_name).first()
+    if not category and category_name:
         category = Category(name=category_name)
         db.session.add(category)
         db.session.flush()
+    if not category:
+        flash('القسم المحدد غير موجود.', 'error')
+        return redirect(url_for('admin'))
     try:
         price = float(request.form.get('price_per_1000', '0'))
         minimum = int(request.form.get('min_quantity', '1'))
@@ -1045,13 +1195,13 @@ def update_service(service_id):
         flash('تحقق من السعر والحد الأدنى والأقصى.', 'error')
         return redirect(url_for('admin'))
     typ = request.form.get('service_type', 'manual')
-    if typ not in ('manual', 'manual_quantity', 'smm'): typ = 'manual'
+    if typ not in ('manual', 'manual_quantity', 'smm', 'smm_fixed'): typ = 'manual'
     if price < 0 or minimum < 1 or maximum < minimum:
         flash('السعر يجب أن يكون موجباً، والحد الأقصى أكبر من أو يساوي الحد الأدنى.', 'error')
         return redirect(url_for('admin'))
-    provider_id = request.form.get('api_provider_id', type=int) if typ == 'smm' else None
-    api_service_id = request.form.get('api_service_id', '').strip() if typ == 'smm' else ''
-    if typ == 'smm' and (not provider_id or not api_service_id):
+    provider_id = request.form.get('api_provider_id', type=int) if typ in ('smm', 'smm_fixed') else None
+    api_service_id = request.form.get('api_service_id', '').strip() if typ in ('smm', 'smm_fixed') else ''
+    if typ in ('smm', 'smm_fixed') and (not provider_id or not api_service_id):
         flash('اختر مزوّد API وأدخل رقم الخدمة للتلقائي SMM.', 'error')
         return redirect(url_for('admin'))
     service.name = name
@@ -1065,6 +1215,7 @@ def update_service(service_id):
     service.api_provider_id = provider_id
     service.api_service_id = api_service_id
     service.description = request.form.get('description', '').strip()
+    service.extra_details = request.form.get('extra_details', '').strip()
     service.is_available = request.form.get('is_available', '0') == '1'
     try:
         image = save_uploaded_image('image_file')
@@ -1252,6 +1403,15 @@ def import_backup():
 
 with app.app_context():
     db.create_all()
+    # Safe additive migration: separate customer-facing extra details from the red order notice.
+    try:
+        from sqlalchemy import inspect
+        service_columns = {column['name'] for column in inspect(db.engine).get_columns('service')}
+        if 'extra_details' not in service_columns:
+            db.session.execute(db.text("ALTER TABLE service ADD COLUMN extra_details TEXT DEFAULT ''"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     # Safe additive migration: preserve all existing user accounts and data.
     try:
         from sqlalchemy import inspect
@@ -1294,6 +1454,23 @@ with app.app_context():
             db.session.execute(db.text('ALTER TABLE service ADD COLUMN api_provider_id INTEGER'))
         if 'api_service_id' not in service_columns:
             db.session.execute(db.text("ALTER TABLE service ADD COLUMN api_service_id VARCHAR(80) DEFAULT ''"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    try:
+        from sqlalchemy import inspect
+        category_columns = {column['name'] for column in inspect(db.engine).get_columns('category')}
+        if 'parent_id' not in category_columns:
+            db.session.execute(db.text('ALTER TABLE category ADD COLUMN parent_id INTEGER'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    try:
+        from sqlalchemy import inspect
+        provider_columns = {column['name'] for column in inspect(db.engine).get_columns('smm_provider')}
+        for col in ('test_api_key', 'live_api_key'):
+            if col not in provider_columns:
+                db.session.execute(db.text(f"ALTER TABLE smm_provider ADD COLUMN {col} TEXT DEFAULT ''"))
         db.session.commit()
     except Exception:
         db.session.rollback()

@@ -139,6 +139,7 @@ class Service(db.Model):
     api_service_id = db.Column(db.String(80), default='')
     image_url = db.Column(db.String(500), default='')
     description = db.Column(db.Text, default='')
+    extra_details = db.Column(db.Text, default='')
     is_available = db.Column(db.Boolean, default=True)
     category = db.relationship('Category', backref=db.backref('services', lazy=True))
 
@@ -1153,7 +1154,7 @@ def add_service():
     api_service_id = request.form.get('api_service_id', '').strip() if typ in ('smm', 'smm_fixed') else ''
     if typ in ('smm', 'smm_fixed') and (not provider_id or not api_service_id):
         flash('لخدمة SMM تلقائية، اختر مزوّد API وأدخل رقم الخدمة لدى المزوّد.', 'error'); return redirect(url_for('admin'))
-    service=Service(name=name, category_id=cat.id, price=price, price_per_1000=price, min_quantity=(minimum if typ in ('smm', 'manual_quantity') else 1), max_quantity=(maximum if typ in ('smm', 'manual_quantity') else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, api_provider_id=provider_id, api_service_id=api_service_id, image_url=product_image, description=request.form.get('description','').strip(), is_available=(request.form.get('is_available', '1') == '1'))
+    service=Service(name=name, category_id=cat.id, price=price, price_per_1000=price, min_quantity=(minimum if typ in ('smm', 'manual_quantity') else 1), max_quantity=(maximum if typ in ('smm', 'manual_quantity') else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, api_provider_id=provider_id, api_service_id=api_service_id, image_url=product_image, description=request.form.get('description','').strip(), extra_details=request.form.get('extra_details','').strip(), is_available=(request.form.get('is_available', '1') == '1'))
     db.session.add(service); db.session.commit(); flash('تمت إضافة الخدمة.', 'success'); return redirect(url_for('admin'))
 
 @app.route('/admin/update_service/<int:service_id>', methods=['POST'])
@@ -1202,6 +1203,7 @@ def update_service(service_id):
     service.api_provider_id = provider_id
     service.api_service_id = api_service_id
     service.description = request.form.get('description', '').strip()
+    service.extra_details = request.form.get('extra_details', '').strip()
     service.is_available = request.form.get('is_available', '0') == '1'
     try:
         image = save_uploaded_image('image_file')
@@ -1389,6 +1391,15 @@ def import_backup():
 
 with app.app_context():
     db.create_all()
+    # Safe additive migration: separate customer-facing extra details from the red order notice.
+    try:
+        from sqlalchemy import inspect
+        service_columns = {column['name'] for column in inspect(db.engine).get_columns('service')}
+        if 'extra_details' not in service_columns:
+            db.session.execute(db.text("ALTER TABLE service ADD COLUMN extra_details TEXT DEFAULT ''"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     # Safe additive migration: preserve all existing user accounts and data.
     try:
         from sqlalchemy import inspect

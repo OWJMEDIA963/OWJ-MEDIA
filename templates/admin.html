@@ -354,6 +354,8 @@
             
             <label class="block text-[11px] font-bold text-gray-300">حالة المنتج</label><select name="is_available" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="1">متوفر</option><option value="0">غير متوفر</option></select>
             <textarea name="description" placeholder="تفاصيل الخدمة..." rows="2" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none"></textarea>
+            <label class="block text-xs font-bold text-cyan-300">تفاصيل أكثر (تظهر عند الضغط على زر تفاصيل أكثر)</label>
+            <textarea name="extra_details" placeholder="اكتب التفاصيل الإضافية التي ستظهر للعميل في نافذة مستقلة..." rows="3" class="w-full bg-gray-950 border border-cyan-500/30 rounded-2xl px-4 py-3 text-xs text-white outline-none"></textarea>
             <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-2xl text-xs">حفظ وإضافة الخدمة</button>
         </form>
     </div>
@@ -381,6 +383,8 @@
                 </select>
                 <input name="input_label" value="{{ s.input_label }}" required placeholder="حقل بيانات الزبون" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
                 <textarea name="description" rows="2" placeholder="الوصف / التنبيه الأحمر" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">{{ s.description or '' }}</textarea>
+                <label class="block text-[11px] font-bold text-cyan-300">تفاصيل أكثر (نافذة مستقلة للعميل)</label>
+                <textarea name="extra_details" rows="3" placeholder="التفاصيل التي تظهر عند الضغط على تفاصيل أكثر" class="w-full bg-gray-900 border border-cyan-500/30 rounded-xl px-3 py-3 text-xs text-white">{{ s.extra_details or '' }}</textarea>
                 <select name="api_provider_id" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">-- مزوّد API (للتلقائي فقط) --</option>{% for provider in smm_providers %}<option value="{{ provider.id }}" {% if s.api_provider_id == provider.id %}selected{% endif %}>{{ provider.name }}</option>{% endfor %}</select>
                 <input name="api_service_id" value="{{ s.api_service_id or '' }}" placeholder="Service ID لدى مزوّد API" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
                 <label class="block text-[11px] font-bold text-gray-300">توفّر المنتج</label>

@@ -185,11 +185,8 @@
 
             <div class="mt-1 sm:mt-2">
                 {% if service.is_available %}
-                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.price_per_1000 if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}">
+                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.price_per_1000 if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}" data-extra-details="{{ (service.extra_details or '')|e }}">
                     اطلب الآن
-                </button>
-                <button type="button" class="js-show-details w-full font-black rounded-lg text-[8px] sm:text-[10px] transition block" data-service-name="{{ service.name|e }}" data-service-description="{{ (service.description or '')|e }}">
-                    تفاصيل أكثر
                 </button>
                 {% else %}
                 <button disabled class="w-full bg-gray-800 text-gray-500 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] cursor-not-allowed">
@@ -235,6 +232,7 @@
             <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-2.5 rounded-2xl text-xs shadow-xl transition">
                 تأكيد وإرسال الطلب
             </button>
+            <button type="button" id="orderExtraDetailsButton" class="w-full rounded-2xl border border-cyan-400/70 bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-black text-cyan-200 transition">تفاصيل أكثر</button>
         </form>
     </div>
 </div>
@@ -267,7 +265,7 @@
         box.classList.add('hidden');
     }
 
-    function openOrderModal(id, name, price, type, label, minQty, maxQty, description) {
+    function openOrderModal(id, name, price, type, label, minQty, maxQty, description, extraDetails) {
         currentPrice = Number.parseFloat(price) || 0;
         currentType = type || '';
         currentMinQuantity = Number.parseInt(minQty, 10) || 1;
@@ -278,6 +276,9 @@
         const descriptionBox = document.getElementById('modalServiceDescription');
         descriptionBox.textContent = description || '';
         descriptionBox.classList.toggle('hidden', !(description && description.trim()));
+        document.getElementById('serviceDetailsTitle').textContent = (name || 'المنتج') + ' - تفاصيل أكثر';
+        document.getElementById('serviceDetailsContent').textContent = (extraDetails || '').trim() || 'لا توجد تفاصيل إضافية لهذا المنتج حالياً.';
+        document.getElementById('orderExtraDetailsButton').dataset.detailsReady = '1';
         document.getElementById('orderForm').action = '/order/' + encodeURIComponent(id);
 
         const qtyContainer = document.getElementById('quantityContainer');
@@ -308,7 +309,8 @@
                 button.dataset.inputLabel,
                 button.dataset.minQuantity,
                 button.dataset.maxQuantity,
-                button.dataset.serviceDescription
+                button.dataset.serviceDescription,
+                button.dataset.extraDetails
             );
         });
     });
@@ -318,22 +320,16 @@
         document.body.classList.remove('overflow-hidden');
     }
 
-    document.querySelectorAll('.js-show-details').forEach(function(button) {
-        button.addEventListener('click', function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            document.getElementById('serviceDetailsTitle').textContent = button.dataset.serviceName || 'تفاصيل المنتج';
-            const content = document.getElementById('serviceDetailsContent');
-            const description = (button.dataset.serviceDescription || '').trim();
-            content.textContent = description || 'لا توجد تفاصيل إضافية لهذا المنتج حالياً. يمكنك إضافة التفاصيل من لوحة الإدارة في خانة وصف المنتج.';
-            document.getElementById('serviceDetailsModal').classList.remove('hidden');
-            document.body.classList.add('overflow-hidden');
-        });
+    document.getElementById('orderExtraDetailsButton').addEventListener('click', function() {
+        document.getElementById('serviceDetailsModal').classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
     });
 
     function closeServiceDetails() {
         document.getElementById('serviceDetailsModal').classList.add('hidden');
-        document.body.classList.remove('overflow-hidden');
+        if (document.getElementById('orderModal').classList.contains('hidden')) {
+            document.body.classList.remove('overflow-hidden');
+        }
     }
     document.getElementById('serviceDetailsModal').addEventListener('click', function(event) {
         if (event.target === this) closeServiceDetails();

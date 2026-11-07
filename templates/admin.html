@@ -38,6 +38,15 @@
 
 
 
+    <section class="rounded-3xl border border-emerald-500/30 bg-gray-900 p-6 shadow-xl space-y-4">
+        <div><h2 class="text-sm font-black text-white">سعر تصريف العملات</h2><p class="mt-1 text-xs text-gray-400">حدد قيمة الدولار الواحد بالليرة السورية. يؤثر التعديل على عرض الأسعار والأرصدة للمستخدمين الذين اختاروا الليرة، مع بقاء الرصيد محفوظاً بالدولار داخلياً.</p></div>
+        <form method="post" action="/admin/exchange-rate" class="flex flex-col sm:flex-row gap-3">
+            <label class="flex-1 text-xs text-gray-300">1 دولار أمريكي = <input type="number" name="usd_to_syp_rate" min="0.0001" step="any" required value="{{ usd_to_syp_rate }}" class="mt-2 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white"></label>
+            <div class="flex items-end"><button class="w-full rounded-xl bg-emerald-500 px-5 py-3 text-xs font-black text-gray-950">حفظ سعر التصريف</button></div>
+        </form>
+        <p class="text-[11px] text-emerald-300">السعر الحالي: 1 USD = {{ usd_to_syp_rate }} ل.س</p>
+    </section>
+
     <!-- استرجاع الحسابات وإدارة الحظر -->
     <section class="rounded-3xl border border-violet-500/30 bg-gray-900 p-6 shadow-xl space-y-4">
         <div><h2 class="text-sm font-black text-white">استرجاع الحسابات وإدارة الحظر</h2><p class="mt-1 text-xs text-gray-400">ابحث باستخدام معرّف المستخدم الظاهر في صفحة حسابه الشخصية.</p></div>
@@ -45,7 +54,7 @@
         {% if account_lookup %}
         <div class="rounded-2xl border border-gray-700 bg-gray-950 p-4 space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2"><b class="text-white">الحساب #{{ account_lookup.id }} — {{ account_lookup.username }}</b><span class="rounded-lg px-3 py-1 text-xs {% if account_lookup.is_banned %}bg-rose-500/15 text-rose-300{% else %}bg-emerald-500/15 text-emerald-300{% endif %}">{% if account_lookup.is_banned %}محظور{% else %}نشط{% endif %}</span></div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-300"><p>الاسم: {{ account_lookup.full_name or '-' }}</p><p>اسم المستخدم: {{ account_lookup.username }}</p><p>البريد: {{ account_lookup.email or '-' }}</p><p>الهاتف: {{ account_lookup.phone or '-' }}</p><p>الرصيد: ${{ account_lookup.balance_usd|money }}</p><p>تاريخ الإنشاء: {{ account_lookup.created_at.strftime('%Y-%m-%d') if account_lookup.created_at else '-' }}</p></div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-300"><p>الاسم: {{ account_lookup.full_name or '-' }}</p><p>اسم المستخدم: {{ account_lookup.username }}</p><p>البريد: {{ account_lookup.email or '-' }}</p><p>الهاتف: {{ account_lookup.phone or '-' }}</p><p>الرصيد: {{ currency_symbol }}{{ account_lookup.balance_usd|money }}</p><p>تاريخ الإنشاء: {{ account_lookup.created_at.strftime('%Y-%m-%d') if account_lookup.created_at else '-' }}</p></div>
             <p class="text-[11px] text-amber-300">لا يمكن عرض كلمة المرور القديمة لأنها محفوظة بشكل مشفّر؛ يمكنك تعيين كلمة مرور جديدة لصاحب الحساب.</p>
             <form action="/admin/account_action" method="post" class="space-y-2"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="reset_password"><input type="password" name="new_password" minlength="8" required placeholder="كلمة مرور جديدة (8 أحرف على الأقل)" class="w-full rounded-xl border border-gray-700 bg-gray-900 p-3 text-xs text-white"><button class="w-full rounded-xl bg-cyan-600 p-3 text-xs font-black text-white">تعيين كلمة مرور جديدة</button></form>
             {% if account_lookup.is_banned %}<p class="rounded-xl bg-rose-500/10 p-3 text-xs text-rose-300">سبب الحظر: {{ account_lookup.ban_reason or '-' }}</p>{% if account_lookup.ban_appeal %}<div class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-gray-200"><b class="text-amber-300">اعتراض المستخدم ({{ account_lookup.appeal_status or 'جديد' }}):</b><p class="mt-2 whitespace-pre-wrap">{{ account_lookup.ban_appeal }}</p><form action="/admin/account_action" method="post" class="mt-2"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="appeal_reviewed"><button class="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">تحديد الاعتراض كمراجع</button></form></div>{% endif %}<form action="/admin/account_action" method="post"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="unban"><button class="w-full rounded-xl bg-emerald-600 p-3 text-xs font-black text-white">رفع الحظر عن الحساب</button></form>
@@ -65,7 +74,7 @@
                     <strong class="text-white">طلب #{{ dep.id }} — {{ dep.user.username if dep.user else 'مستخدم محذوف' }}</strong>
                     <span class="rounded-lg px-2 py-1 {% if dep.status == 'مقبول' %}bg-emerald-500/15 text-emerald-300{% elif dep.status == 'مرفوض' %}bg-rose-500/15 text-rose-300{% else %}bg-amber-500/15 text-amber-300{% endif %}">{{ dep.status }}</span>
                 </div>
-                <p class="text-xs text-gray-300">المبلغ: <b class="text-cyan-300">${{ dep.amount|money }}</b>{% if dep.payment_method_name %} | طريقة الدفع: <b class="text-cyan-300">{{ dep.payment_method_name }}</b>{% endif %} | المستخدم ID: {{ dep.user_id }} | التاريخ: {{ dep.created_at.strftime('%Y-%m-%d %H:%M') if dep.created_at else '-' }}</p>
+                <p class="text-xs text-gray-300">المبلغ: <b class="text-cyan-300">{{ currency_symbol }}{{ dep.amount|money }}</b>{% if dep.payment_method_name %} | طريقة الدفع: <b class="text-cyan-300">{{ dep.payment_method_name }}</b>{% endif %} | المستخدم ID: {{ dep.user_id }} | التاريخ: {{ dep.created_at.strftime('%Y-%m-%d %H:%M') if dep.created_at else '-' }}</p>
                 {% if dep.proof %}<p class="text-xs text-gray-400 break-words">رقم العملية / تفاصيل التحويل: {{ dep.proof }}</p>{% endif %}{% if dep.proof_image %}<div class="space-y-2"><p class="text-xs font-bold text-cyan-300">صورة إشعار الحوالة:</p><a href="{{ dep.proof_image }}" target="_blank" rel="noopener" class="inline-flex flex-col gap-2"><img src="{{ dep.proof_image }}" alt="إشعار حوالة طلب {{ dep.id }}" loading="lazy" class="max-h-72 max-w-full rounded-xl border border-gray-700 bg-white object-contain"><span class="text-xs text-cyan-300 underline">فتح صورة الإشعار بالحجم الكامل</span></a></div>{% endif %}{% if not dep.proof_image %}<p class="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">لم تصل صورة إشعار الحوالة مع هذا الطلب. اطلب من المستخدم إعادة إرسالها.</p>{% endif %}
                 {% if dep.status == 'مرفوض' and dep.rejection_reason %}<p class="rounded-xl border border-rose-500/30 bg-rose-950/30 p-3 text-xs text-rose-300">سبب الرفض: {{ dep.rejection_reason }}</p>{% endif %}
                 {% if dep.status == 'قيد المراجعة' %}
@@ -90,7 +99,7 @@
                     <div class="space-y-1 text-xs text-gray-300">
                         <p class="font-bold text-white">الخدمة: {{ ord.service_name }} (#{{ ord.id }})</p>
                         <p>المطلوب/الرابط: <a href="{{ ord.link }}" target="_blank" class="text-cyan-400 underline">{{ ord.link }}</a></p>
-                        <p>الكمية: {{ ord.quantity }} | التكلفة: ${{ ord.total_price|money }}</p>
+                        <p>الكمية: {{ ord.quantity }} | التكلفة: {{ currency_symbol }}{{ ord.total_price|money }}</p>
                         <p>الحالة: <span class="px-2 py-0.5 rounded-lg text-[10px] {% if ord.status == 'مكتمل' %} bg-emerald-500/20 text-emerald-400 {% else %} bg-amber-500/20 text-amber-400 {% endif %}">{{ ord.status }}</span></p>
                     </div>
                     {% if ord.status != 'مكتمل' %}

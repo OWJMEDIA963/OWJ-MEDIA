@@ -176,7 +176,7 @@
             <div class="owj-service-content">
                 <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
                 <div class="owj-service-price-strip" aria-label="السعر">
-                    <span class="owj-price-value">${{ (service.price_per_1000 or service.price if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price)|money }}</span>
+                    <span class="owj-price-value">{{ currency_symbol }}{{ (service.price_per_1000 or service.price if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price)|money }}</span>
                 </div>
                 {% if not service.is_available %}
                 <span class="owj-unavailable-label">غير متوفرة</span>

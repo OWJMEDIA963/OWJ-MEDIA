@@ -211,6 +211,7 @@ class Order(db.Model):
     quantity = db.Column(db.Integer, default=1)
     total_price = db.Column(db.Float, default=0.0)
     status = db.Column(db.String(40), default='قيد المراجعة')
+    failure_reason = db.Column(db.String(500), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('User', backref='orders')
     service = db.relationship('Service')
@@ -983,7 +984,49 @@ def handle_deposit(deposit_id):
 @app.route('/admin/complete_order/<int:order_id>', methods=['POST'])
 @admin_required
 def complete_order(order_id):
-    order = Order.query.get_or_404(order_id); order.status='مكتمل'; db.session.commit(); flash('تم تحديث حالة الطلب.', 'success'); return redirect(url_for('admin'))
+    order = Order.query.get_or_404(order_id)
+    if order.status == 'فشل':
+        flash('لا يمكن إكمال طلب فاشل تم رد قيمته للزبون.', 'error')
+        return redirect(url_for('admin'))
+    order.status = 'مكتمل'
+    order.failure_reason = ''
+    send_user_notification(order.user_id, 'تم إكمال طلبك', f'تم إكمال الطلب #{order.id} لخدمة {order.service_name} بنجاح.', url_for('my_orders'))
+    db.session.commit()
+    flash(f'تم تعيين الطلب #{order.id} كمكتمل.', 'success')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/fail_order/<int:order_id>', methods=['POST'])
+@admin_required
+def fail_order(order_id):
+    order = Order.query.filter_by(id=order_id).with_for_update().first_or_404()
+    reason = request.form.get('failure_reason', '').strip()
+    if not reason:
+        flash('اكتب سبب فشل الطلب ليظهر للزبون.', 'error')
+        return redirect(url_for('admin'))
+    if order.status == 'فشل':
+        flash('هذا الطلب فاشل مسبقاً وتم رد قيمته، لم يتم رد المبلغ مرة أخرى.', 'error')
+        return redirect(url_for('admin'))
+    if order.status == 'مكتمل':
+        flash('لا يمكن تعيين طلب مكتمل كفاشل.', 'error')
+        return redirect(url_for('admin'))
+    # Refund exactly once: failed status is the idempotency guard.
+    user = User.query.filter_by(id=order.user_id).with_for_update().first()
+    if not user:
+        flash('تعذر العثور على حساب الزبون.', 'error')
+        return redirect(url_for('admin'))
+    refund = float(order.total_price or 0)
+    user.balance_usd = round(float(user.balance_usd or 0) + refund, 2)
+    order.status = 'فشل'
+    order.failure_reason = reason[:500]
+    send_user_notification(
+        order.user_id,
+        'فشل الطلب وتم رد المبلغ',
+        f'تعذر تنفيذ الطلب #{order.id} ({order.service_name}). السبب: {order.failure_reason}. تمت إعادة ${format_money(refund)} إلى رصيد محفظتك.',
+        url_for('my_orders')
+    )
+    db.session.commit()
+    flash(f'تم تسجيل فشل الطلب #{order.id} وإعادة ${format_money(refund)} إلى محفظة الزبون.', 'success')
+    return redirect(url_for('admin'))
 
 @app.route('/admin/handle_verification/<int:req_id>', methods=['POST'])
 @admin_required
@@ -1357,8 +1400,20 @@ def delete_category():
 @app.route('/admin/delete_service', methods=['POST'])
 @admin_required
 def delete_service():
-    service=Service.query.get(request.form.get('service_id',type=int))
-    if service: db.session.delete(service); db.session.commit(); flash('تم حذف الخدمة.', 'success')
+    service = Service.query.get(request.form.get('service_id', type=int))
+    if not service:
+        flash('الخدمة المحددة غير موجودة.', 'error')
+        return redirect(url_for('admin'))
+    try:
+        # Keep historical orders intact while removing the service itself.
+        Order.query.filter_by(service_id=service.id).update({Order.service_id: None}, synchronize_session=False)
+        db.session.delete(service)
+        db.session.commit()
+        flash('تم حذف الخدمة بنجاح، مع الحفاظ على سجل الطلبات السابقة.', 'success')
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Failed to delete service')
+        flash('تعذر حذف الخدمة حالياً. تحقق من ارتباطاتها ثم حاول مجدداً.', 'error')
     return redirect(url_for('admin'))
 
 @app.route('/admin/export_backup')
@@ -1511,6 +1566,15 @@ def import_backup():
 
 with app.app_context():
     db.create_all()
+    # Add failure reason to existing order tables without losing existing orders.
+    try:
+        from sqlalchemy import inspect
+        order_columns = {column['name'] for column in inspect(db.engine).get_columns('order')}
+        if 'failure_reason' not in order_columns:
+            db.session.execute(db.text("ALTER TABLE \"order\" ADD COLUMN failure_reason VARCHAR(500) DEFAULT ''"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     try:
         if not SiteSetting.query.filter_by(key='usd_to_syp_rate').first():
             db.session.add(SiteSetting(key='usd_to_syp_rate', value='10000'))

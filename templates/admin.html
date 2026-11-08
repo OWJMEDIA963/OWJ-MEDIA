@@ -102,10 +102,23 @@
                         <p>الكمية: {{ ord.quantity }} | التكلفة: {{ currency_symbol }}{{ ord.total_price|money }}</p>
                         <p>الحالة: <span class="px-2 py-0.5 rounded-lg text-[10px] {% if ord.status == 'مكتمل' %} bg-emerald-500/20 text-emerald-400 {% else %} bg-amber-500/20 text-amber-400 {% endif %}">{{ ord.status }}</span></p>
                     </div>
-                    {% if ord.status != 'مكتمل' %}
-                    <form action="/admin/complete_order/{{ ord.id }}" method="POST">
-                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2 rounded-xl text-xs">تعيين مكتمل</button>
-                    </form>
+                    {% if ord.status == 'فشل' %}
+                        <div class="w-full rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+                            <p class="font-black">سبب الفشل: {{ ord.failure_reason or 'غير محدد' }}</p>
+                            <p class="mt-1">تم رد قيمة الطلب إلى محفظة الزبون.</p>
+                        </div>
+                    {% elif ord.status == 'مكتمل' %}
+                        <span class="rounded-xl bg-emerald-500/10 px-3 py-2 text-xs font-black text-emerald-300">تم إكمال الطلب</span>
+                    {% else %}
+                    <div class="flex w-full flex-col gap-2 sm:w-auto">
+                        <form action="/admin/complete_order/{{ ord.id }}" method="POST" onsubmit="return confirm('تأكيد تعيين الطلب كمكتمل؟')">
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2 rounded-xl text-xs">تعيين مكتمل</button>
+                        </form>
+                        <form action="/admin/fail_order/{{ ord.id }}" method="POST" class="space-y-2" onsubmit="return confirm('سيتم تسجيل فشل الطلب وإعادة قيمته إلى محفظة الزبون. هل تريد المتابعة؟')">
+                            <textarea name="failure_reason" required maxlength="500" rows="2" placeholder="اكتب سبب فشل الطلب ليظهر للزبون" class="w-full rounded-xl border border-rose-500/30 bg-gray-900 p-2 text-xs text-white"></textarea>
+                            <button type="submit" class="w-full bg-rose-600 hover:bg-rose-500 text-white font-black px-4 py-2 rounded-xl text-xs">فشل الطلب + رد المبلغ</button>
+                        </form>
+                    </div>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -433,6 +446,10 @@
                 <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-xl text-xs">حفظ تعديلات {{ s.name }}</button>
             </form>
             <form action="/admin/toggle_service/{{ s.id }}" method="POST" class="mt-2"><button type="submit" class="w-full {% if s.is_available %}bg-rose-600{% else %}bg-emerald-600{% endif %} text-white font-bold py-2 rounded-xl text-xs">{% if s.is_available %}إيقاف المنتج وجعله غير متوفر{% else %}إعادة توفير المنتج{% endif %}</button></form>
+            <form action="/admin/delete_service" method="POST" class="mt-2" onsubmit="return confirm('هل أنت متأكد من حذف الخدمة: {{ s.name|e }}؟ لا يمكن التراجع عن الحذف، وسيبقى سجل الطلبات السابق محفوظاً.');">
+                <input type="hidden" name="service_id" value="{{ s.id }}">
+                <button type="submit" class="w-full bg-rose-950 hover:bg-rose-800 border border-rose-600 text-rose-200 font-black py-2 rounded-xl text-xs">حذف هذه الخدمة نهائياً</button>
+            </form>
         </details>
         {% else %}<p class="text-xs text-gray-500">لا توجد منتجات بعد.</p>{% endfor %}
     </section>

@@ -106,6 +106,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), default='user')
     balance_usd = db.Column(db.Float, default=0.0)
+    currency = db.Column(db.String(3), default='USD', nullable=False)
     is_verified = db.Column(db.Boolean, default=False)
     is_trusted_merchant = db.Column(db.Boolean, default=False)
     is_banned = db.Column(db.Boolean, default=False)
@@ -117,6 +118,41 @@ class User(db.Model):
     def is_authenticated(self): return True
     def set_password(self, password): self.password_hash = generate_password_hash(password)
     def check_password(self, password): return check_password_hash(self.password_hash, password)
+
+class SiteSetting(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(80), unique=True, nullable=False)
+    value = db.Column(db.String(200), nullable=False, default='')
+
+
+def get_exchange_rate():
+    try:
+        setting = SiteSetting.query.filter_by(key='usd_to_syp_rate').first()
+        rate = float(setting.value) if setting and setting.value else 0
+        return rate if rate > 0 else 1
+    except Exception:
+        return 1
+
+
+def currency_symbol_for(currency):
+    return 'ل.س' if currency == 'SYP' else '$'
+
+
+def display_money(value):
+    try:
+        amount = float(value or 0)
+    except (TypeError, ValueError):
+        amount = 0.0
+    try:
+        user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
+        currency = user.currency if user and user.currency in ('USD', 'SYP') else 'USD'
+        if currency == 'SYP':
+            amount *= get_exchange_rate()
+        return format_money(amount)
+    except Exception:
+        return format_money(amount)
+
+app.jinja_env.filters['money'] = display_money
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -363,7 +399,9 @@ def get_or_create_single_support_ticket(user_id):
 def inject_globals():
     user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
     unread_count = Notification.query.filter_by(user_id=user.id, is_read=False).count() if user else 0
-    return {'current_user': user, 'site_name': 'أوج ميديا', 'unread_notification_count': unread_count}
+    currency = user.currency if user and user.currency in ('USD', 'SYP') else 'USD'
+    rate = get_exchange_rate()
+    return {'current_user': user, 'site_name': 'أوج ميديا', 'unread_notification_count': unread_count, 'currency_symbol': currency_symbol_for(currency), 'currency_code': currency, 'usd_to_syp_rate': rate}
 
 def login_required(fn):
     @wraps(fn)
@@ -444,7 +482,9 @@ def register():
         elif User.query.filter_by(username=username).first():
             flash('اسم المستخدم مستخدم بالفعل.', 'error')
         else:
-            user = User(username=username, full_name=request.form.get('full_name','').strip(), email=request.form.get('email','').strip(), phone=request.form.get('phone','').strip())
+            currency = request.form.get('currency', 'USD').upper()
+            if currency not in ('USD', 'SYP'): currency = 'USD'
+            user = User(username=username, full_name=request.form.get('full_name','').strip(), email=request.form.get('email','').strip(), phone=request.form.get('phone','').strip(), currency=currency)
             user.set_password(password); db.session.add(user); db.session.commit()
             notify_admins('تسجيل حساب جديد', f'تم إنشاء حساب جديد باسم {user.username} ومعرّفه #{user.id}.', url_for('admin_accounts', account_id=user.id))
             db.session.commit()
@@ -466,6 +506,8 @@ def profile():
         user.full_name = request.form.get('full_name', user.full_name).strip()
         user.email = request.form.get('email', user.email).strip()
         user.phone = request.form.get('phone', user.phone).strip()
+        currency = request.form.get('currency', user.currency).upper()
+        if currency in ('USD', 'SYP'): user.currency = currency
         db.session.commit(); flash('تم تحديث بياناتك.', 'success'); return redirect(url_for('profile'))
     return render_template('profile.html', user=user)
 
@@ -799,6 +841,28 @@ def admin_accounts():
     return render_template('admin_accounts.html', account_lookup=account_lookup, account_lookup_id=account_lookup_id)
 
 
+@app.route('/admin/exchange-rate', methods=['POST'])
+@admin_required
+def update_exchange_rate():
+    raw = request.form.get('usd_to_syp_rate', '').strip().replace(',', '.')
+    try:
+        rate = float(raw)
+        if rate <= 0 or rate > 100000000:
+            raise ValueError()
+    except (TypeError, ValueError):
+        flash('أدخل سعر تصريف صحيحاً أكبر من صفر.', 'error')
+        return redirect(url_for('admin'))
+    setting = SiteSetting.query.filter_by(key='usd_to_syp_rate').first()
+    if not setting:
+        setting = SiteSetting(key='usd_to_syp_rate', value=str(rate))
+        db.session.add(setting)
+    else:
+        setting.value = str(rate)
+    db.session.commit()
+    flash('تم تحديث سعر تصريف الدولار مقابل الليرة السورية بنجاح.', 'success')
+    return redirect(url_for('admin'))
+
+
 @app.route('/admin')
 @admin_required
 def admin():
@@ -1129,9 +1193,36 @@ def add_category():
     elif Category.query.filter_by(name=name, parent_id=None).first():
         flash('القسم الرئيسي موجود مسبقاً.', 'error')
     else:
-        db.session.add(Category(name=name, parent_id=None))
+        try:
+            image_url = save_uploaded_image('category_image_file') or request.form.get('category_image_url', '').strip()
+        except ValueError as exc:
+            flash(str(exc), 'error')
+            return redirect(url_for('admin'))
+        db.session.add(Category(name=name, parent_id=None, image_url=image_url))
         db.session.commit()
-        flash('تم إنشاء القسم الرئيسي بنجاح.', 'success')
+        flash('تم إنشاء القسم الرئيسي بنجاح' + (' مع الصورة.' if image_url else '.'), 'success')
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/update_category_image', methods=['POST'])
+@admin_required
+def update_category_image():
+    category_id = request.form.get('category_id', type=int)
+    category = Category.query.filter_by(id=category_id, parent_id=None).first() if category_id else None
+    if not category:
+        flash('اختر قسماً رئيسياً صحيحاً.', 'error')
+        return redirect(url_for('admin'))
+    try:
+        image_url = save_uploaded_image('category_image_file') or request.form.get('category_image_url', '').strip()
+    except ValueError as exc:
+        flash(str(exc), 'error')
+        return redirect(url_for('admin'))
+    if not image_url:
+        flash('اختر صورة من جهازك أو أدخل رابط الصورة.', 'error')
+        return redirect(url_for('admin'))
+    category.image_url = image_url
+    db.session.commit()
+    flash('تم حفظ صورة القسم الرئيسي بنجاح.', 'success')
     return redirect(url_for('admin'))
 
 
@@ -1420,6 +1511,12 @@ def import_backup():
 
 with app.app_context():
     db.create_all()
+    try:
+        if not SiteSetting.query.filter_by(key='usd_to_syp_rate').first():
+            db.session.add(SiteSetting(key='usd_to_syp_rate', value='10000'))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
     # Safe additive migration: separate customer-facing extra details from the red order notice.
     try:
         from sqlalchemy import inspect
@@ -1433,7 +1530,7 @@ with app.app_context():
     try:
         from sqlalchemy import inspect
         user_columns = {column['name'] for column in inspect(db.engine).get_columns('user')}
-        additions = [('is_banned', 'BOOLEAN DEFAULT FALSE'), ('ban_reason', "VARCHAR(500) DEFAULT ''"), ('ban_appeal', "TEXT DEFAULT ''"), ('appeal_status', "VARCHAR(30) DEFAULT ''"), ('is_trusted_merchant', 'BOOLEAN DEFAULT FALSE')]
+        additions = [('is_banned', 'BOOLEAN DEFAULT FALSE'), ('ban_reason', "VARCHAR(500) DEFAULT ''"), ('ban_appeal', "TEXT DEFAULT ''"), ('appeal_status', "VARCHAR(30) DEFAULT ''"), ('is_trusted_merchant', 'BOOLEAN DEFAULT FALSE'), ('currency', "VARCHAR(3) DEFAULT 'USD'")]
         for column_name, definition in additions:
             if column_name not in user_columns:
                 db.session.execute(db.text(f'ALTER TABLE "user" ADD COLUMN {column_name} {definition}'))

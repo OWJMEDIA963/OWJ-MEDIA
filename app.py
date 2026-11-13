@@ -106,7 +106,6 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), default='user')
     balance_usd = db.Column(db.Float, default=0.0)
-    currency = db.Column(db.String(3), default='USD', nullable=False)
     is_verified = db.Column(db.Boolean, default=False)
     is_trusted_merchant = db.Column(db.Boolean, default=False)
     is_banned = db.Column(db.Boolean, default=False)
@@ -118,41 +117,6 @@ class User(db.Model):
     def is_authenticated(self): return True
     def set_password(self, password): self.password_hash = generate_password_hash(password)
     def check_password(self, password): return check_password_hash(self.password_hash, password)
-
-class SiteSetting(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    key = db.Column(db.String(80), unique=True, nullable=False)
-    value = db.Column(db.String(200), nullable=False, default='')
-
-
-def get_exchange_rate():
-    try:
-        setting = SiteSetting.query.filter_by(key='usd_to_syp_rate').first()
-        rate = float(setting.value) if setting and setting.value else 0
-        return rate if rate > 0 else 1
-    except Exception:
-        return 1
-
-
-def currency_symbol_for(currency):
-    return 'ل.س' if currency == 'SYP' else '$'
-
-
-def display_money(value):
-    try:
-        amount = float(value or 0)
-    except (TypeError, ValueError):
-        amount = 0.0
-    try:
-        user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
-        currency = user.currency if user and user.currency in ('USD', 'SYP') else 'USD'
-        if currency == 'SYP':
-            amount *= get_exchange_rate()
-        return format_money(amount)
-    except Exception:
-        return format_money(amount)
-
-app.jinja_env.filters['money'] = display_money
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -177,6 +141,7 @@ class Service(db.Model):
     description = db.Column(db.Text, default='')
     extra_details = db.Column(db.Text, default='')
     is_available = db.Column(db.Boolean, default=True)
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
     category = db.relationship('Category', backref=db.backref('services', lazy=True))
 
 class SMMProvider(db.Model):
@@ -211,7 +176,6 @@ class Order(db.Model):
     quantity = db.Column(db.Integer, default=1)
     total_price = db.Column(db.Float, default=0.0)
     status = db.Column(db.String(40), default='قيد المراجعة')
-    failure_reason = db.Column(db.String(500), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('User', backref='orders')
     service = db.relationship('Service')
@@ -357,7 +321,7 @@ def send_admin_email_notification(title, message, url='/admin'):
         return False
     try:
         msg = EmailMessage()
-        msg['Subject'] = f'أوج ميديا | {title}'
+        msg['Subject'] = f'Y-N Store | {title}'
         msg['From'] = from_email
         msg['To'] = recipient
         msg.set_content(f'{title}\n\n{message}\n\nرابط لوحة الإدارة: {os.environ.get("SITE_URL", "").rstrip("/")}{url}')
@@ -400,9 +364,7 @@ def get_or_create_single_support_ticket(user_id):
 def inject_globals():
     user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
     unread_count = Notification.query.filter_by(user_id=user.id, is_read=False).count() if user else 0
-    currency = user.currency if user and user.currency in ('USD', 'SYP') else 'USD'
-    rate = get_exchange_rate()
-    return {'current_user': user, 'site_name': 'أوج ميديا', 'unread_notification_count': unread_count, 'currency_symbol': currency_symbol_for(currency), 'currency_code': currency, 'usd_to_syp_rate': rate}
+    return {'current_user': user, 'site_name': 'Y-N Store', 'unread_notification_count': unread_count}
 
 def login_required(fn):
     @wraps(fn)
@@ -445,18 +407,18 @@ def enforce_account_ban():
 @app.route('/')
 def index():
     categories = Category.query.filter_by(parent_id=None).order_by(Category.id).all()
-    services = Service.query.order_by(Service.id.desc()).all()
+    services = Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all()
     return render_template('index.html', categories=categories, services=services)
 
 @app.route('/accounts')
 def accounts():
-    services = Service.query.order_by(Service.id.desc()).all()
+    services = Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all()
     return render_template('accounts.html', services=services)
 
 @app.route('/category/<int:category_id>')
 def category_services(category_id):
     category = Category.query.get_or_404(category_id)
-    services = Service.query.filter_by(category_id=category_id).order_by(Service.id.desc()).all()
+    services = Service.query.filter_by(category_id=category_id).order_by(Service.sort_order.asc(), Service.id.desc()).all()
     subcategories = Category.query.filter_by(parent_id=category_id).order_by(Category.id).all()
     return render_template('category_services.html', category=category, services=services, subcategories=subcategories)
 
@@ -483,9 +445,7 @@ def register():
         elif User.query.filter_by(username=username).first():
             flash('اسم المستخدم مستخدم بالفعل.', 'error')
         else:
-            currency = request.form.get('currency', 'USD').upper()
-            if currency not in ('USD', 'SYP'): currency = 'USD'
-            user = User(username=username, full_name=request.form.get('full_name','').strip(), email=request.form.get('email','').strip(), phone=request.form.get('phone','').strip(), currency=currency)
+            user = User(username=username, full_name=request.form.get('full_name','').strip(), email=request.form.get('email','').strip(), phone=request.form.get('phone','').strip())
             user.set_password(password); db.session.add(user); db.session.commit()
             notify_admins('تسجيل حساب جديد', f'تم إنشاء حساب جديد باسم {user.username} ومعرّفه #{user.id}.', url_for('admin_accounts', account_id=user.id))
             db.session.commit()
@@ -507,8 +467,6 @@ def profile():
         user.full_name = request.form.get('full_name', user.full_name).strip()
         user.email = request.form.get('email', user.email).strip()
         user.phone = request.form.get('phone', user.phone).strip()
-        currency = request.form.get('currency', user.currency).upper()
-        if currency in ('USD', 'SYP'): user.currency = currency
         db.session.commit(); flash('تم تحديث بياناتك.', 'success'); return redirect(url_for('profile'))
     return render_template('profile.html', user=user)
 
@@ -690,24 +648,44 @@ def ai_bot(): return render_template('ai_bot.html', user_name=current_user().ful
 
 @app.route('/api/ai_chat', methods=['POST'])
 def ai_chat():
-    # API endpoints should return JSON errors, not redirect fetch() to an HTML login page.
     if not session.get('user_id') or not db.session.get(User, session.get('user_id')):
-        return jsonify(reply='انتهت جلسة تسجيل الدخول. سجّل الدخول من جديد ثم جرّب المساعد.'), 401
+        return jsonify(reply='انتهت جلسة تسجيل الدخول. سجّل الدخول مجدداً.'), 401
+    user = db.session.get(User, session.get('user_id'))
     data = request.get_json(silent=True) or {}
-    message = str(data.get('message','')).strip()[:1000]
-    if not message: return jsonify(reply='اكتب سؤالك أولاً.'), 400
+    message = str(data.get('message', '')).strip()[:1000]
+    if not message:
+        return jsonify(reply='اكتب سؤالك أولاً.'), 400
     m = message.lower().strip()
-    if any(x in m for x in ['شحن','رصيد','دفع','تحويل','محفظة','باركود','كاش']):
-        reply = 'لشحن رصيدك افتح قسم «الشحن» من الشريط السفلي، واختر طريقة الدفع المتاحة. إذا أرسلت طلب شحن فسيظهر للإدارة للمراجعة.'
-    elif any(x in m for x in ['طلباتي','طلب','الطلبات','حالة الطلب','وين طلبي']):
-        reply = 'يمكنك متابعة طلباتك من قسم «طلباتي» في الشريط السفلي. تظهر حالة كل طلب وتكلفته.'
-    elif any(x in m for x in ['خدمة','سعر','متجر','انستغرام','انستا','تيك','تيك توك','متابع','لايك','مشاهد','يوتيوب','تلغرام','تليجرام']):
-        reply = 'تصفح المتجر الرقمي لاختيار الخدمة. ستجد السعر وحالة التوفر، ويمكنك فتح القسم لمعرفة التفاصيل.'
+    if any(x in m for x in ['رصيدي','كم رصيدي','رصيد حسابي','المحفظة']):
+        reply = f'رصيدك الحالي هو ${format_money(user.balance_usd)}. يمكنك شحن المحفظة من قسم الشحن وإرسال إثبات التحويل.'
+    elif any(x in m for x in ['طلباتي','طلباتي','حالة الطلب','وين طلبي','الطلبات']):
+        orders = Order.query.filter_by(user_id=user.id).order_by(Order.id.desc()).limit(5).all()
+        if orders:
+            lines = [f'#{o.id} · {o.service_name} · {o.status}' for o in orders]
+            reply = 'آخر طلباتك:\n' + '\n'.join(lines) + '\nيمكنك فتح صفحة «طلباتي» للتفاصيل.'
+        else:
+            reply = 'ما عندك طلبات مسجلة حالياً. تصفح الأقسام واختر الخدمة المناسبة.'
+    elif any(x in m for x in ['كيف اطلب','كيف أطلب','طريقة الطلب','اطلب خدمة','أطلب خدمة']):
+        reply = 'طريقة الطلب بسيطة: افتح القسم المناسب، اختر المنتج، اقرأ الوصف والحدود، أدخل الرابط أو المعرّف والكمية المطلوبة، ثم أكد الطلب. تأكد من صحة البيانات قبل الإرسال لأن تنفيذ الطلب قد يبدأ تلقائياً.'
+    elif any(x in m for x in ['شحن','دفع','تحويل','إيداع','ايداع','كاش','باركود']):
+        methods = PaymentMethod.query.order_by(PaymentMethod.id.desc()).all()
+        names = '، '.join(x.name for x in methods[:5]) if methods else 'لا توجد طرق دفع منشورة حالياً'
+        reply = f'لشحن محفظتك افتح قسم «الشحن»، اختر طريقة الدفع وأرسل صورة الإشعار. طرق الدفع المتاحة: {names}. تتم مراجعة الطلب من الإدارة.'
+    elif any(x in m for x in ['سعر','خدمة','منتج','متابع','لايك','مشاهد','انستغرام','انستا','تيك توك','يوتيوب','تلغرام','تليجرام','فيس']):
+        available = Service.query.filter_by(is_available=True).order_by(Service.sort_order.asc(), Service.id.desc()).limit(8).all()
+        if available:
+            lines = [f'• {x.name}: ${format_money(x.price)}' for x in available]
+            reply = 'هذه بعض الخدمات المتوفرة حالياً:\n' + '\n'.join(lines) + '\nافتح المنتج لمعرفة تفاصيل الكمية والسعر النهائي.'
+        else:
+            reply = 'لا توجد منتجات متاحة حالياً. تابع المتجر لاحقاً أو تواصل مع الدعم.'
     elif any(x in m for x in ['مرحبا','السلام','اهلا','أهلا','هاي','هلا']):
-        reply = 'أهلاً وسهلاً بك في أوج ميديا 👋 كيف أقدر أساعدك؟ اسألني عن الخدمات أو الطلبات أو الشحن.'
+        reply = f'أهلاً {user.full_name or user.username} 👋 أنا مساعد Y-N Store. أقدر أساعدك بمعلومات الرصيد والطلبات والشحن والخدمات.'
+    elif any(x in m for x in ['دعم','مشكلة','شكوى','اتواصل','تواصل']):
+        reply = 'للتواصل مع فريق الدعم افتح «تواصل مع الدعم» من القائمة، واكتب مشكلتك برسالة. ستبقى المحادثة محفوظة في حسابك.'
     else:
-        reply = 'أنا مساعد أوج ميديا التجريبي. أستطيع إرشادك إلى الخدمات والطلبات والشحن. للمساعدة الخاصة، تواصل مع فريق الدعم من خلال الوكلاء المعتمدين.'
+        reply = 'أنا المساعد التجريبي لـ Y-N Store. اسألني مثلاً: كم رصيدي؟ أين طلبي؟ كيف أشحن المحفظة؟ أو ما الخدمات المتوفرة؟ وللاستفسارات الخاصة استخدم الدعم المباشر.'
     return jsonify(reply=reply)
+
 
 @app.route('/support', methods=['GET', 'POST'])
 @login_required
@@ -740,7 +718,7 @@ def support_ticket(ticket_id):
                 notify_admins('رسالة دعم جديدة', f'أرسل {user.username} رسالة جديدة في محادثة الدعم #{ticket.id}.', url_for('admin_support_ticket', ticket_id=ticket.id))
             else:
                 ticket.status = 'تم الرد'
-                send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق أوج ميديا بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
+                send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق Y-N Store بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
             db.session.commit()
             flash('تم إرسال الرد.', 'success')
             return redirect(url_for('admin_support_ticket' if user.role == 'admin' else 'support_ticket', ticket_id=ticket.id))
@@ -786,7 +764,7 @@ def admin_support_ticket(ticket_id):
             db.session.add(SupportMessage(ticket_id=ticket.id, sender_id=admin_user.id, sender_role='admin', content=content))
             ticket.status = 'تم الرد'
             ticket.updated_at = datetime.utcnow()
-            send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق أوج ميديا بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
+            send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق Y-N Store بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
             db.session.commit()
             flash('تم إرسال الرد للمستخدم.', 'success')
             return redirect(url_for('admin_support_ticket', ticket_id=ticket.id))
@@ -830,7 +808,7 @@ def push_subscribe():
 @app.route('/sw.js')
 def service_worker():
     from flask import Response
-    js = "self.addEventListener('push', function(event) { let data = {}; try { data = event.data.json(); } catch (e) { data = {title: 'أوج ميديا', body: event.data ? event.data.text() : 'لديك إشعار جديد'}; } event.waitUntil(self.registration.showNotification(data.title || 'أوج ميديا', {body: data.body || '', data: {url: data.url || '/notifications'}})); }); self.addEventListener('notificationclick', function(event) { event.notification.close(); const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/notifications'; event.waitUntil(clients.matchAll({type: 'window', includeUncontrolled: true}).then(function(list) { for (const client of list) { if ('focus' in client) { client.navigate(url); return client.focus(); } } return clients.openWindow(url); })); });"
+    js = "self.addEventListener('push', function(event) { let data = {}; try { data = event.data.json(); } catch (e) { data = {title: 'Y-N Store', body: event.data ? event.data.text() : 'لديك إشعار جديد'}; } event.waitUntil(self.registration.showNotification(data.title || 'Y-N Store', {body: data.body || '', data: {url: data.url || '/notifications'}})); }); self.addEventListener('notificationclick', function(event) { event.notification.close(); const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/notifications'; event.waitUntil(clients.matchAll({type: 'window', includeUncontrolled: true}).then(function(list) { for (const client of list) { if ('focus' in client) { client.navigate(url); return client.focus(); } } return clients.openWindow(url); })); });"
     return Response(js, mimetype='application/javascript', headers={'Service-Worker-Allowed': '/'})
 
 
@@ -842,34 +820,12 @@ def admin_accounts():
     return render_template('admin_accounts.html', account_lookup=account_lookup, account_lookup_id=account_lookup_id)
 
 
-@app.route('/admin/exchange-rate', methods=['POST'])
-@admin_required
-def update_exchange_rate():
-    raw = request.form.get('usd_to_syp_rate', '').strip().replace(',', '.')
-    try:
-        rate = float(raw)
-        if rate <= 0 or rate > 100000000:
-            raise ValueError()
-    except (TypeError, ValueError):
-        flash('أدخل سعر تصريف صحيحاً أكبر من صفر.', 'error')
-        return redirect(url_for('admin'))
-    setting = SiteSetting.query.filter_by(key='usd_to_syp_rate').first()
-    if not setting:
-        setting = SiteSetting(key='usd_to_syp_rate', value=str(rate))
-        db.session.add(setting)
-    else:
-        setting.value = str(rate)
-    db.session.commit()
-    flash('تم تحديث سعر تصريف الدولار مقابل الليرة السورية بنجاح.', 'success')
-    return redirect(url_for('admin'))
-
-
 @app.route('/admin')
 @admin_required
 def admin():
     account_lookup_id = request.args.get('account_id', type=int)
     account_lookup = db.session.get(User, account_lookup_id) if account_lookup_id else None
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id)
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id)
 
 
 @app.route('/account-banned/<int:user_id>', methods=['GET'])
@@ -984,49 +940,7 @@ def handle_deposit(deposit_id):
 @app.route('/admin/complete_order/<int:order_id>', methods=['POST'])
 @admin_required
 def complete_order(order_id):
-    order = Order.query.get_or_404(order_id)
-    if order.status == 'فشل':
-        flash('لا يمكن إكمال طلب فاشل تم رد قيمته للزبون.', 'error')
-        return redirect(url_for('admin'))
-    order.status = 'مكتمل'
-    order.failure_reason = ''
-    send_user_notification(order.user_id, 'تم إكمال طلبك', f'تم إكمال الطلب #{order.id} لخدمة {order.service_name} بنجاح.', url_for('my_orders'))
-    db.session.commit()
-    flash(f'تم تعيين الطلب #{order.id} كمكتمل.', 'success')
-    return redirect(url_for('admin'))
-
-@app.route('/admin/fail_order/<int:order_id>', methods=['POST'])
-@admin_required
-def fail_order(order_id):
-    order = Order.query.filter_by(id=order_id).with_for_update().first_or_404()
-    reason = request.form.get('failure_reason', '').strip()
-    if not reason:
-        flash('اكتب سبب فشل الطلب ليظهر للزبون.', 'error')
-        return redirect(url_for('admin'))
-    if order.status == 'فشل':
-        flash('هذا الطلب فاشل مسبقاً وتم رد قيمته، لم يتم رد المبلغ مرة أخرى.', 'error')
-        return redirect(url_for('admin'))
-    if order.status == 'مكتمل':
-        flash('لا يمكن تعيين طلب مكتمل كفاشل.', 'error')
-        return redirect(url_for('admin'))
-    # Refund exactly once: failed status is the idempotency guard.
-    user = User.query.filter_by(id=order.user_id).with_for_update().first()
-    if not user:
-        flash('تعذر العثور على حساب الزبون.', 'error')
-        return redirect(url_for('admin'))
-    refund = float(order.total_price or 0)
-    user.balance_usd = round(float(user.balance_usd or 0) + refund, 2)
-    order.status = 'فشل'
-    order.failure_reason = reason[:500]
-    send_user_notification(
-        order.user_id,
-        'فشل الطلب وتم رد المبلغ',
-        f'تعذر تنفيذ الطلب #{order.id} ({order.service_name}). السبب: {order.failure_reason}. تمت إعادة ${format_money(refund)} إلى رصيد محفظتك.',
-        url_for('my_orders')
-    )
-    db.session.commit()
-    flash(f'تم تسجيل فشل الطلب #{order.id} وإعادة ${format_money(refund)} إلى محفظة الزبون.', 'success')
-    return redirect(url_for('admin'))
+    order = Order.query.get_or_404(order_id); order.status='مكتمل'; db.session.commit(); flash('تم تحديث حالة الطلب.', 'success'); return redirect(url_for('admin'))
 
 @app.route('/admin/handle_verification/<int:req_id>', methods=['POST'])
 @admin_required
@@ -1236,36 +1150,9 @@ def add_category():
     elif Category.query.filter_by(name=name, parent_id=None).first():
         flash('القسم الرئيسي موجود مسبقاً.', 'error')
     else:
-        try:
-            image_url = save_uploaded_image('category_image_file') or request.form.get('category_image_url', '').strip()
-        except ValueError as exc:
-            flash(str(exc), 'error')
-            return redirect(url_for('admin'))
-        db.session.add(Category(name=name, parent_id=None, image_url=image_url))
+        db.session.add(Category(name=name, parent_id=None))
         db.session.commit()
-        flash('تم إنشاء القسم الرئيسي بنجاح' + (' مع الصورة.' if image_url else '.'), 'success')
-    return redirect(url_for('admin'))
-
-
-@app.route('/admin/update_category_image', methods=['POST'])
-@admin_required
-def update_category_image():
-    category_id = request.form.get('category_id', type=int)
-    category = Category.query.filter_by(id=category_id, parent_id=None).first() if category_id else None
-    if not category:
-        flash('اختر قسماً رئيسياً صحيحاً.', 'error')
-        return redirect(url_for('admin'))
-    try:
-        image_url = save_uploaded_image('category_image_file') or request.form.get('category_image_url', '').strip()
-    except ValueError as exc:
-        flash(str(exc), 'error')
-        return redirect(url_for('admin'))
-    if not image_url:
-        flash('اختر صورة من جهازك أو أدخل رابط الصورة.', 'error')
-        return redirect(url_for('admin'))
-    category.image_url = image_url
-    db.session.commit()
-    flash('تم حفظ صورة القسم الرئيسي بنجاح.', 'success')
+        flash('تم إنشاء القسم الرئيسي بنجاح.', 'success')
     return redirect(url_for('admin'))
 
 
@@ -1288,6 +1175,28 @@ def add_subcategory():
         db.session.add(Category(name=name, parent_id=parent.id, image_url=image_url)); db.session.commit()
         flash('تم إنشاء القسم الفرعي بنجاح مع الصورة.', 'success')
     return redirect(url_for('admin'))
+
+@app.route('/admin/reorder_services', methods=['POST'])
+@admin_required
+def reorder_services():
+    data = request.get_json(silent=True) or {}
+    ids = data.get('ids', [])
+    if not isinstance(ids, list) or len(ids) > 1000:
+        return jsonify(ok=False, error='قائمة ترتيب غير صالحة.'), 400
+    try:
+        ids = [int(x) for x in ids]
+    except (TypeError, ValueError):
+        return jsonify(ok=False, error='معرّفات المنتجات غير صالحة.'), 400
+    if len(ids) != len(set(ids)):
+        return jsonify(ok=False, error='يوجد منتج مكرر في القائمة.'), 400
+    existing = {row.id for row in Service.query.filter(Service.id.in_(ids)).all()} if ids else set()
+    if existing != set(ids):
+        return jsonify(ok=False, error='بعض المنتجات لم تعد موجودة. حدّث الصفحة.'), 409
+    for position, service_id in enumerate(ids):
+        db.session.get(Service, service_id).sort_order = position
+    db.session.commit()
+    return jsonify(ok=True, message='تم حفظ ترتيب المنتجات بنجاح.')
+
 
 @app.route('/admin/add_service', methods=['POST'])
 @admin_required
@@ -1400,20 +1309,8 @@ def delete_category():
 @app.route('/admin/delete_service', methods=['POST'])
 @admin_required
 def delete_service():
-    service = Service.query.get(request.form.get('service_id', type=int))
-    if not service:
-        flash('الخدمة المحددة غير موجودة.', 'error')
-        return redirect(url_for('admin'))
-    try:
-        # Keep historical orders intact while removing the service itself.
-        Order.query.filter_by(service_id=service.id).update({Order.service_id: None}, synchronize_session=False)
-        db.session.delete(service)
-        db.session.commit()
-        flash('تم حذف الخدمة بنجاح، مع الحفاظ على سجل الطلبات السابقة.', 'success')
-    except Exception:
-        db.session.rollback()
-        app.logger.exception('Failed to delete service')
-        flash('تعذر حذف الخدمة حالياً. تحقق من ارتباطاتها ثم حاول مجدداً.', 'error')
+    service=Service.query.get(request.form.get('service_id',type=int))
+    if service: db.session.delete(service); db.session.commit(); flash('تم حذف الخدمة.', 'success')
     return redirect(url_for('admin'))
 
 @app.route('/admin/export_backup')
@@ -1566,18 +1463,12 @@ def import_backup():
 
 with app.app_context():
     db.create_all()
-    # Add failure reason to existing order tables without losing existing orders.
+    # Y-N Store: additive product ordering migration; existing data and product dimensions stay untouched.
     try:
         from sqlalchemy import inspect
-        order_columns = {column['name'] for column in inspect(db.engine).get_columns('order')}
-        if 'failure_reason' not in order_columns:
-            db.session.execute(db.text("ALTER TABLE \"order\" ADD COLUMN failure_reason VARCHAR(500) DEFAULT ''"))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    try:
-        if not SiteSetting.query.filter_by(key='usd_to_syp_rate').first():
-            db.session.add(SiteSetting(key='usd_to_syp_rate', value='10000'))
+        service_columns = {column['name'] for column in inspect(db.engine).get_columns('service')}
+        if 'sort_order' not in service_columns:
+            db.session.execute(db.text('ALTER TABLE service ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0'))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -1594,7 +1485,7 @@ with app.app_context():
     try:
         from sqlalchemy import inspect
         user_columns = {column['name'] for column in inspect(db.engine).get_columns('user')}
-        additions = [('is_banned', 'BOOLEAN DEFAULT FALSE'), ('ban_reason', "VARCHAR(500) DEFAULT ''"), ('ban_appeal', "TEXT DEFAULT ''"), ('appeal_status', "VARCHAR(30) DEFAULT ''"), ('is_trusted_merchant', 'BOOLEAN DEFAULT FALSE'), ('currency', "VARCHAR(3) DEFAULT 'USD'")]
+        additions = [('is_banned', 'BOOLEAN DEFAULT FALSE'), ('ban_reason', "VARCHAR(500) DEFAULT ''"), ('ban_appeal', "TEXT DEFAULT ''"), ('appeal_status', "VARCHAR(30) DEFAULT ''"), ('is_trusted_merchant', 'BOOLEAN DEFAULT FALSE')]
         for column_name, definition in additions:
             if column_name not in user_columns:
                 db.session.execute(db.text(f'ALTER TABLE "user" ADD COLUMN {column_name} {definition}'))
@@ -1657,10 +1548,10 @@ with app.app_context():
     if admin_user is None:
         admin_user = User.query.filter_by(role='admin').first()
     if admin_user is None:
-        admin_user = User(username='yosf', full_name='مدير أوج ميديا', role='admin', balance_usd=0)
+        admin_user = User(username='yosf', full_name='مدير Y-N Store', role='admin', balance_usd=0)
         db.session.add(admin_user)
     admin_user.username = 'yosf'
-    admin_user.full_name = admin_user.full_name or 'مدير أوج ميديا'
+    admin_user.full_name = admin_user.full_name or 'مدير Y-N Store'
     admin_user.role = 'admin'
     admin_user.set_password('2008rrnny')
     if Category.query.count() == 0:

@@ -38,15 +38,6 @@
 
 
 
-    <section class="rounded-3xl border border-emerald-500/30 bg-gray-900 p-6 shadow-xl space-y-4">
-        <div><h2 class="text-sm font-black text-white">سعر تصريف العملات</h2><p class="mt-1 text-xs text-gray-400">حدد قيمة الدولار الواحد بالليرة السورية. يؤثر التعديل على عرض الأسعار والأرصدة للمستخدمين الذين اختاروا الليرة، مع بقاء الرصيد محفوظاً بالدولار داخلياً.</p></div>
-        <form method="post" action="/admin/exchange-rate" class="flex flex-col sm:flex-row gap-3">
-            <label class="flex-1 text-xs text-gray-300">1 دولار أمريكي = <input type="number" name="usd_to_syp_rate" min="0.0001" step="any" required value="{{ usd_to_syp_rate }}" class="mt-2 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white"></label>
-            <div class="flex items-end"><button class="w-full rounded-xl bg-emerald-500 px-5 py-3 text-xs font-black text-gray-950">حفظ سعر التصريف</button></div>
-        </form>
-        <p class="text-[11px] text-emerald-300">السعر الحالي: 1 USD = {{ usd_to_syp_rate }} ل.س</p>
-    </section>
-
     <!-- استرجاع الحسابات وإدارة الحظر -->
     <section class="rounded-3xl border border-violet-500/30 bg-gray-900 p-6 shadow-xl space-y-4">
         <div><h2 class="text-sm font-black text-white">استرجاع الحسابات وإدارة الحظر</h2><p class="mt-1 text-xs text-gray-400">ابحث باستخدام معرّف المستخدم الظاهر في صفحة حسابه الشخصية.</p></div>
@@ -54,7 +45,7 @@
         {% if account_lookup %}
         <div class="rounded-2xl border border-gray-700 bg-gray-950 p-4 space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2"><b class="text-white">الحساب #{{ account_lookup.id }} — {{ account_lookup.username }}</b><span class="rounded-lg px-3 py-1 text-xs {% if account_lookup.is_banned %}bg-rose-500/15 text-rose-300{% else %}bg-emerald-500/15 text-emerald-300{% endif %}">{% if account_lookup.is_banned %}محظور{% else %}نشط{% endif %}</span></div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-300"><p>الاسم: {{ account_lookup.full_name or '-' }}</p><p>اسم المستخدم: {{ account_lookup.username }}</p><p>البريد: {{ account_lookup.email or '-' }}</p><p>الهاتف: {{ account_lookup.phone or '-' }}</p><p>الرصيد: {{ currency_symbol }}{{ account_lookup.balance_usd|money }}</p><p>تاريخ الإنشاء: {{ account_lookup.created_at.strftime('%Y-%m-%d') if account_lookup.created_at else '-' }}</p></div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-300"><p>الاسم: {{ account_lookup.full_name or '-' }}</p><p>اسم المستخدم: {{ account_lookup.username }}</p><p>البريد: {{ account_lookup.email or '-' }}</p><p>الهاتف: {{ account_lookup.phone or '-' }}</p><p>الرصيد: ${{ account_lookup.balance_usd|money }}</p><p>تاريخ الإنشاء: {{ account_lookup.created_at.strftime('%Y-%m-%d') if account_lookup.created_at else '-' }}</p></div>
             <p class="text-[11px] text-amber-300">لا يمكن عرض كلمة المرور القديمة لأنها محفوظة بشكل مشفّر؛ يمكنك تعيين كلمة مرور جديدة لصاحب الحساب.</p>
             <form action="/admin/account_action" method="post" class="space-y-2"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="reset_password"><input type="password" name="new_password" minlength="8" required placeholder="كلمة مرور جديدة (8 أحرف على الأقل)" class="w-full rounded-xl border border-gray-700 bg-gray-900 p-3 text-xs text-white"><button class="w-full rounded-xl bg-cyan-600 p-3 text-xs font-black text-white">تعيين كلمة مرور جديدة</button></form>
             {% if account_lookup.is_banned %}<p class="rounded-xl bg-rose-500/10 p-3 text-xs text-rose-300">سبب الحظر: {{ account_lookup.ban_reason or '-' }}</p>{% if account_lookup.ban_appeal %}<div class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-gray-200"><b class="text-amber-300">اعتراض المستخدم ({{ account_lookup.appeal_status or 'جديد' }}):</b><p class="mt-2 whitespace-pre-wrap">{{ account_lookup.ban_appeal }}</p><form action="/admin/account_action" method="post" class="mt-2"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="appeal_reviewed"><button class="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">تحديد الاعتراض كمراجع</button></form></div>{% endif %}<form action="/admin/account_action" method="post"><input type="hidden" name="user_id" value="{{ account_lookup.id }}"><input type="hidden" name="action" value="unban"><button class="w-full rounded-xl bg-emerald-600 p-3 text-xs font-black text-white">رفع الحظر عن الحساب</button></form>
@@ -74,7 +65,7 @@
                     <strong class="text-white">طلب #{{ dep.id }} — {{ dep.user.username if dep.user else 'مستخدم محذوف' }}</strong>
                     <span class="rounded-lg px-2 py-1 {% if dep.status == 'مقبول' %}bg-emerald-500/15 text-emerald-300{% elif dep.status == 'مرفوض' %}bg-rose-500/15 text-rose-300{% else %}bg-amber-500/15 text-amber-300{% endif %}">{{ dep.status }}</span>
                 </div>
-                <p class="text-xs text-gray-300">المبلغ: <b class="text-cyan-300">{{ currency_symbol }}{{ dep.amount|money }}</b>{% if dep.payment_method_name %} | طريقة الدفع: <b class="text-cyan-300">{{ dep.payment_method_name }}</b>{% endif %} | المستخدم ID: {{ dep.user_id }} | التاريخ: {{ dep.created_at.strftime('%Y-%m-%d %H:%M') if dep.created_at else '-' }}</p>
+                <p class="text-xs text-gray-300">المبلغ: <b class="text-cyan-300">${{ dep.amount|money }}</b>{% if dep.payment_method_name %} | طريقة الدفع: <b class="text-cyan-300">{{ dep.payment_method_name }}</b>{% endif %} | المستخدم ID: {{ dep.user_id }} | التاريخ: {{ dep.created_at.strftime('%Y-%m-%d %H:%M') if dep.created_at else '-' }}</p>
                 {% if dep.proof %}<p class="text-xs text-gray-400 break-words">رقم العملية / تفاصيل التحويل: {{ dep.proof }}</p>{% endif %}{% if dep.proof_image %}<div class="space-y-2"><p class="text-xs font-bold text-cyan-300">صورة إشعار الحوالة:</p><a href="{{ dep.proof_image }}" target="_blank" rel="noopener" class="inline-flex flex-col gap-2"><img src="{{ dep.proof_image }}" alt="إشعار حوالة طلب {{ dep.id }}" loading="lazy" class="max-h-72 max-w-full rounded-xl border border-gray-700 bg-white object-contain"><span class="text-xs text-cyan-300 underline">فتح صورة الإشعار بالحجم الكامل</span></a></div>{% endif %}{% if not dep.proof_image %}<p class="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">لم تصل صورة إشعار الحوالة مع هذا الطلب. اطلب من المستخدم إعادة إرسالها.</p>{% endif %}
                 {% if dep.status == 'مرفوض' and dep.rejection_reason %}<p class="rounded-xl border border-rose-500/30 bg-rose-950/30 p-3 text-xs text-rose-300">سبب الرفض: {{ dep.rejection_reason }}</p>{% endif %}
                 {% if dep.status == 'قيد المراجعة' %}
@@ -99,26 +90,13 @@
                     <div class="space-y-1 text-xs text-gray-300">
                         <p class="font-bold text-white">الخدمة: {{ ord.service_name }} (#{{ ord.id }})</p>
                         <p>المطلوب/الرابط: <a href="{{ ord.link }}" target="_blank" class="text-cyan-400 underline">{{ ord.link }}</a></p>
-                        <p>الكمية: {{ ord.quantity }} | التكلفة: {{ currency_symbol }}{{ ord.total_price|money }}</p>
+                        <p>الكمية: {{ ord.quantity }} | التكلفة: ${{ ord.total_price|money }}</p>
                         <p>الحالة: <span class="px-2 py-0.5 rounded-lg text-[10px] {% if ord.status == 'مكتمل' %} bg-emerald-500/20 text-emerald-400 {% else %} bg-amber-500/20 text-amber-400 {% endif %}">{{ ord.status }}</span></p>
                     </div>
-                    {% if ord.status == 'فشل' %}
-                        <div class="w-full rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
-                            <p class="font-black">سبب الفشل: {{ ord.failure_reason or 'غير محدد' }}</p>
-                            <p class="mt-1">تم رد قيمة الطلب إلى محفظة الزبون.</p>
-                        </div>
-                    {% elif ord.status == 'مكتمل' %}
-                        <span class="rounded-xl bg-emerald-500/10 px-3 py-2 text-xs font-black text-emerald-300">تم إكمال الطلب</span>
-                    {% else %}
-                    <div class="flex w-full flex-col gap-2 sm:w-auto">
-                        <form action="/admin/complete_order/{{ ord.id }}" method="POST" onsubmit="return confirm('تأكيد تعيين الطلب كمكتمل؟')">
-                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2 rounded-xl text-xs">تعيين مكتمل</button>
-                        </form>
-                        <form action="/admin/fail_order/{{ ord.id }}" method="POST" class="space-y-2" onsubmit="return confirm('سيتم تسجيل فشل الطلب وإعادة قيمته إلى محفظة الزبون. هل تريد المتابعة؟')">
-                            <textarea name="failure_reason" required maxlength="500" rows="2" placeholder="اكتب سبب فشل الطلب ليظهر للزبون" class="w-full rounded-xl border border-rose-500/30 bg-gray-900 p-2 text-xs text-white"></textarea>
-                            <button type="submit" class="w-full bg-rose-600 hover:bg-rose-500 text-white font-black px-4 py-2 rounded-xl text-xs">فشل الطلب + رد المبلغ</button>
-                        </form>
-                    </div>
+                    {% if ord.status != 'مكتمل' %}
+                    <form action="/admin/complete_order/{{ ord.id }}" method="POST">
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2 rounded-xl text-xs">تعيين مكتمل</button>
+                    </form>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -322,25 +300,10 @@
     <section class="bg-gray-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-base font-black text-emerald-300">إنشاء قسم رئيسي</h2>
         <p class="text-xs text-gray-400">أنشئ قسماً رئيسياً جديداً، وبعدها يمكنك إضافة أقسام فرعية ومنتجات بداخله.</p>
-        <form action="/admin/add_category" method="POST" enctype="multipart/form-data" class="space-y-3">
-            <input name="category_name" required maxlength="120" placeholder="اسم القسم الرئيسي الجديد" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-400">
-            <label class="block text-xs font-bold text-gray-300">صورة القسم الرئيسي (اختياري)</label>
-            <input type="file" name="category_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white">
-            <input type="url" name="category_image_url" placeholder="أو ضع رابط صورة القسم" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-400">
-            <button type="submit" class="w-full rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-black text-gray-950">+ إنشاء القسم الرئيسي</button>
+        <form action="/admin/add_category" method="POST" class="flex flex-col sm:flex-row gap-3">
+            <input name="category_name" required maxlength="120" placeholder="اسم القسم الرئيسي الجديد" class="flex-1 bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-400">
+            <button type="submit" class="rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-black text-gray-950">+ إنشاء القسم الرئيسي</button>
         </form>
-        <div class="border-t border-gray-800 pt-4 space-y-3">
-            <h3 class="text-sm font-black text-white">إضافة أو تغيير صورة قسم رئيسي موجود</h3>
-            <form action="/admin/update_category_image" method="POST" enctype="multipart/form-data" class="space-y-3">
-                <select name="category_id" required class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white">
-                    <option value="">اختر القسم الرئيسي</option>
-                    {% for cat in categories if not cat.parent_id %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
-                </select>
-                <input type="file" name="category_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white">
-                <input type="url" name="category_image_url" placeholder="أو ضع رابط الصورة" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white outline-none">
-                <button type="submit" class="w-full rounded-2xl bg-cyan-500 px-6 py-3 text-sm font-black text-gray-950">حفظ صورة القسم</button>
-            </form>
-        </div>
     </section>
 
     <!-- إنشاء قسم فرعي -->
@@ -413,6 +376,28 @@
         </form>
     </div>
 
+    <!-- ترتيب المنتجات بالسحب والإفلات -->
+    <section class="bg-gray-900 border border-violet-500/25 rounded-3xl p-5 shadow-xl space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="text-sm font-black text-white">ترتيب ظهور المنتجات</h2><span class="text-[10px] text-violet-300">اسحب ☰ ثم احفظ</span></div>
+        <p class="text-[11px] text-gray-400">اسحب المنتجات للأعلى أو الأسفل. الترتيب المحفوظ ينعكس في الصفحة الرئيسية وصفحات الأقسام دون تغيير أحجام البطاقات.</p>
+        <ol id="ynSortableProducts" class="space-y-2">
+        {% for s in services %}
+          <li draggable="true" data-service-id="{{ s.id }}" class="flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-950 p-3 cursor-grab active:cursor-grabbing">
+            <span class="text-violet-300 text-lg select-none">☰</span><span class="min-w-0 flex-1 truncate text-xs font-bold text-white">{{ s.name }}</span><div class="flex items-center gap-1"><button type="button" class="yn-move-up rounded-lg bg-gray-800 px-2 py-1 text-xs text-white" aria-label="رفع المنتج">↑</button><button type="button" class="yn-move-down rounded-lg bg-gray-800 px-2 py-1 text-xs text-white" aria-label="خفض المنتج">↓</button><span class="text-[10px] text-gray-500">#{{ s.id }}</span></div>
+          </li>
+        {% else %}<li class="text-xs text-gray-500">لا توجد منتجات لترتيبها.</li>{% endfor %}
+        </ol>
+        <div class="flex items-center gap-3"><button id="ynSaveProductOrder" type="button" class="rounded-xl bg-violet-600 px-5 py-3 text-xs font-black text-white">حفظ ترتيب المنتجات</button><span id="ynOrderStatus" class="text-[11px] text-gray-400" aria-live="polite"></span></div>
+    </section>
+    <script>
+    (()=>{const list=document.getElementById('ynSortableProducts'),save=document.getElementById('ynSaveProductOrder'),status=document.getElementById('ynOrderStatus');if(!list||!save)return;let dragging=null;
+      list.addEventListener('click',e=>{const row=e.target.closest('[data-service-id]');if(!row)return;if(e.target.closest('.yn-move-up')&&row.previousElementSibling)list.insertBefore(row,row.previousElementSibling);if(e.target.closest('.yn-move-down')&&row.nextElementSibling)list.insertBefore(row.nextElementSibling,row);});
+      list.addEventListener('dragstart',e=>{const row=e.target.closest('[data-service-id]');if(!row)return;dragging=row;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',row.dataset.serviceId);row.classList.add('opacity-40');});
+      list.addEventListener('dragend',()=>{dragging?.classList.remove('opacity-40');dragging=null;});
+      list.addEventListener('dragover',e=>{e.preventDefault();const target=e.target.closest('[data-service-id]');if(!target||!dragging||target===dragging)return;const r=target.getBoundingClientRect();list.insertBefore(dragging,e.clientY<r.top+r.height/2?target:target.nextSibling);});
+      save.addEventListener('click',async()=>{const ids=[...list.querySelectorAll('[data-service-id]')].map(x=>Number(x.dataset.serviceId));save.disabled=true;status.textContent='جارٍ الحفظ…';try{const res=await fetch('/admin/reorder_services',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',body:JSON.stringify({ids})});const data=await res.json();if(!res.ok)throw new Error(data.error||'تعذر حفظ الترتيب');status.textContent='✓ '+(data.message||'تم الحفظ');status.className='text-[11px] text-emerald-400';}catch(err){status.textContent=err.message;status.className='text-[11px] text-rose-400';}finally{save.disabled=false;}});
+    })();</script>
+
     <!-- تعديل المنتجات الحالية وتغيير التوفر -->
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-5 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">تعديل المنتجات وتغيير التوفر</h2>
@@ -446,10 +431,6 @@
                 <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-xl text-xs">حفظ تعديلات {{ s.name }}</button>
             </form>
             <form action="/admin/toggle_service/{{ s.id }}" method="POST" class="mt-2"><button type="submit" class="w-full {% if s.is_available %}bg-rose-600{% else %}bg-emerald-600{% endif %} text-white font-bold py-2 rounded-xl text-xs">{% if s.is_available %}إيقاف المنتج وجعله غير متوفر{% else %}إعادة توفير المنتج{% endif %}</button></form>
-            <form action="/admin/delete_service" method="POST" class="mt-2" onsubmit="return confirm('هل أنت متأكد من حذف الخدمة: {{ s.name|e }}؟ لا يمكن التراجع عن الحذف، وسيبقى سجل الطلبات السابق محفوظاً.');">
-                <input type="hidden" name="service_id" value="{{ s.id }}">
-                <button type="submit" class="w-full bg-rose-950 hover:bg-rose-800 border border-rose-600 text-rose-200 font-black py-2 rounded-xl text-xs">حذف هذه الخدمة نهائياً</button>
-            </form>
         </details>
         {% else %}<p class="text-xs text-gray-500">لا توجد منتجات بعد.</p>{% endfor %}
     </section>

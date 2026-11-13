@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>أوج ميديا</title>
+    <title>Y-N Store</title>
+    <meta name="description" content="Y-N Store - منصتك للخدمات الرقمية وشحن الألعاب وخدمات التواصل الاجتماعي بسرعة وأمان.">
+    <meta name="theme-color" content="#08091b">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
@@ -50,9 +52,9 @@
         <div>
             <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-800">
                 <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-400 font-black">OWJ</div>
+                    <div class="w-12 h-12 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-400 font-black">Y-N</div>
                     <div>
-                        <h3 class="text-sm font-black text-white">أوج ميديا</h3>
+                        <h3 class="text-sm font-black text-white">Y-N Store</h3>
                         <p class="text-[11px] text-gray-400">الخدمات الرقمية</p>
                     </div>
                 </div>
@@ -101,7 +103,7 @@
             {% if current_user %}
             <a href="/logout" class="block bg-rose-500/10 border border-rose-500/30 text-rose-400 py-3 rounded-2xl text-xs font-bold mb-3">تسجيل الخروج</a>
             {% endif %}
-            <p class="text-[10px] text-gray-500">© 2026 أوج ميديا</p>
+            <p class="text-[10px] text-gray-500">© 2026 Y-N Store</p>
         </div>
     </div>
 
@@ -113,7 +115,7 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
                 <a href="/" class="text-sm font-black text-white flex items-center gap-1.5">
-                    <span>أوج ميديا</span>
+                    <span>Y-N Store</span>
                     {% if current_user and current_user.is_verified %}
                     <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.25a.75.75 0 00-1.14-.976l-3.36 3.92-1.74-1.74a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.12-.08l4-4.5z"/></svg>
                     {% endif %}
@@ -122,7 +124,7 @@
             </div>
             <div class="flex items-center gap-2">
                 {% if current_user %}
-                <a href="/deposit" class="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-3.5 py-1.5 rounded-xl text-xs font-black">{{ currency_symbol }}{{ current_user.balance_usd|money }}</a>
+                <a href="/deposit" class="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-3.5 py-1.5 rounded-xl text-xs font-black">${{ "%.2f"|format(current_user.balance_usd) }}</a>
                 {% if current_user.role == 'admin' %}
                 <a href="/admin" class="bg-amber-500 text-gray-950 px-3 py-1.5 rounded-xl text-xs font-black">لوحة التحكم</a>
                 {% endif %}
@@ -197,7 +199,7 @@ function hideStoreUnavailable(){const el=document.getElementById('storeUnavailab
 document.addEventListener('keydown',function(e){if(e.key==='Escape')hideStoreUnavailable();});
 </script>
 
-<!-- مساعد أوج ميديا العائم: هوية محادثة بنفسجي/نيلي مستقلة عن ألوان المتجر -->
+<!-- مساعد Y-N Store العائم: هوية محادثة بنفسجي/نيلي مستقلة عن ألوان المتجر -->
 <style>
  #owjBotButton{background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:1px solid #c4b5fd;box-shadow:0 12px 32px rgba(99,102,241,.38)}
  #owjBotWindow{background:#111126;border:1px solid rgba(167,139,250,.42);box-shadow:0 24px 70px rgba(20,12,55,.58)}
@@ -212,18 +214,18 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')hideStoreUna
  #owjBotMessages .quick-question{background:#30285b;border:1px solid #6d5ca8;color:#ddd6fe}
  @media(max-width:480px){ #owjBotWindow{bottom:6.1rem;left:.75rem;width:calc(100vw - 1.5rem);max-width:none}#owjBotMessages{height: min(56vh,390px)}}
 </style>
-<button id="owjBotButton" type="button" aria-label="فتح مساعد أوج ميديا" aria-controls="owjBotWindow" aria-expanded="false" class="fixed bottom-24 left-4 z-50 w-14 h-14 rounded-full flex items-center justify-center active:scale-95 transition">
+<button id="owjBotButton" type="button" aria-label="فتح مساعد Y-N Store" aria-controls="owjBotWindow" aria-expanded="false" class="fixed bottom-24 left-4 z-50 w-14 h-14 rounded-full flex items-center justify-center active:scale-95 transition">
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-7 h-7"><rect x="3" y="7" width="18" height="13" rx="4"/><path d="M12 3v4M8 13h.01M16 13h.01M9 17h6"/></svg>
  <span class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#111126]"></span>
 </button>
-<section id="owjBotWindow" dir="rtl" role="dialog" aria-label="مساعد أوج ميديا" aria-modal="false" class="fixed bottom-40 left-4 z-50 w-[calc(100vw-2rem)] max-w-sm hidden overflow-hidden rounded-3xl">
+<section id="owjBotWindow" dir="rtl" role="dialog" aria-label="مساعد Y-N Store" aria-modal="false" class="fixed bottom-40 left-4 z-50 w-[calc(100vw-2rem)] max-w-sm hidden overflow-hidden rounded-3xl">
  <header class="owj-bot-head flex items-center justify-between p-4">
-  <div class="flex items-center gap-3"><div class="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-black text-xs">OWJ</div><div><h2 class="text-sm font-black text-white">مساعد أوج ميديا</h2><p class="text-[10px] text-violet-200 flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span> جاهز لمساعدتك</p></div></div>
+  <div class="flex items-center gap-3"><div class="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-black text-xs">Y-N</div><div><h2 class="text-sm font-black text-white">مساعد Y-N Store</h2><p class="text-[10px] text-violet-200 flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span> جاهز لمساعدتك</p></div></div>
   <button id="owjBotClose" type="button" aria-label="إغلاق المحادثة" class="w-9 h-9 rounded-xl bg-white/10 text-white hover:bg-white/20 text-xl">×</button>
  </header>
  <div class="px-4 py-2 bg-[#1c1938] text-[10px] text-violet-200 border-b border-violet-400/10">اسأل عن الخدمات أو الطلبات أو شحن المحفظة</div>
  <div id="owjBotMessages" aria-live="polite" class="h-80 overflow-y-auto p-4 space-y-3 text-xs">
-  <div class="bot-msg max-w-[92%] p-3 leading-6">أهلاً بك في أوج ميديا 👋<br>أنا مساعدك الرقمي، كيف فيني أساعدك اليوم؟
+  <div class="bot-msg max-w-[92%] p-3 leading-6">أهلاً بك في Y-N Store 👋<br>أنا مساعدك الرقمي، كيف فيني أساعدك اليوم؟
    <div class="mt-3 flex flex-wrap gap-2"><button type="button" data-question="كيف أطلب خدمة؟" class="quick-question rounded-xl px-3 py-2">🛍️ طريقة الطلب</button><button type="button" data-question="كيف أشحن رصيدي؟" class="quick-question rounded-xl px-3 py-2">💳 شحن الرصيد</button><button type="button" data-question="كيف أتابع طلباتي؟" class="quick-question rounded-xl px-3 py-2">📦 متابعة الطلبات</button></div>
   </div>
  </div>

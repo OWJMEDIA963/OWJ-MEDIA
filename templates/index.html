@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}الرئيسية - أوج ميديا
+{% block title %}الرئيسية - Y-N Store
 
 
 {% endblock %}
@@ -39,11 +39,11 @@
 .owj-category-card:hover{border-color:rgba(34,211,238,.75)!important;box-shadow:0 8px 22px rgba(8,145,178,.18)!important;}
 .owj-category-card:hover .owj-category-image{transform:scale(1.045)!important;}
 @media(min-width:640px){.owj-category-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:16px!important}.owj-category-card{border-radius:18px!important}.owj-category-name{font-size:14px!important}.owj-category-count{font-size:12px!important}}
+.yn-store-banner{width:100%;background:#05051b;line-height:0}.yn-store-banner img{display:block;width:100%;height:auto;max-width:100%;object-fit:contain}
 </style>
 <div class="max-w-7xl mx-auto px-3 sm:px-5 py-4 sm:py-6 space-y-4 sm:space-y-6">
- <section class="owj-hero-compact relative overflow-hidden border border-cyan-500/20 bg-gradient-to-bl from-cyan-950/60 via-gray-900 to-[#030712] shadow-xl">
-  <div class="absolute -left-8 -top-8 w-20 h-20 rounded-full bg-cyan-500/10 blur-2xl"></div>
-  <div class="relative"><span class="owj-hero-pill inline-flex rounded-full border border-cyan-500/30 bg-cyan-500/10 font-bold text-cyan-300">منصتك للخدمات الرقمية</span><h1 class="owj-hero-title font-black text-white">ارتقِ بحضورك الرقمي مع <span class="text-cyan-400">أوج ميديا</span></h1><p class="owj-hero-desc text-gray-400">خدمات رقمية وشحن ألعاب في واجهة مرتبة وسهلة الاستخدام.</p></div>
+ <section class="yn-store-banner overflow-hidden rounded-2xl border border-violet-500/20 shadow-2xl" aria-label="Y-N Store">
+  <img src="{{ url_for('static', filename='images/yn-store-banner.png') }}" alt="Y-N Store - منصتك للخدمات الرقمية" fetchpriority="high" decoding="async">
  </section>
 
  <section class="space-y-3" aria-label="البحث عن خدمة">

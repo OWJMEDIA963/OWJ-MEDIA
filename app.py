@@ -1364,6 +1364,7 @@ def import_backup():
         return redirect(url_for('admin'))
 
     ignored_backup_columns = set()
+    ignored_backup_tables = set()
     try:
         raw = file.stream.read().decode('utf-8-sig')
         rows = list(csv.reader(io.StringIO(raw)))
@@ -1380,13 +1381,20 @@ def import_backup():
             if not row or all(not cell for cell in row):
                 continue
             if backup_version == 'owj_media_full_backup_v3' and len(row) == 2 and row[0] == '__table__':
+                # Older/newer site versions may have tables that do not exist in this build.
+                # Ignore their table markers instead of rejecting the entire backup.
                 if row[1] not in models_by_table:
-                    raise ValueError(f'النسخة تحتوي جدولًا غير معروف: {row[1]}')
-                declared_tables.add(row[1])
+                    ignored_backup_tables.add(row[1])
+                else:
+                    declared_tables.add(row[1])
                 continue
-            if len(row) != 2 or row[0] not in models_by_table:
+            if len(row) != 2:
                 raise ValueError(f'بيانات غير صالحة في السطر {line_no}.')
             table_name, raw_json = row
+            # Skip records belonging to tables that this version of the site no longer uses.
+            if table_name not in models_by_table:
+                ignored_backup_tables.add(table_name)
+                continue
             try:
                 data = json.loads(raw_json)
             except Exception:
@@ -1465,6 +1473,12 @@ def import_backup():
             sample = '، '.join(sorted(ignored_backup_columns)[:8])
             suffix = f' (تم تجاهل أعمدة قديمة غير موجودة في إصدار الموقع الحالي: {sample}'
             if len(ignored_backup_columns) > 8:
+                suffix += ' وغيرها'
+            message += suffix + ')'
+        if ignored_backup_tables:
+            sample = '، '.join(sorted(ignored_backup_tables)[:8])
+            suffix = f' (تم تجاهل جداول غير موجودة في إصدار الموقع الحالي: {sample}'
+            if len(ignored_backup_tables) > 8:
                 suffix += ' وغيرها'
             message += suffix + ')'
         flash(message, 'success')

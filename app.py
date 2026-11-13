@@ -1363,6 +1363,7 @@ def import_backup():
         flash('الملف يجب أن يكون بصيغة CSV.', 'error')
         return redirect(url_for('admin'))
 
+    ignored_backup_columns = set()
     try:
         raw = file.stream.read().decode('utf-8-sig')
         rows = list(csv.reader(io.StringIO(raw)))
@@ -1394,8 +1395,12 @@ def import_backup():
                 raise ValueError(f'سجل غير صالح في السطر {line_no}.')
             model = models_by_table[table_name]
             allowed = {column.key for column in model.__table__.columns}
-            if not set(data).issubset(allowed):
-                raise ValueError(f'تحتوي النسخة أعمدة غير معروفة في جدول {table_name}.')
+            # Older backups may contain columns removed or renamed in newer versions.
+            # Keep every field this version understands and safely skip obsolete fields.
+            unknown_columns = set(data) - allowed
+            if unknown_columns:
+                ignored_backup_columns.update(f'{table_name}.{name}' for name in unknown_columns)
+                data = {key: value for key, value in data.items() if key in allowed}
             for column in model.__table__.columns:
                 value = data.get(column.key)
                 if value is not None and isinstance(column.type, DateTime) and isinstance(value, str):
@@ -1455,7 +1460,14 @@ def import_backup():
 
         nonempty_tables = sum(1 for items in grouped.values() if items)
         details = '، '.join(f'{table}: {len(items)}' for table, items in grouped.items() if items)
-        flash(f'تم التحقق من الاستعادة بنجاح: {total_records} سجلًا في {nonempty_tables} جداول. {details}', 'success')
+        message = f'تم التحقق من الاستعادة بنجاح: {total_records} سجلًا في {nonempty_tables} جداول. {details}'
+        if ignored_backup_columns:
+            sample = '، '.join(sorted(ignored_backup_columns)[:8])
+            suffix = f' (تم تجاهل أعمدة قديمة غير موجودة في إصدار الموقع الحالي: {sample}'
+            if len(ignored_backup_columns) > 8:
+                suffix += ' وغيرها'
+            message += suffix + ')'
+        flash(message, 'success')
     except Exception as exc:
         db.session.rollback()
         flash('فشلت الاستعادة ولم تُعتمد أي تغييرات. السبب: ' + str(exc), 'error')

@@ -41,7 +41,29 @@
         body.light-theme main .border-gray-800, body.light-theme main .border-gray-700 { border-color:#dbe3ef !important; }
         body.light-theme input, body.light-theme textarea, body.light-theme select { background:#fff !important; color:#172033 !important; border-color:#cbd5e1 !important; }
         body.light-theme nav span, body.light-theme nav a { color:#475569 !important; }
-    </style>
+    
+
+/* Y-N Store: realistic royal-blue theme (solid colors, restrained shadows) */
+:root{--yn-blue:#2457d6;--yn-blue-hover:#1d4ed8;--yn-blue-soft:#93c5fd;--yn-bg:#0b1220;--yn-panel:#111c2e;--yn-panel-2:#16243a;--yn-border:#263b60;--yn-text:#e8eef8;--yn-muted:#a8b6cc}
+html{color-scheme:dark}
+body{background-color:var(--yn-bg)!important;color:var(--yn-text)}
+/* Replace cyan/purple accent utilities with a consistent royal blue */
+[class*="bg-cyan-"],[class*="bg-sky-"],[class*="bg-indigo-"],[class*="bg-violet-"],[class*="bg-purple-"]{background-color:var(--yn-blue)!important}
+[class*="text-cyan-"],[class*="text-sky-"],[class*="text-indigo-"],[class*="text-violet-"],[class*="text-purple-"]{color:var(--yn-blue-soft)!important}
+[class*="border-cyan-"],[class*="border-sky-"],[class*="border-indigo-"],[class*="border-violet-"],[class*="border-purple-"]{border-color:var(--yn-border)!important}
+[class*="from-cyan-"],[class*="from-sky-"],[class*="from-indigo-"],[class*="from-violet-"],[class*="from-purple-"],[class*="to-cyan-"],[class*="to-sky-"],[class*="to-indigo-"],[class*="to-violet-"],[class*="to-purple-"]{--tw-gradient-from:var(--yn-blue)!important;--tw-gradient-to:var(--yn-blue)!important}
+[class*="bg-gradient-to-"]{background-image:none!important}
+[class*="bg-gray-950"],[class*="bg-gray-900"],[class*="bg-slate-950"],[class*="bg-slate-900"]{background-color:var(--yn-panel)!important}
+[class*="border-gray-800"],[class*="border-gray-700"],[class*="border-slate-800"],[class*="border-slate-700"]{border-color:var(--yn-border)!important}
+button,[role="button"],a[class*="bg-cyan-"],a[class*="bg-sky-"],a[class*="bg-indigo-"],a[class*="bg-violet-"],a[class*="bg-purple-"]{transition:background-color .16s ease,border-color .16s ease,transform .16s ease}
+button[class*="bg-cyan-"],button[class*="bg-sky-"],button[class*="bg-indigo-"],button[class*="bg-violet-"],button[class*="bg-purple-"],a[class*="bg-cyan-"],a[class*="bg-sky-"],a[class*="bg-indigo-"],a[class*="bg-violet-"],a[class*="bg-purple-"]{background:var(--yn-blue)!important;color:#fff!important;border-color:var(--yn-blue)!important;box-shadow:0 3px 9px rgba(15,45,110,.22)!important}
+button[class*="bg-cyan-"]:hover,button[class*="bg-sky-"]:hover,button[class*="bg-indigo-"]:hover,button[class*="bg-violet-"]:hover,button[class*="bg-purple-"]:hover,a[class*="bg-cyan-"]:hover,a[class*="bg-sky-"]:hover,a[class*="bg-indigo-"]:hover,a[class*="bg-violet-"]:hover,a[class*="bg-purple-"]:hover{background:var(--yn-blue-hover)!important}
+input:focus,select:focus,textarea:focus{outline-color:var(--yn-blue)!important;border-color:var(--yn-blue)!important;box-shadow:0 0 0 2px rgba(36,87,214,.16)!important}
+/* Keep the theme calm and product-like: avoid neon glows */
+[class*="shadow-cyan-"],[class*="shadow-sky-"],[class*="shadow-indigo-"],[class*="shadow-purple-"]{--tw-shadow:0 4px 12px rgba(0,0,0,.18)!important;box-shadow:0 4px 12px rgba(0,0,0,.18)!important}
+body.light-theme{--yn-bg:#f3f6fb;--yn-panel:#fff;--yn-panel-2:#f8fafc;--yn-border:#d5dfed;--yn-text:#172033;--yn-muted:#64748b;color-scheme:light}
+
+</style>
 </head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
 

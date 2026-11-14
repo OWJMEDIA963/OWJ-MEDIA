@@ -300,14 +300,36 @@
     <section class="bg-gray-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-base font-black text-emerald-300">إنشاء قسم رئيسي</h2>
         <p class="text-xs text-gray-400">أنشئ قسماً رئيسياً جديداً، وبعدها يمكنك إضافة أقسام فرعية ومنتجات بداخله.</p>
-        <form action="/admin/add_category" method="POST" class="flex flex-col sm:flex-row gap-3">
-            <input name="category_name" required maxlength="120" placeholder="اسم القسم الرئيسي الجديد" class="flex-1 bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-400">
+        <form action="/admin/add_category" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input name="category_name" required maxlength="120" placeholder="اسم القسم الرئيسي الجديد" class="bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-400">
+            <input type="file" name="category_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
+            <input type="url" name="category_image_url" placeholder="أو رابط صورة القسم الرئيسي" class="bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
             <button type="submit" class="rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-black text-gray-950">+ إنشاء القسم الرئيسي</button>
         </form>
     </section>
 
     <!-- إنشاء قسم فرعي -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4"><h2 class="text-sm font-black text-white">إضافة قسم فرعي</h2><form action="/admin/add_subcategory" method="POST" enctype="multipart/form-data" class="space-y-3"><select name="parent_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي</option>{% for cat in categories if not cat.parent_id %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select><input name="subcategory_name" required placeholder="اسم القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><label class="block text-[11px] font-bold text-gray-300">صورة القسم الفرعي (اختياري)</label><input type="file" name="subcategory_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><input type="url" name="subcategory_image_url" placeholder="أو رابط صورة القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><button class="w-full rounded-2xl bg-cyan-500 py-3 text-xs font-black text-gray-950">إنشاء القسم الفرعي</button></form></div>
+
+    <!-- إدارة صور وترتيب الأقسام الرئيسية والفرعية -->
+    <section class="bg-gray-900 border border-violet-500/30 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+      <div><h2 class="text-base font-black text-violet-300">إدارة صور وترتيب الأقسام</h2><p class="mt-1 text-xs text-gray-400">عدّل اسم القسم وصورته الرئيسية أو الفرعية وحدد رقم الترتيب. الرقم الأصغر يظهر أولاً، وكل تعديل يُحفظ بشكل مستقل.</p></div>
+      <div class="space-y-3">
+      {% for cat in categories|sort(attribute='sort_order') %}
+        <form action="/admin/update_category/{{ cat.id }}" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center rounded-2xl border border-gray-800 bg-gray-950 p-3">
+          <div class="sm:col-span-2 flex items-center gap-2 min-w-0">
+            {% if cat.image_url %}<img src="{{ cat.image_url }}" alt="" class="w-12 h-12 rounded-xl object-cover bg-gray-800">{% else %}<div class="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center text-gray-500">🖼️</div>{% endif %}
+            <div class="min-w-0"><div class="text-xs font-black text-white truncate">{{ cat.name }}</div><div class="text-[10px] text-gray-500">{% if cat.parent_id %}فرعي من {{ cat.parent.name }}{% else %}قسم رئيسي{% endif %}</div></div>
+          </div>
+          <input name="category_name" value="{{ cat.name }}" required maxlength="120" placeholder="اسم القسم" class="sm:col-span-3 min-w-0 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white">
+          <input type="number" name="sort_order" min="0" max="1000000" value="{{ cat.sort_order or 0 }}" aria-label="ترتيب القسم" class="sm:col-span-1 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white" title="رقم الترتيب">
+          <input type="file" name="category_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="sm:col-span-3 min-w-0 bg-gray-900 border border-gray-800 rounded-xl px-2 py-2 text-[10px] text-white">
+          <input type="url" name="category_image_url" placeholder="رابط صورة جديد (اختياري)" class="sm:col-span-2 min-w-0 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-[10px] text-white">
+          <div class="sm:col-span-1 flex flex-col gap-2"><label class="text-[10px] text-gray-400"><input type="checkbox" name="remove_category_image" value="1" class="ml-1"> حذف الصورة</label><button class="rounded-lg bg-violet-600 px-3 py-2 text-[10px] font-black text-white">حفظ</button></div>
+        </form>
+      {% else %}<p class="text-xs text-gray-500">لا توجد أقسام حتى الآن.</p>{% endfor %}
+      </div>
+    </section>
 
     <!-- إضافة منتج مباشرة إلى قسم فرعي -->
     <section class="bg-gray-900 border border-cyan-500/30 rounded-3xl p-6 shadow-xl space-y-4">

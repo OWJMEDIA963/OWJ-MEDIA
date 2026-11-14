@@ -177,6 +177,7 @@ class Order(db.Model):
     quantity = db.Column(db.Integer, default=1)
     total_price = db.Column(db.Float, default=0.0)
     status = db.Column(db.String(40), default='قيد المراجعة')
+    provider_order_id = db.Column(db.String(120), default='', index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('User', backref='orders')
     service = db.relationship('Service')
@@ -517,10 +518,65 @@ def verification():
         return redirect(url_for('verification'))
     return render_template('verification.html', user=user, latest=latest)
 
+def refresh_api_order_status(order):
+    """Refresh a provider-backed order using the same SMM API used to place it."""
+    if not order.provider_order_id or not order.service:
+        return
+    if order.service.service_type not in ('smm', 'smm_fixed') or not order.service.api_provider_id:
+        return
+    provider = SMMProvider.query.filter_by(id=order.service.api_provider_id, is_active=True).first()
+    if not provider:
+        return
+    try:
+        response = requests.post(
+            provider.api_url,
+            data={'key': reveal_api_key(provider.api_key), 'action': 'status', 'order': order.provider_order_id},
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            timeout=12,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict) or payload.get('error'):
+            return
+        raw = str(payload.get('status', '')).strip().lower()
+        status_map = {
+            'pending': 'قيد الانتظار', 'in progress': 'قيد التنفيذ', 'in_progress': 'قيد التنفيذ',
+            'processing': 'قيد التنفيذ', 'completed': 'مكتمل', 'complete': 'مكتمل',
+            'partial': 'مكتمل جزئياً', 'canceled': 'ملغي', 'cancelled': 'ملغي',
+            'failed': 'فشل الطلب', 'refunded': 'تم إرجاع المبلغ',
+        }
+        new_status = status_map.get(raw)
+        if not new_status or new_status == order.status:
+            return
+        previous = order.status
+        order.status = new_status
+        send_user_notification(
+            order.user_id,
+            f'تحديث حالة الطلب #{order.id}',
+            f'تم تحديث حالة طلب {order.service_name} من «{previous}» إلى «{new_status}».',
+            url_for('my_orders'),
+        )
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.warning('Could not refresh provider status for local order #%s: %s', order.id, exc)
+
+
+@app.route('/api/my_orders/status')
+@login_required
+def my_orders_status_api():
+    orders = Order.query.filter_by(user_id=current_user().id).order_by(Order.id.desc()).limit(100).all()
+    for order in orders:
+        refresh_api_order_status(order)
+    return jsonify({'orders': [{'id': order.id, 'status': order.status} for order in orders]})
+
+
 @app.route('/my_orders')
 @login_required
 def my_orders():
     orders = Order.query.filter_by(user_id=current_user().id).order_by(Order.id.desc()).all()
+    for order in orders:
+        refresh_api_order_status(order)
     return render_template('my_orders.html', orders=orders)
 
 @app.route('/order/<int:service_id>', methods=['POST'])
@@ -589,7 +645,7 @@ def place_order(service_id):
             flash('الخدمة غير متاحة حاليا، حاول بعد 5 دقائق.', 'error')
             return redirect(url_for('category_services', category_id=service.category_id))
     user.balance_usd -= total
-    order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type in ('smm', 'smm_fixed') else 'قيد المراجعة'))
+    order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type in ('smm', 'smm_fixed') else 'قيد المراجعة'), provider_order_id=provider_order_id)
     db.session.add(order); db.session.commit()
     order_kind = 'تلقائي عبر API' if service.service_type in ('smm', 'smm_fixed') else ('يدوي' if service.service_type == 'manual' else 'طلب خدمة')
     notify_admins(f'طلب جديد {order_kind} #{order.id}', f'المستخدم {user.username} (#{user.id}) أرسل طلب {service.name} بقيمة ${format_money(total)}. الحالة: {order.status}.', url_for('admin'))
@@ -1524,6 +1580,15 @@ def import_backup():
 
 with app.app_context():
     db.create_all()
+    # Store the remote provider's order ID so customer-facing status can be refreshed from the same API.
+    try:
+        from sqlalchemy import inspect
+        order_columns = {column['name'] for column in inspect(db.engine).get_columns('order')}
+        if 'provider_order_id' not in order_columns:
+            db.session.execute(db.text("ALTER TABLE \"order\" ADD COLUMN provider_order_id VARCHAR(120) DEFAULT ''"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     # Y-N Store: additive product ordering migration; existing data and product dimensions stay untouched.
     try:
         from sqlalchemy import inspect

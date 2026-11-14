@@ -220,13 +220,20 @@
             <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-2xl text-xs">إضافة وكيل معتمد</button>
         </form>
         <div class="space-y-2">
-            <h3 class="text-xs font-bold text-gray-300">الوكلاء الحاليون</h3>
-            {% for ag in agents %}
-            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950 p-3">
-                <div class="min-w-0"><p class="text-xs font-bold text-white">{{ ag.name }}</p><p class="text-[10px] text-gray-400">{{ ag.city }} · {{ ag.phone }}</p></div>
-                {% if is_admin %}<form action="/admin/delete_agent/{{ ag.id }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف هذا الوكيل؟')"><button type="submit" class="shrink-0 rounded-lg bg-rose-600 px-3 py-2 text-[11px] font-black text-white">حذف الوكيل</button></form>{% endif %}
+            <h3 class="text-xs font-black text-white">الوكلاء الحاليون</h3>
+            {% for agent in agents %}
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-800 bg-gray-950 p-3">
+                <div class="min-w-0">
+                    <p class="text-xs font-bold text-white">{{ agent.name }}</p>
+                    <p class="text-[11px] text-gray-400">{{ agent.city }}{% if agent.phone %} · {{ agent.phone }}{% endif %}</p>
+                </div>
+                <form action="/admin/delete_agent/{{ agent.id }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف هذا الوكيل؟')">
+                    <button type="submit" class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white hover:bg-rose-500">حذف الوكيل</button>
+                </form>
             </div>
-            {% else %}<p class="text-xs text-gray-500">لا يوجد وكلاء مضافون حالياً.</p>{% endfor %}
+            {% else %}
+            <p class="text-xs text-gray-500">لا يوجد وكلاء مضافون حالياً.</p>
+            {% endfor %}
         </div>
     </div>
 
@@ -260,23 +267,86 @@
     <!-- مزودو SMM API -->
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إعدادات مزوّدي SMM API</h2>
-        <p class="text-xs text-gray-400 leading-6">أضف رابط API ومفتاحه من لوحة مزوّد SMM الذي تملك حساباً لديه. المفتاح يُحفظ في قاعدة بيانات الموقع ولا يظهر للزوار.</p>
+        <p class="text-xs text-gray-400 leading-6">قسم مستقل لإدارة API: أدخل مفتاح التجربة والمفتاح الفعلي، اختبر الاتصال، ثم اجلب كتالوج الخدمات وأدرج الخدمة المطلوبة في المنتج. المفاتيح تحفظ مشفّرة ولا تظهر للزوار.</p>
         <form action="/admin/add_smm_provider" method="POST" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input name="provider_name" required placeholder="اسم المزوّد (مثلاً: مزوّد SMM 1)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
             <input name="api_url" type="url" required placeholder="رابط API مثل https://provider.com/api/v2" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
-            <input name="api_key" type="password" required autocomplete="new-password" placeholder="مفتاح API السري" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white sm:col-span-2">
+            <input name="test_api_key" type="password" autocomplete="new-password" placeholder="مفتاح التجربة (اختياري)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><input name="live_api_key" type="password" required autocomplete="new-password" placeholder="المفتاح الفعلي (Live)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
             <button class="sm:col-span-2 bg-cyan-500 text-gray-950 font-black py-3 rounded-xl text-xs">حفظ مزوّد API</button>
         </form>
         {% if smm_providers %}
         <div class="space-y-2">
             {% for provider in smm_providers %}
             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950 p-3">
-                <div><p class="text-xs font-bold text-white">{{ provider.name }}</p><p dir="ltr" class="text-[10px] text-gray-500 break-all">{{ provider.api_url }}</p><p class="text-[10px] text-emerald-400">مفتاح API محفوظ</p></div>
-                <form action="/admin/delete_smm_provider/{{ provider.id }}" method="POST" onsubmit="return confirm('حذف المزوّد؟ سيتم فصل الخدمات المرتبطة به.')"><button class="rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 px-3 py-2 text-[10px]">حذف</button></form>
+                <div><p class="text-xs font-bold text-white">{{ provider.name }}</p><p dir="ltr" class="text-[10px] text-gray-500 break-all">{{ provider.api_url }}</p><p class="text-[10px] text-emerald-400">المفاتيح محفوظة بشكل مشفّر · الخدمات المحفوظة: {{ provider.catalog_services|length }}</p></div>
+                <div class="flex flex-wrap gap-2">
+                <form action="/admin/test_smm_provider/{{ provider.id }}" method="POST"><button class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-[10px]">اختبار API / الرصيد</button></form>
+                <form action="/admin/fetch_smm_services/{{ provider.id }}" method="POST"><button class="rounded-lg bg-sky-600 text-white px-3 py-2 text-[10px]">تحديث الخدمات من السيرفر</button></form>
+                <form action="/admin/delete_smm_provider/{{ provider.id }}" method="POST" onsubmit="return confirm('حذف المزوّد؟ سيتم فصل الخدمات المرتبطة به.')"><button class="rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 px-3 py-2 text-[10px]">حذف</button></form></div>
             </div>
             {% endfor %}
         </div>
         {% endif %}
+        {% if smm_catalog_services %}
+        <div class="rounded-2xl border border-sky-500/30 bg-gray-950 p-4 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2"><h3 class="text-sm font-black text-sky-300">كتالوج الخدمات المستوردة ({{ smm_catalog_services|length }} خدمة)</h3><div class="flex w-full sm:w-auto gap-2"><input id="apiServicesSearch" type="search" placeholder="رقم الخدمة أو اسمها..." class="min-w-0 flex-1 rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-xs text-white"><button type="button" id="apiServicesSearchBtn" class="rounded-xl bg-cyan-500 px-4 py-2 text-xs font-black text-gray-950">بحث</button></div></div>
+          <p class="text-[10px] text-gray-400">كل خدمة ظاهرة برقمها وسعرها وحدود الكمية. اضغط «ربط بمنتج» لتعبئة نموذج إضافة المنتج تلقائياً.</p>
+          <div class="max-h-[560px] overflow-auto rounded-xl border border-gray-800"><table class="w-full min-w-[700px] text-right text-xs"><thead class="sticky top-0 bg-gray-800 text-gray-300"><tr><th class="p-3">رقم الخدمة</th><th class="p-3">اسم الخدمة</th><th class="p-3">السعر / 1000</th><th class="p-3">أقل كمية</th><th class="p-3">أقصى كمية</th><th class="p-3">ربط</th></tr></thead><tbody id="apiServicesRows" class="divide-y divide-gray-800">{% for item in smm_catalog_services %}<tr class="api-service-row hover:bg-gray-900" data-search="{{ item.service_code }} {{ item.name|lower }} {{ item.provider.name|lower }}"><td class="p-3 font-black text-cyan-300">#{{ item.service_code }}</td><td class="p-3 text-white"><div>{{ item.name }}</div><small class="text-gray-500">{{ item.provider.name }}</small></td><td class="p-3 text-emerald-300">{{ item.rate }}</td><td class="p-3">{{ item.min_quantity }}</td><td class="p-3">{{ item.max_quantity }}</td><td class="p-3"><button type="button" class="api-service-link whitespace-nowrap rounded-lg bg-sky-600 px-3 py-2 text-[10px] font-bold text-white" data-code="{{ item.service_code }}">ربط بمنتج</button></td></tr>{% endfor %}</tbody></table></div>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- إنشاء قسم رئيسي -->
+    <section class="bg-gray-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl space-y-4">
+        <h2 class="text-base font-black text-emerald-300">إنشاء قسم رئيسي</h2>
+        <p class="text-xs text-gray-400">أنشئ قسماً رئيسياً جديداً، وبعدها يمكنك إضافة أقسام فرعية ومنتجات بداخله.</p>
+        <form action="/admin/add_category" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input name="category_name" required maxlength="120" placeholder="اسم القسم الرئيسي الجديد" class="bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-400">
+            <input type="file" name="category_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
+            <input type="url" name="category_image_url" placeholder="أو رابط صورة القسم الرئيسي" class="bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
+            <button type="submit" class="rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-black text-gray-950">+ إنشاء القسم الرئيسي</button>
+        </form>
+    </section>
+
+    <!-- إنشاء قسم فرعي -->
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4"><h2 class="text-sm font-black text-white">إضافة قسم فرعي</h2><form action="/admin/add_subcategory" method="POST" enctype="multipart/form-data" class="space-y-3"><select name="parent_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي</option>{% for cat in categories if not cat.parent_id %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select><input name="subcategory_name" required placeholder="اسم القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><label class="block text-[11px] font-bold text-gray-300">صورة القسم الفرعي (اختياري)</label><input type="file" name="subcategory_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><input type="url" name="subcategory_image_url" placeholder="أو رابط صورة القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><button class="w-full rounded-2xl bg-cyan-500 py-3 text-xs font-black text-gray-950">إنشاء القسم الفرعي</button></form></div>
+
+    <!-- إدارة صور وترتيب الأقسام الرئيسية والفرعية -->
+    <section class="bg-gray-900 border border-violet-500/30 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+      <div><h2 class="text-base font-black text-violet-300">إدارة صور وترتيب الأقسام</h2><p class="mt-1 text-xs text-gray-400">عدّل اسم القسم وصورته الرئيسية أو الفرعية وحدد رقم الترتيب. الرقم الأصغر يظهر أولاً، وكل تعديل يُحفظ بشكل مستقل.</p></div>
+      <div class="space-y-3">
+      {% for cat in categories|sort(attribute='sort_order') %}
+        <form action="/admin/update_category/{{ cat.id }}" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center rounded-2xl border border-gray-800 bg-gray-950 p-3">
+          <div class="sm:col-span-2 flex items-center gap-2 min-w-0">
+            {% if cat.image_url %}<img src="{{ cat.image_url }}" alt="" class="w-12 h-12 rounded-xl object-cover bg-gray-800">{% else %}<div class="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center text-gray-500">🖼️</div>{% endif %}
+            <div class="min-w-0"><div class="text-xs font-black text-white truncate">{{ cat.name }}</div><div class="text-[10px] text-gray-500">{% if cat.parent_id %}فرعي من {{ cat.parent.name }}{% else %}قسم رئيسي{% endif %}</div></div>
+          </div>
+          <input name="category_name" value="{{ cat.name }}" required maxlength="120" placeholder="اسم القسم" class="sm:col-span-3 min-w-0 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white">
+          <input type="number" name="sort_order" min="0" max="1000000" value="{{ cat.sort_order or 0 }}" aria-label="ترتيب القسم" class="sm:col-span-1 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white" title="رقم الترتيب">
+          <input type="file" name="category_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="sm:col-span-3 min-w-0 bg-gray-900 border border-gray-800 rounded-xl px-2 py-2 text-[10px] text-white">
+          <input type="url" name="category_image_url" placeholder="رابط صورة جديد (اختياري)" class="sm:col-span-2 min-w-0 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-[10px] text-white">
+          <div class="sm:col-span-1 flex flex-col gap-2"><label class="text-[10px] text-gray-400"><input type="checkbox" name="remove_category_image" value="1" class="ml-1"> حذف الصورة</label><button class="rounded-lg bg-violet-600 px-3 py-2 text-[10px] font-black text-white">حفظ</button></div>
+        </form>
+      {% else %}<p class="text-xs text-gray-500">لا توجد أقسام حتى الآن.</p>{% endfor %}
+      </div>
+    </section>
+
+    <!-- إضافة منتج مباشرة إلى قسم فرعي -->
+    <section class="bg-gray-900 border border-cyan-500/30 rounded-3xl p-6 shadow-xl space-y-4">
+        <h2 class="text-base font-black text-cyan-300">إضافة منتج داخل قسم فرعي مباشرة</h2>
+        <p class="text-xs text-gray-400">اختر القسم الفرعي ثم أدخل بيانات المنتج؛ سيظهر المنتج داخل القسم الفرعي المختار.</p>
+        <form action="/admin/add_service" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input name="name" required placeholder="اسم المنتج" class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white">
+            <select name="category_id" required class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white"><option value="">اختر القسم الفرعي للمنتج</option>{% for cat in categories if cat.parent_id %}<option value="{{ cat.id }}">{{ cat.parent.name }} ← {{ cat.name }}</option>{% endfor %}</select>
+            <input type="number" step="0.01" min="0" name="price_per_1000" required placeholder="السعر ($)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <select name="service_type" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white"><option value="manual">يدوي بسعر ثابت</option><option value="manual_quantity">يدوي بالكمية</option><option value="smm">تلقائي API بسعر لكل 1000</option><option value="smm_fixed">تلقائي API بسعر ثابت لكل طلب</option></select>
+            <input type="number" name="min_quantity" value="1" min="1" required placeholder="الحد الأدنى" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <input type="number" name="max_quantity" value="10000" min="1" required placeholder="الحد الأقصى" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <input name="input_label" required placeholder="المطلوب من العميل (رابط/آيدي)" class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <input name="image_url" type="url" placeholder="رابط صورة المنتج (اختياري)" class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <textarea name="description" rows="2" placeholder="وصف المنتج (اختياري)" class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white"></textarea>
+            <button class="sm:col-span-2 rounded-xl bg-cyan-400 py-3 font-black text-gray-950">إضافة المنتج للقسم الفرعي</button>
+        </form>
     </section>
 
     <!-- إضافة خدمة مع رابط صورة القسم وصورة المنتج -->
@@ -284,12 +354,12 @@
         <h2 class="text-sm font-black text-white">إضافة وتعديل الخدمات وتخصيص حقول الإدخال</h2>
         <form action="/admin/add_service" method="POST" enctype="multipart/form-data" class="space-y-3">
             <input type="text" name="name" placeholder="اسم الخدمة أو المنتج" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
-            <input type="text" name="category_name" placeholder="القسم الرئيسي" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
+            <select name="category_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none"><option value="">اختر القسم الرئيسي أو الفرعي الذي ستوضع الخدمة بداخله</option>{% for cat in categories %}<option value="{{ cat.id }}">{% if cat.parent_id %}↳ قسم فرعي: {{ cat.parent.name }} / {% else %}قسم رئيسي: {% endif %}{{ cat.name }}</option>{% endfor %}</select>
             
             <div class="grid grid-cols-3 gap-2">
-                <input type="number" step="0.01" min="0.00" name="price_per_1000" placeholder="السعر الثابت أو السعر لكل 1000 ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
-                <input type="number" name="min_quantity" placeholder="الحد الأدنى" value="10" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
-                <input type="number" name="max_quantity" placeholder="الحد الأقصى" value="10000" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
+                <input id="productApiRate" type="number" step="0.01" min="0.00" name="price_per_1000" placeholder="السعر الثابت أو السعر لكل 1000 ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
+                <input id="productApiMin" type="number" name="min_quantity" placeholder="الحد الأدنى" value="10" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
+                <input id="productApiMax" type="number" name="max_quantity" placeholder="الحد الأقصى" value="10000" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
             </div>
 
             <input type="text" name="input_label" placeholder="النص المطلوب للعميل (مثال: ضع رابط انستغرام أو آيدي ببجي)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
@@ -299,17 +369,18 @@
                 <select name="service_type" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none">
                     <option value="manual">يدوي بسعر ثابت لكل طلب</option>
                     <option value="manual_quantity">يدوي بالكمية (سعر لكل 1000 نقطة/عملة)</option>
-                    <option value="smm">تلقائي SMM (ربط API)</option>
+                    <option value="smm">تلقائي API بسعر لكل 1000</option><option value="smm_fixed">تلقائي API بسعر ثابت لكل طلب</option>
                 </select>
                 <p class="text-[10px] leading-5 text-gray-500">اليدوي بالكمية مناسب لجواكر والنقاط والعملات: ضع السعر لكل 1000، وحدد الحد الأدنى والأقصى؛ الزبون يختار الكمية ويُحسب السعر تلقائياً، ثم تستلم الطلب وتنفذه يدوياً. اليدوي الثابت يبقى بسعر لكل طلب.</p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label class="block text-[11px] font-bold text-gray-300 mb-1">مزوّد API للخدمة</label>
-                    <select name="api_provider_id" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">-- اختر مزوّد API --</option>{% for provider in smm_providers %}<option value="{{ provider.id }}">{{ provider.name }}</option>{% endfor %}</select>
+                    <select id="apiProviderSelect" name="api_provider_id" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">-- اختر مزوّد API --</option>{% for provider in smm_providers %}<option value="{{ provider.id }}">{{ provider.name }}</option>{% endfor %}</select>
                 </div>
-                <div><label class="block text-[11px] font-bold text-gray-300 mb-1">رقم الخدمة لدى مزوّد SMM</label><input name="api_service_id" placeholder="Service ID من لوحة المزوّد" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"></div>
+                <div class="sm:col-span-2 rounded-xl border border-sky-500/30 bg-sky-950/20 p-3 space-y-2"><label class="block text-[11px] font-bold text-sky-300">اختيار خدمة جُلبت من API (اختياري)</label><select id="apiCatalogPicker" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">اختر خدمة من الكتالوج المحفوظ</option>{% for item in smm_catalog_services %}<option value="{{ item.service_code }}" data-provider="{{ item.provider_id }}" data-name="{{ item.name|e }}" data-rate="{{ item.rate }}" data-min="{{ item.min_quantity }}" data-max="{{ item.max_quantity }}">{{ item.provider.name }} · #{{ item.service_code }} · {{ item.name }} · {{ item.rate }}$ / 1000</option>{% endfor %}</select><button type="button" id="useApiCatalogService" class="rounded-lg bg-sky-500 px-4 py-2 text-xs font-black text-gray-950">استخدام رقم الخدمة في نموذج المنتج</button><p class="text-[10px] text-gray-400">عند الاختيار يتم تعبئة رقم الخدمة والمزوّد والسعر والحدود تلقائياً.</p></div>
+                <div><label class="block text-[11px] font-bold text-gray-300 mb-1">رقم الخدمة لدى مزوّد SMM</label><input id="apiServiceIdInput" name="api_service_id" placeholder="Service ID من لوحة المزوّد" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"></div>
             </div>
-            <p class="text-[10px] text-amber-300 leading-5">يجب اختيار المزوّد وإدخال رقم الخدمة عند اختيار النوع التلقائي SMM. الربط يستخدم واجهة API المتوافقة مع صيغة action=add / service / link / quantity.</p>
+            <p class="text-[10px] text-amber-300 leading-5">عند اختيار التلقائي API اختر المزوّد ورقم الخدمة. النوع بسعر ثابت يحاسب العميل مرة واحدة لكل طلب ويرسل كمية 1 للمزوّد. الربط يستخدم واجهة API المتوافقة مع صيغة action=add / service / link / quantity.</p>
 
             <label class="block text-xs font-bold text-gray-300">صورة المنتج / الخدمة (اختياري)</label>
             <input type="file" name="image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">
@@ -321,9 +392,33 @@
             
             <label class="block text-[11px] font-bold text-gray-300">حالة المنتج</label><select name="is_available" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="1">متوفر</option><option value="0">غير متوفر</option></select>
             <textarea name="description" placeholder="تفاصيل الخدمة..." rows="2" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none"></textarea>
+            <label class="block text-xs font-bold text-cyan-300">تفاصيل أكثر (تظهر عند الضغط على زر تفاصيل أكثر)</label>
+            <textarea name="extra_details" placeholder="اكتب التفاصيل الإضافية التي ستظهر للعميل في نافذة مستقلة..." rows="3" class="w-full bg-gray-950 border border-cyan-500/30 rounded-2xl px-4 py-3 text-xs text-white outline-none"></textarea>
             <button type="submit" class="w-full bg-cyan-500 text-gray-950 font-black py-3 rounded-2xl text-xs">حفظ وإضافة الخدمة</button>
         </form>
     </div>
+
+    <!-- ترتيب المنتجات بالسحب والإفلات -->
+    <section class="bg-gray-900 border border-violet-500/25 rounded-3xl p-5 shadow-xl space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="text-sm font-black text-white">ترتيب ظهور المنتجات</h2><span class="text-[10px] text-violet-300">اسحب ☰ ثم احفظ</span></div>
+        <p class="text-[11px] text-gray-400">اسحب المنتجات للأعلى أو الأسفل. الترتيب المحفوظ ينعكس في الصفحة الرئيسية وصفحات الأقسام دون تغيير أحجام البطاقات.</p>
+        <ol id="ynSortableProducts" class="space-y-2">
+        {% for s in services %}
+          <li draggable="true" data-service-id="{{ s.id }}" class="flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-950 p-3 cursor-grab active:cursor-grabbing">
+            <span class="text-violet-300 text-lg select-none">☰</span><span class="min-w-0 flex-1 truncate text-xs font-bold text-white">{{ s.name }}</span><div class="flex items-center gap-1"><button type="button" class="yn-move-up rounded-lg bg-gray-800 px-2 py-1 text-xs text-white" aria-label="رفع المنتج">↑</button><button type="button" class="yn-move-down rounded-lg bg-gray-800 px-2 py-1 text-xs text-white" aria-label="خفض المنتج">↓</button><span class="text-[10px] text-gray-500">#{{ s.id }}</span></div>
+          </li>
+        {% else %}<li class="text-xs text-gray-500">لا توجد منتجات لترتيبها.</li>{% endfor %}
+        </ol>
+        <div class="flex items-center gap-3"><button id="ynSaveProductOrder" type="button" class="rounded-xl bg-violet-600 px-5 py-3 text-xs font-black text-white">حفظ ترتيب المنتجات</button><span id="ynOrderStatus" class="text-[11px] text-gray-400" aria-live="polite"></span></div>
+    </section>
+    <script>
+    (()=>{const list=document.getElementById('ynSortableProducts'),save=document.getElementById('ynSaveProductOrder'),status=document.getElementById('ynOrderStatus');if(!list||!save)return;let dragging=null;
+      list.addEventListener('click',e=>{const row=e.target.closest('[data-service-id]');if(!row)return;if(e.target.closest('.yn-move-up')&&row.previousElementSibling)list.insertBefore(row,row.previousElementSibling);if(e.target.closest('.yn-move-down')&&row.nextElementSibling)list.insertBefore(row.nextElementSibling,row);});
+      list.addEventListener('dragstart',e=>{const row=e.target.closest('[data-service-id]');if(!row)return;dragging=row;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',row.dataset.serviceId);row.classList.add('opacity-40');});
+      list.addEventListener('dragend',()=>{dragging?.classList.remove('opacity-40');dragging=null;});
+      list.addEventListener('dragover',e=>{e.preventDefault();const target=e.target.closest('[data-service-id]');if(!target||!dragging||target===dragging)return;const r=target.getBoundingClientRect();list.insertBefore(dragging,e.clientY<r.top+r.height/2?target:target.nextSibling);});
+      save.addEventListener('click',async()=>{const ids=[...list.querySelectorAll('[data-service-id]')].map(x=>Number(x.dataset.serviceId));save.disabled=true;status.textContent='جارٍ الحفظ…';try{const res=await fetch('/admin/reorder_services',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',body:JSON.stringify({ids})});const data=await res.json();if(!res.ok)throw new Error(data.error||'تعذر حفظ الترتيب');status.textContent='✓ '+(data.message||'تم الحفظ');status.className='text-[11px] text-emerald-400';}catch(err){status.textContent=err.message;status.className='text-[11px] text-rose-400';}finally{save.disabled=false;}});
+    })();</script>
 
     <!-- تعديل المنتجات الحالية وتغيير التوفر -->
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-5 shadow-xl space-y-4">
@@ -334,7 +429,7 @@
             <summary class="cursor-pointer flex items-center justify-between gap-3 text-xs font-bold text-white"><span>{{ s.name }}</span><span class="text-[10px] {% if s.is_available %}text-emerald-400{% else %}text-rose-400{% endif %}">{% if s.is_available %}متوفر{% else %}غير متوفر{% endif %}</span></summary>
             <form action="/admin/update_service/{{ s.id }}" method="POST" enctype="multipart/form-data" class="mt-4 space-y-3">
                 <input name="name" value="{{ s.name }}" required placeholder="اسم المنتج" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
-                <input name="category_name" value="{{ s.category.name }}" required placeholder="القسم" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+                <select name="category_id" required class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي أو الفرعي</option>{% for cat in categories %}<option value="{{ cat.id }}" {% if s.category_id == cat.id %}selected{% endif %}>{% if cat.parent_id %}↳ قسم فرعي: {{ cat.parent.name }} / {% else %}قسم رئيسي: {% endif %}{{ cat.name }}</option>{% endfor %}</select>
                 <div class="grid grid-cols-3 gap-2">
                     <input type="number" step="0.01" min="0" name="price_per_1000" value="{{ s.price_per_1000 if s.service_type in ['smm','manual_quantity'] else s.price }}" required placeholder="السعر" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
                     <input type="number" min="1" name="min_quantity" value="{{ s.min_quantity or 1 }}" required placeholder="الأدنى" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
@@ -343,10 +438,13 @@
                 <select name="service_type" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
                     <option value="manual" {% if s.service_type == 'manual' %}selected{% endif %}>يدوي بسعر ثابت لكل طلب</option>
                     <option value="manual_quantity" {% if s.service_type == 'manual_quantity' %}selected{% endif %}>يدوي بالكمية (لكل 1000)</option>
-                    <option value="smm" {% if s.service_type == 'smm' %}selected{% endif %}>تلقائي SMM عبر API</option>
+                    <option value="smm" {% if s.service_type == 'smm' %}selected{% endif %}>تلقائي API بسعر لكل 1000</option>
+                    <option value="smm_fixed" {% if s.service_type == 'smm_fixed' %}selected{% endif %}>تلقائي API بسعر ثابت لكل طلب</option>
                 </select>
                 <input name="input_label" value="{{ s.input_label }}" required placeholder="حقل بيانات الزبون" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
                 <textarea name="description" rows="2" placeholder="الوصف / التنبيه الأحمر" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">{{ s.description or '' }}</textarea>
+                <label class="block text-[11px] font-bold text-cyan-300">تفاصيل أكثر (نافذة مستقلة للعميل)</label>
+                <textarea name="extra_details" rows="3" placeholder="التفاصيل التي تظهر عند الضغط على تفاصيل أكثر" class="w-full bg-gray-900 border border-cyan-500/30 rounded-xl px-3 py-3 text-xs text-white">{{ s.extra_details or '' }}</textarea>
                 <select name="api_provider_id" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">-- مزوّد API (للتلقائي فقط) --</option>{% for provider in smm_providers %}<option value="{{ provider.id }}" {% if s.api_provider_id == provider.id %}selected{% endif %}>{{ provider.name }}</option>{% endfor %}</select>
                 <input name="api_service_id" value="{{ s.api_service_id or '' }}" placeholder="Service ID لدى مزوّد API" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
                 <label class="block text-[11px] font-bold text-gray-300">توفّر المنتج</label>
@@ -360,4 +458,22 @@
     </section>
 
 </div>
+<script>
+(() => {
+ const picker=document.getElementById('apiCatalogPicker'), useBtn=document.getElementById('useApiCatalogService');
+ if(!picker||!useBtn)return;
+ useBtn.addEventListener('click',()=>{
+  const opt=picker.options[picker.selectedIndex]; if(!opt||!opt.value){alert('اختر خدمة من الكتالوج أولاً');return;}
+  const form=picker.closest('form'), id=document.getElementById('apiServiceIdInput'), provider=document.getElementById('apiProviderSelect'), rate=document.getElementById('productApiRate'), min=document.getElementById('productApiMin'), max=document.getElementById('productApiMax'), name=form?form.querySelector('input[name="name"]'):null;
+  if(id)id.value=opt.value;if(provider)provider.value=opt.dataset.provider;if(rate)rate.value=opt.dataset.rate;if(min)min.value=opt.dataset.min;if(max)max.value=opt.dataset.max;if(name&&!name.value)name.value=opt.dataset.name;
+  const type=document.querySelector('form[action="/admin/add_service"] select[name="service_type"]');if(type)type.value='smm';
+  alert('تم تعبئة رقم الخدمة والمزوّد والسعر والحدود في نموذج المنتج.');
+ });
+ const search=document.getElementById('apiServicesSearch'), searchBtn=document.getElementById('apiServicesSearchBtn');
+ const filterApiServices=()=>{if(!search)return;const q=search.value.trim().toLowerCase();document.querySelectorAll('.api-service-row').forEach(row=>row.hidden=!row.dataset.search.toLowerCase().includes(q));};
+ if(search){search.addEventListener('input',filterApiServices);search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();filterApiServices();}});}
+ if(searchBtn)searchBtn.addEventListener('click',filterApiServices);
+ document.querySelectorAll('.api-service-link').forEach(btn=>btn.addEventListener('click',()=>{if(!picker)return;picker.value=btn.dataset.code;picker.dispatchEvent(new Event('change'));if(useBtn)useBtn.click();document.getElementById('apiServiceIdInput')?.scrollIntoView({behavior:'smooth',block:'center'});}));
+})();
+</script>
 {% endblock %}

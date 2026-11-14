@@ -123,6 +123,7 @@ class Category(db.Model):
     name = db.Column(db.String(120), nullable=False)
     image_url = db.Column(db.String(500), default='')
     parent_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
     parent = db.relationship('Category', remote_side=[id], backref=db.backref('subcategories', lazy=True))
 
 class Service(db.Model):
@@ -406,7 +407,7 @@ def enforce_account_ban():
 
 @app.route('/')
 def index():
-    categories = Category.query.filter_by(parent_id=None).order_by(Category.id).all()
+    categories = Category.query.filter_by(parent_id=None).order_by(Category.sort_order.asc(), Category.id.asc()).all()
     services = Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all()
     return render_template('index.html', categories=categories, services=services)
 
@@ -419,7 +420,7 @@ def accounts():
 def category_services(category_id):
     category = Category.query.get_or_404(category_id)
     services = Service.query.filter_by(category_id=category_id).order_by(Service.sort_order.asc(), Service.id.desc()).all()
-    subcategories = Category.query.filter_by(parent_id=category_id).order_by(Category.id).all()
+    subcategories = Category.query.filter_by(parent_id=category_id).order_by(Category.sort_order.asc(), Category.id.asc()).all()
     return render_template('category_services.html', category=category, services=services, subcategories=subcategories)
 
 @app.route('/login', methods=['GET','POST'])
@@ -1150,9 +1151,42 @@ def add_category():
     elif Category.query.filter_by(name=name, parent_id=None).first():
         flash('القسم الرئيسي موجود مسبقاً.', 'error')
     else:
-        db.session.add(Category(name=name, parent_id=None))
+        try:
+            image_url = save_uploaded_image('category_image_file') or request.form.get('category_image_url', '').strip()
+            last_order = db.session.query(db.func.max(Category.sort_order)).filter_by(parent_id=None).scalar()
+            db.session.add(Category(name=name, parent_id=None, image_url=image_url, sort_order=(last_order or 0) + 1))
+            db.session.commit()
+            flash('تم إنشاء القسم الرئيسي مع صورته بنجاح.', 'success')
+        except ValueError as exc:
+            flash(str(exc), 'error')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/update_category/<int:category_id>', methods=['POST'])
+@admin_required
+def update_category(category_id):
+    category = Category.query.get_or_404(category_id)
+    name = request.form.get('category_name', '').strip()
+    if not name:
+        flash('اسم القسم مطلوب.', 'error')
+        return redirect(url_for('admin'))
+    duplicate = Category.query.filter(Category.id != category.id, Category.name == name, Category.parent_id == category.parent_id).first()
+    if duplicate:
+        flash('يوجد قسم آخر بالاسم نفسه ضمن المستوى نفسه.', 'error')
+        return redirect(url_for('admin'))
+    try:
+        uploaded = save_uploaded_image('category_image_file')
+        image_url = uploaded or request.form.get('category_image_url', '').strip()
+        category.name = name
+        if image_url:
+            category.image_url = image_url
+        elif request.form.get('remove_category_image') == '1':
+            category.image_url = ''
+        category.sort_order = max(0, min(request.form.get('sort_order', type=int) or 0, 1000000))
         db.session.commit()
-        flash('تم إنشاء القسم الرئيسي بنجاح.', 'success')
+        flash('تم حفظ اسم القسم وصورته وترتيبه.', 'success')
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), 'error')
     return redirect(url_for('admin'))
 
 
@@ -1172,7 +1206,8 @@ def add_subcategory():
         except ValueError as exc:
             flash(str(exc), 'error')
             return redirect(url_for('admin'))
-        db.session.add(Category(name=name, parent_id=parent.id, image_url=image_url)); db.session.commit()
+        last_order = db.session.query(db.func.max(Category.sort_order)).filter_by(parent_id=parent.id).scalar()
+        db.session.add(Category(name=name, parent_id=parent.id, image_url=image_url, sort_order=(last_order or 0) + 1)); db.session.commit()
         flash('تم إنشاء القسم الفرعي بنجاح مع الصورة.', 'success')
     return redirect(url_for('admin'))
 
@@ -1557,6 +1592,15 @@ with app.app_context():
         category_columns = {column['name'] for column in inspect(db.engine).get_columns('category')}
         if 'parent_id' not in category_columns:
             db.session.execute(db.text('ALTER TABLE category ADD COLUMN parent_id INTEGER'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    # Safe additive migration: ordering for main and subcategories.
+    try:
+        from sqlalchemy import inspect
+        category_columns = {column['name'] for column in inspect(db.engine).get_columns('category')}
+        if 'sort_order' not in category_columns:
+            db.session.execute(db.text('ALTER TABLE category ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0'))
         db.session.commit()
     except Exception:
         db.session.rollback()

@@ -326,6 +326,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')hideStoreUna
       let isShown = false;
       let activeUserRequests = 0;
       let lastUserIntent = 0;
+      let pendingLongOperationNavigation = false;
       function showLoading() {
         if (isShown) return;
         isShown = true;
@@ -347,23 +348,26 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')hideStoreUna
         const form = event.target;
         if (!(form instanceof HTMLFormElement)) return;
         lastUserIntent = Date.now();
-        // AJAX forms can opt out with data-no-page-loader.
-        setTimeout(() => {
-          if (!event.defaultPrevented && !form.dataset.noPageLoader) scheduleLoading();
-        }, 0);
+        // Ordinary forms and navigation stay clean. Show the branded loader only
+        // for uploads or forms explicitly marked as a long-running operation.
+        const hasFileUpload = !!form.querySelector('input[type="file"]');
+        const isLongOperation = form.dataset.longOperation === 'true' || form.hasAttribute('data-long-operation');
+        if ((hasFileUpload || isLongOperation) && !form.dataset.noPageLoader) {
+          pendingLongOperationNavigation = true;
+          setTimeout(() => {
+            if (event.defaultPrevented) {
+              pendingLongOperationNavigation = false;
+              return;
+            }
+            scheduleLoading(350);
+          }, 0);
+        }
       }, true);
+      // Remember user interaction for fetch-based actions, but never show a
+      // full-screen loader merely because the user navigates to another page.
       document.addEventListener('click', (event) => {
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         lastUserIntent = Date.now();
-        const link = event.target.closest && event.target.closest('a[href]');
-        if (!link || event.defaultPrevented) return;
-        if (link.target === '_blank' || link.hasAttribute('download')) return;
-        const href = link.getAttribute('href');
-        if (!href || href.startsWith('#') || href.startsWith('javascript:') || link.hasAttribute('data-no-page-loader')) return;
-        let target;
-        try { target = new URL(link.href, window.location.href); } catch (_) { return; }
-        if (target.origin !== window.location.origin || target.href === window.location.href) return;
-        scheduleLoading();
       }, true);
       document.addEventListener('change', (event) => {
         if (event.target && event.target.matches && event.target.matches('input[type="file"]')) {
@@ -390,8 +394,9 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')hideStoreUna
           });
         };
       }
-      window.addEventListener('beforeunload', () => showLoading());
-      window.addEventListener('pageshow', hideLoading);
+      // Only show during navigation when a file upload or explicitly long form is pending.
+      window.addEventListener('beforeunload', () => { if (pendingLongOperationNavigation) showLoading(); });
+      window.addEventListener('pageshow', () => { pendingLongOperationNavigation = false; hideLoading(); });
       window.addEventListener('pagehide', () => { if (showTimer) clearTimeout(showTimer); });
       window.ynShowLoading = showLoading;
       window.ynHideLoading = hideLoading;

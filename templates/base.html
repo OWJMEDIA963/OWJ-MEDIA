@@ -62,6 +62,16 @@ input:focus,select:focus,textarea:focus{outline-color:var(--yn-blue)!important;b
 /* Keep the theme calm and product-like: avoid neon glows */
 [class*="shadow-cyan-"],[class*="shadow-sky-"],[class*="shadow-indigo-"],[class*="shadow-purple-"]{--tw-shadow:0 4px 12px rgba(0,0,0,.18)!important;box-shadow:0 4px 12px rgba(0,0,0,.18)!important}
 body.light-theme{--yn-bg:#f3f6fb;--yn-panel:#fff;--yn-panel-2:#f8fafc;--yn-border:#d5dfed;--yn-text:#172033;--yn-muted:#64748b;color-scheme:light}
+/* Readable, calm light theme for category names and cards */
+body.light-theme main .owj-category-card,body.light-theme main .owj-subcategory-card{background:#ffffff!important;border-color:#d5dfed!important;color:#172033!important;box-shadow:0 3px 10px rgba(25,45,80,.07)!important}
+body.light-theme main .owj-category-name,body.light-theme main .owj-subcategory-card,body.light-theme main .owj-subcategory-card div{color:#172033!important}
+body.light-theme main .owj-category-count{color:#3158a8!important}
+body.light-theme main .owj-category-image-wrap,body.light-theme main .owj-category-image{background:#eef3fb!important}
+body.light-theme main .owj-category-placeholder{background:#e4ecfb!important;color:#2457d6!important}
+body.light-theme main .owj-subcategory-card img{background:#f1f5fb!important}
+body.light-theme main section h2{color:#172033!important}
+body.light-theme main .text-gray-400,body.light-theme main .text-gray-500{color:#64748b!important}
+body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#253047!important}
 
 </style>
 </head>
@@ -93,7 +103,7 @@ body.light-theme{--yn-bg:#f3f6fb;--yn-panel:#fff;--yn-panel-2:#f8fafc;--yn-borde
                 </a>
 
                 <a href="/deposit" class="flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800">
-                    <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                    <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.5 7.5A2.5 2.5 0 016 5h12a2.5 2.5 0 012.5 2.5v11A2.5 2.5 0 0118 21H6a2.5 2.5 0 01-2.5-2.5z"/><path stroke-linecap="round" stroke-linejoin="round" d="M3.5 8h17M15.5 14h2.5M7 5V3.8A1.8 1.8 0 018.8 2h6.4A1.8 1.8 0 0117 3.8V5"/></svg>
                     <span>شحن المحفظة</span>
                 </a>
                 <a href="/ai_bot" class="flex items-center gap-4 px-4 py-3.5 bg-cyan-950/40 text-cyan-300 rounded-2xl text-xs font-bold border border-cyan-500/30">

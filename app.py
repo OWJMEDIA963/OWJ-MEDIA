@@ -882,7 +882,9 @@ def admin_accounts():
 def admin():
     account_lookup_id = request.args.get('account_id', type=int)
     account_lookup = db.session.get(User, account_lookup_id) if account_lookup_id else None
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=Category.query.all(), services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id)
+    all_categories = Category.query.all()
+    ordered_categories = sorted(all_categories, key=lambda item: (0 if item.parent_id is None else item.parent_id, item.sort_order or 0, item.id))
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id)
 
 
 @app.route('/account-banned/<int:user_id>', methods=['GET'])
@@ -1243,6 +1245,36 @@ def update_category(category_id):
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'error')
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/move_category/<int:category_id>/<direction>', methods=['POST'])
+@admin_required
+def move_category(category_id, direction):
+    """Move a category up/down within its own parent group."""
+    if direction not in ('up', 'down'):
+        flash('اتجاه الترتيب غير صحيح.', 'error')
+        return redirect(url_for('admin'))
+    category = Category.query.get_or_404(category_id)
+    siblings = Category.query.filter_by(parent_id=category.parent_id).order_by(Category.sort_order.asc(), Category.id.asc()).all()
+    current_index = next((i for i, item in enumerate(siblings) if item.id == category.id), None)
+    if current_index is None:
+        flash('تعذر العثور على القسم ضمن قائمة الترتيب.', 'error')
+        return redirect(url_for('admin'))
+    target_index = current_index - 1 if direction == 'up' else current_index + 1
+    if target_index < 0 or target_index >= len(siblings):
+        flash('القسم موجود بالفعل عند هذا الطرف من القائمة.', 'info')
+        return redirect(url_for('admin'))
+    siblings[current_index], siblings[target_index] = siblings[target_index], siblings[current_index]
+    try:
+        # Re-number all siblings sequentially to keep ordering simple and reliable.
+        for index, item in enumerate(siblings, start=1):
+            item.sort_order = index * 10
+        db.session.commit()
+        flash('تم تغيير ترتيب القسم بنجاح.', 'success')
+    except Exception:
+        db.session.rollback()
+        flash('تعذر تغيير ترتيب القسم. حاول مرة أخرى.', 'error')
     return redirect(url_for('admin'))
 
 

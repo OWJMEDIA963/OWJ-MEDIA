@@ -313,9 +313,9 @@
 
     <!-- إدارة صور وترتيب الأقسام الرئيسية والفرعية -->
     <section class="bg-gray-900 border border-violet-500/30 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
-      <div><h2 class="text-base font-black text-violet-300">إدارة صور وترتيب الأقسام</h2><p class="mt-1 text-xs text-gray-400">عدّل اسم القسم وصورته الرئيسية أو الفرعية وحدد رقم الترتيب. الرقم الأصغر يظهر أولاً، وكل تعديل يُحفظ بشكل مستقل.</p></div>
+      <div><h2 class="text-base font-black text-violet-300">إدارة صور وترتيب الأقسام</h2><p class="mt-1 text-xs text-gray-400">عدّل اسم القسم وصورته الرئيسية أو الفرعية واستخدم زري «فوق» و«تحت» لتحريك القسم مباشرة، أو غيّر رقم الترتيب يدوياً. كل قسم يتحرك ضمن مستواه فقط (رئيسي أو فرعي).</p></div>
       <div class="space-y-3">
-      {% for cat in categories|sort(attribute='sort_order') %}
+      {% for cat in ordered_categories %}
         <form action="/admin/update_category/{{ cat.id }}" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center rounded-2xl border border-gray-800 bg-gray-950 p-3">
           <div class="sm:col-span-2 flex items-center gap-2 min-w-0">
             {% if cat.image_url %}<img src="{{ cat.image_url }}" alt="" class="w-12 h-12 rounded-xl object-cover bg-gray-800">{% else %}<div class="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center text-gray-500">🖼️</div>{% endif %}
@@ -325,7 +325,7 @@
           <input type="number" name="sort_order" min="0" max="1000000" value="{{ cat.sort_order or 0 }}" aria-label="ترتيب القسم" class="sm:col-span-1 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white" title="رقم الترتيب">
           <input type="file" name="category_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="sm:col-span-3 min-w-0 bg-gray-900 border border-gray-800 rounded-xl px-2 py-2 text-[10px] text-white">
           <input type="url" name="category_image_url" placeholder="رابط صورة جديد (اختياري)" class="sm:col-span-2 min-w-0 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-[10px] text-white">
-          <div class="sm:col-span-1 flex flex-col gap-2"><label class="text-[10px] text-gray-400"><input type="checkbox" name="remove_category_image" value="1" class="ml-1"> حذف الصورة</label><button class="rounded-lg bg-violet-600 px-3 py-2 text-[10px] font-black text-white">حفظ</button></div>
+          <div class="sm:col-span-1 flex flex-col gap-2"><label class="text-[10px] text-gray-400"><input type="checkbox" name="remove_category_image" value="1" class="ml-1"> حذف الصورة</label><button class="rounded-lg bg-violet-600 px-3 py-2 text-[10px] font-black text-white">حفظ</button><div class="flex gap-1"><button type="submit" formaction="/admin/move_category/{{ cat.id }}/up" formmethod="post" formnovalidate title="تحريك القسم للأعلى" class="flex-1 rounded-lg border border-blue-400/30 bg-blue-500/10 px-2 py-2 text-xs font-black text-blue-300">↑ فوق</button><button type="submit" formaction="/admin/move_category/{{ cat.id }}/down" formmethod="post" formnovalidate title="تحريك القسم للأسفل" class="flex-1 rounded-lg border border-blue-400/30 bg-blue-500/10 px-2 py-2 text-xs font-black text-blue-300">↓ تحت</button></div></div>
         </form>
       {% else %}<p class="text-xs text-gray-500">لا توجد أقسام حتى الآن.</p>{% endfor %}
       </div>

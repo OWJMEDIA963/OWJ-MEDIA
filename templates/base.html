@@ -322,84 +322,155 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')hideStoreUna
     (() => {
       const overlay = document.getElementById('ynLoadingOverlay');
       if (!overlay) return;
+
+      const STORAGE_KEY = 'ynLongOperationPending';
       let showTimer = null;
+      let hideTimer = null;
       let isShown = false;
       let activeUserRequests = 0;
       let lastUserIntent = 0;
       let pendingLongOperationNavigation = false;
+
       function showLoading() {
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = null;
         if (isShown) return;
         isShown = true;
         overlay.classList.add('yn-loading-visible');
         overlay.setAttribute('aria-hidden', 'false');
       }
-      function scheduleLoading(delay = 220) {
+
+      function scheduleLoading(delay = 280) {
         if (showTimer) clearTimeout(showTimer);
-        showTimer = setTimeout(showLoading, delay);
+        if (hideTimer) clearTimeout(hideTimer);
+        showTimer = setTimeout(() => {
+          showTimer = null;
+          if (activeUserRequests > 0 || pendingLongOperationNavigation) showLoading();
+        }, delay);
       }
+
       function hideLoading() {
         if (showTimer) clearTimeout(showTimer);
+        if (hideTimer) clearTimeout(hideTimer);
         showTimer = null;
+        hideTimer = null;
         isShown = false;
         overlay.classList.remove('yn-loading-visible');
         overlay.setAttribute('aria-hidden', 'true');
       }
+
+      function scheduleHide(delay = 850) {
+        if (activeUserRequests > 0) return;
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+          hideTimer = null;
+          if (activeUserRequests === 0) hideLoading();
+        }, delay);
+      }
+
+      function hasOutcomeMessage() {
+        return !!document.querySelector('.owj-toast, [role="alert"], .alert-success, .alert-danger, .alert-error');
+      }
+
+      // Long forms (uploads, backup restore, etc.) carry the loading state across
+      // the redirect, so the indicator does not disappear during the operation.
       document.addEventListener('submit', (event) => {
         const form = event.target;
         if (!(form instanceof HTMLFormElement)) return;
         lastUserIntent = Date.now();
-        // Ordinary forms and navigation stay clean. Show the branded loader only
-        // for uploads or forms explicitly marked as a long-running operation.
         const hasFileUpload = !!form.querySelector('input[type="file"]');
         const isLongOperation = form.dataset.longOperation === 'true' || form.hasAttribute('data-long-operation');
         if ((hasFileUpload || isLongOperation) && !form.dataset.noPageLoader) {
           pendingLongOperationNavigation = true;
+          try { sessionStorage.setItem(STORAGE_KEY, '1'); } catch (_) {}
           setTimeout(() => {
             if (event.defaultPrevented) {
               pendingLongOperationNavigation = false;
+              try { sessionStorage.removeItem(STORAGE_KEY); } catch (_) {}
               return;
             }
-            scheduleLoading(350);
+            scheduleLoading(280);
           }, 0);
         }
       }, true);
-      // Remember user interaction for fetch-based actions, but never show a
-      // full-screen loader merely because the user navigates to another page.
+
       document.addEventListener('click', (event) => {
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         lastUserIntent = Date.now();
       }, true);
       document.addEventListener('change', (event) => {
-        if (event.target && event.target.matches && event.target.matches('input[type="file"]')) {
-          lastUserIntent = Date.now();
-        }
+        if (event.target && event.target.matches && event.target.matches('input[type="file"]')) lastUserIntent = Date.now();
       }, true);
-      // Catch user-triggered AJAX/fetch actions, but ignore background polling.
+
+      // Track user-triggered fetches. Keep the loader alive until the request has
+      // settled AND the page has had time to render its success/failure message.
       if (window.fetch) {
         const nativeFetch = window.fetch.bind(window);
         window.fetch = function(...args) {
-          const shouldShow = Date.now() - lastUserIntent < 2200;
-          if (shouldShow) activeUserRequests++;
+          const shouldTrack = Date.now() - lastUserIntent < 2200;
+          if (!shouldTrack) return nativeFetch(...args);
+          activeUserRequests++;
+          scheduleLoading(280);
           let request;
           try { request = nativeFetch(...args); }
           catch (error) {
-            if (shouldShow) { activeUserRequests = Math.max(0, activeUserRequests - 1); if (!activeUserRequests) hideLoading(); }
+            activeUserRequests = Math.max(0, activeUserRequests - 1);
+            if (activeUserRequests === 0) scheduleHide(850);
             throw error;
           }
-          if (!shouldShow) return request;
-          scheduleLoading(280);
-          return request.finally(() => {
-            activeUserRequests = Math.max(0, activeUserRequests - 1);
-            if (!activeUserRequests) hideLoading();
-          });
+          return request.then(
+            response => {
+              activeUserRequests = Math.max(0, activeUserRequests - 1);
+              if (activeUserRequests === 0) scheduleHide(850);
+              return response;
+            },
+            error => {
+              activeUserRequests = Math.max(0, activeUserRequests - 1);
+              if (activeUserRequests === 0) scheduleHide(850);
+              throw error;
+            }
+          );
         };
       }
-      // Only show during navigation when a file upload or explicitly long form is pending.
-      window.addEventListener('beforeunload', () => { if (pendingLongOperationNavigation) showLoading(); });
-      window.addEventListener('pageshow', () => { pendingLongOperationNavigation = false; hideLoading(); });
+
+      // If a success/failure toast is rendered, let it appear first and then close
+      // the overlay. This is the primary end signal for AJAX actions.
+      const outcomeSelector = '.owj-toast, [role="alert"], .alert-success, .alert-danger, .alert-error';
+      const outcomeObserver = new MutationObserver((records) => {
+        const newOutcome = records.some(record => Array.from(record.addedNodes || []).some(node => {
+          if (!(node instanceof Element)) return false;
+          return node.matches(outcomeSelector) || !!node.querySelector(outcomeSelector);
+        }));
+        if (newOutcome && isShown && activeUserRequests === 0) scheduleHide(350);
+      });
+      outcomeObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+      window.addEventListener('beforeunload', () => {
+        if (pendingLongOperationNavigation) showLoading();
+      });
+      window.addEventListener('pageshow', () => {
+        pendingLongOperationNavigation = false;
+        let carried = false;
+        try {
+          carried = sessionStorage.getItem(STORAGE_KEY) === '1';
+          if (carried) sessionStorage.removeItem(STORAGE_KEY);
+        } catch (_) {}
+        if (carried) {
+          showLoading();
+          // Wait for the redirected page's flash message. A safety timeout avoids
+          // leaving the overlay stuck if the server returns no message at all.
+          if (hasOutcomeMessage()) scheduleHide(450);
+          else scheduleHide(1400);
+        } else {
+          hideLoading();
+        }
+      });
       window.addEventListener('pagehide', () => { if (showTimer) clearTimeout(showTimer); });
-      window.ynShowLoading = showLoading;
+
+      // Optional explicit hooks for long tasks implemented in page-specific JS.
+      window.ynShowLoading = () => { lastUserIntent = Date.now(); showLoading(); };
       window.ynHideLoading = hideLoading;
+      window.ynFinishLoading = (delay = 350) => scheduleHide(delay);
     })();
     </script>
 

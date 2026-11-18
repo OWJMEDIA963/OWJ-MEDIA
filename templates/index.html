@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}الرئيسية - Y-N Store
+{% block title %}الرئيسية - NOVA STORE
 
 
 {% endblock %}
@@ -54,8 +54,9 @@
 
 </style>
 <div class="max-w-7xl mx-auto px-3 sm:px-5 py-4 sm:py-6 space-y-4 sm:space-y-6">
- <section class="yn-store-banner overflow-hidden rounded-2xl border border-violet-500/20 shadow-2xl" aria-label="Y-N Store">
-  <img src="{{ url_for('static', filename='images/yn-store-banner.webp') }}" alt="Y-N Store - منصتك للخدمات الرقمية" fetchpriority="high" decoding="async" width="1080" height="281">
+ <section class="nova-banner-wrap" aria-label="NOVA STORE إعلانات">
+  {% if banners %}{% for banner in banners %}<a class="nova-banner-slide {% if loop.first %}active{% endif %}" href="{{ banner.target_url or '#' }}" {% if not banner.target_url %}onclick="return false"{% endif %}><img src="{{ banner.image_url }}" alt="{{ banner.title or 'NOVA STORE' }}" loading="{% if loop.first %}eager{% else %}lazy{% endif %}"></a>{% endfor %}{% else %}<div class="nova-banner-slide active"><img src="{{ url_for('static', filename='images/nova-store-banner.svg') }}" alt="NOVA STORE - منصتك للخدمات الرقمية" fetchpriority="high"></div>{% endif %}
+  {% if banners|length > 1 %}<div class="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-2" id="novaBannerDots">{% for banner in banners %}<button class="nova-dot {% if loop.first %}active{% endif %}" aria-label="بنر {{ loop.index }}" onclick="novaShowBanner({{ loop.index0 }})"></button>{% endfor %}</div>{% endif %}
  </section>
 
  <section class="space-y-3" aria-label="البحث عن خدمة">
@@ -97,5 +98,8 @@
  }
  input.addEventListener('input',render);clear.addEventListener('click',()=>{input.value='';render();input.focus();});input.addEventListener('keydown',e=>{if(e.key==='Escape'){input.value='';render();}});
 })();
+</script>
+<script>
+(()=>{const slides=[...document.querySelectorAll('.nova-banner-slide')],dots=[...document.querySelectorAll('.nova-dot')];if(slides.length<2)return;let current=0;window.novaShowBanner=i=>{current=(i+slides.length)%slides.length;slides.forEach((s,n)=>s.classList.toggle('active',n===current));dots.forEach((d,n)=>d.classList.toggle('active',n===current));};setInterval(()=>window.novaShowBanner(current+1),5500);})();
 </script>
 {% endblock %}

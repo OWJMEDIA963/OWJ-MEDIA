@@ -95,6 +95,19 @@ def save_uploaded_image(field_name):
     filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}_{filename}"
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     return '/static/uploads/' + filename
+
+def save_banner_image(field_name):
+    f=request.files.get(field_name)
+    if not f or not f.filename: raise ValueError('اختر صورة للبنر.')
+    ext=f.filename.rsplit('.',1)[-1].lower() if '.' in f.filename else ''
+    mime={'png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','webp':'image/webp','gif':'image/gif'}.get(ext)
+    if not mime: raise ValueError('نوع صورة البنر غير مدعوم.')
+    raw=f.read(2*1024*1024+1)
+    if len(raw)>2*1024*1024: raise ValueError('حجم البنر أكبر من 2 ميغابايت.')
+    signatures={'png':raw.startswith(b'\x89PNG\r\n\x1a\n'),'jpg':raw.startswith(b'\xff\xd8\xff'),'jpeg':raw.startswith(b'\xff\xd8\xff'),'gif':raw.startswith((b'GIF87a',b'GIF89a')),'webp':len(raw)>=12 and raw[:4]==b'RIFF' and raw[8:12]==b'WEBP'}
+    if not signatures.get(ext,False): raise ValueError('الملف ليس صورة صالحة.')
+    return 'data:'+mime+';base64,'+base64.b64encode(raw).decode('ascii')
+
 db = SQLAlchemy(app)
 
 class User(db.Model):
@@ -286,6 +299,48 @@ class PushSubscription(db.Model):
     user = db.relationship('User', backref=db.backref('push_subscriptions', lazy=True, cascade='all, delete-orphan'))
 
 
+
+class PromoBanner(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(160), default='')
+    image_url = db.Column(db.String(500), nullable=False, default='')
+    target_url = db.Column(db.String(500), default='')
+    is_active = db.Column(db.Boolean, default=True)
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class MerchantRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    details = db.Column(db.Text, default='')
+    status = db.Column(db.String(30), default='pending')
+    weekly_amount = db.Column(db.Float, default=0)
+    last_weekly_paid = db.Column(db.DateTime, default=None)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    reviewed_at = db.Column(db.DateTime, default=None)
+    user = db.relationship('User')
+
+class ApiRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    website_url = db.Column(db.String(500), default='')
+    details = db.Column(db.Text, default='')
+    status = db.Column(db.String(30), default='pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    reviewed_at = db.Column(db.DateTime, default=None)
+    user = db.relationship('User')
+
+class CustomerApiKey(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    key_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    key_encrypted = db.Column(db.Text, nullable=False)
+    key_prefix = db.Column(db.String(16), default='')
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User')
+
+
 def send_user_notification(user_id, title, message, url='/notifications'):
     # Save an in-site notification; send phone/browser push when VAPID is configured.
     db.session.add(Notification(user_id=user_id, title=title[:160], message=message[:500], url=url[:500]))
@@ -366,7 +421,8 @@ def get_or_create_single_support_ticket(user_id):
 def inject_globals():
     user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
     unread_count = Notification.query.filter_by(user_id=user.id, is_read=False).count() if user else 0
-    return {'current_user': user, 'site_name': 'Y-N Store', 'unread_notification_count': unread_count}
+    active_banners = PromoBanner.query.filter_by(is_active=True).order_by(PromoBanner.sort_order.asc(), PromoBanner.id.asc()).all()
+    return {'current_user': user, 'site_name': 'NOVA STORE', 'unread_notification_count': unread_count, 'active_banners': active_banners}
 
 def login_required(fn):
     @wraps(fn)
@@ -410,7 +466,7 @@ def enforce_account_ban():
 def index():
     categories = Category.query.filter_by(parent_id=None).order_by(Category.sort_order.asc(), Category.id.asc()).all()
     services = Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all()
-    return render_template('index.html', categories=categories, services=services)
+    return render_template('index.html', categories=categories, services=services, banners=PromoBanner.query.filter_by(is_active=True).order_by(PromoBanner.sort_order.asc(), PromoBanner.id.asc()).all())
 
 @app.route('/accounts')
 def accounts():
@@ -461,6 +517,23 @@ def register():
 def logout():
     session.clear(); return redirect(url_for('index'))
 
+
+@app.before_request
+def process_merchant_weekly_grant():
+    uid=session.get('user_id')
+    if not uid: return None
+    user=db.session.get(User,uid)
+    if not user or user.role!='merchant': return None
+    req=MerchantRequest.query.filter_by(user_id=user.id,status='approved').order_by(MerchantRequest.id.desc()).first()
+    if not req or req.weekly_amount<=0 or not req.last_weekly_paid or datetime.utcnow()-req.last_weekly_paid<timedelta(days=7): return None
+    admin_user=User.query.filter_by(role='admin').first()
+    if not admin_user: return None
+    user.balance_usd+=req.weekly_amount; req.last_weekly_paid=datetime.utcnow()
+    db.session.add(WalletTransaction(user_id=user.id,admin_id=admin_user.id,transaction_type='weekly_merchant_grant',amount=req.weekly_amount,reason='دفعة أسبوعية تلقائية للتاجر'))
+    send_user_notification(user.id,'تمت إضافة دفعتك الأسبوعية',f'تم إضافة ${format_money(req.weekly_amount)} إلى محفظتك.',url_for('deposit'))
+    db.session.commit()
+    return None
+
 @app.route('/profile', methods=['GET','POST'])
 @login_required
 def profile():
@@ -470,7 +543,147 @@ def profile():
         user.email = request.form.get('email', user.email).strip()
         user.phone = request.form.get('phone', user.phone).strip()
         db.session.commit(); flash('تم تحديث بياناتك.', 'success'); return redirect(url_for('profile'))
-    return render_template('profile.html', user=user)
+    merchant_request = MerchantRequest.query.filter_by(user_id=user.id).order_by(MerchantRequest.id.desc()).first()
+    api_request = ApiRequest.query.filter_by(user_id=user.id).order_by(ApiRequest.id.desc()).first()
+    api_key = CustomerApiKey.query.filter_by(user_id=user.id, is_active=True).order_by(CustomerApiKey.id.desc()).first()
+    revealed_key = reveal_api_key(api_key.key_encrypted) if api_key else ''
+    return render_template('profile.html', user=user, merchant_request=merchant_request, api_request=api_request, api_key=api_key, revealed_key=revealed_key)
+
+@app.route('/profile/merchant_request', methods=['POST'])
+@login_required
+def merchant_request_submit():
+    user=current_user()
+    if user.role in ('merchant','admin'):
+        flash('حسابك تاجر بالفعل أو مدير.', 'info'); return redirect(url_for('profile'))
+    pending=MerchantRequest.query.filter_by(user_id=user.id,status='pending').first()
+    if pending:
+        flash('لديك طلب تاجر قيد المراجعة.', 'warning'); return redirect(url_for('profile'))
+    req=MerchantRequest(user_id=user.id,details=request.form.get('details','').strip()[:3000])
+    db.session.add(req); db.session.commit()
+    notify_admins('طلب حساب تاجر جديد',f'المستخدم {user.username} قدم طلب تاجر.',url_for('admin_requests'))
+    db.session.commit(); flash('تم إرسال طلب التاجر للإدارة.', 'success'); return redirect(url_for('profile'))
+
+@app.route('/profile/api_request', methods=['POST'])
+@login_required
+def api_request_submit():
+    user=current_user()
+    pending=ApiRequest.query.filter_by(user_id=user.id,status='pending').first()
+    existing=CustomerApiKey.query.filter_by(user_id=user.id,is_active=True).first()
+    if pending or existing:
+        flash('لديك طلب API قيد المراجعة أو مفتاح فعال بالفعل.', 'warning'); return redirect(url_for('profile'))
+    req=ApiRequest(user_id=user.id,website_url=request.form.get('website_url','').strip()[:500],details=request.form.get('details','').strip()[:3000])
+    db.session.add(req); db.session.commit()
+    notify_admins('طلب API جديد',f'المستخدم {user.username} طلب API. الموقع: {req.website_url or "غير محدد"}',url_for('admin_requests'))
+    db.session.commit(); flash('تم إرسال طلب API للمراجعة.', 'success'); return redirect(url_for('profile'))
+
+@app.route('/admin/banners', methods=['GET','POST'])
+@admin_required
+def admin_banners():
+    if request.method=='POST':
+        action=request.form.get('action')
+        if action=='add':
+            try: image=save_banner_image('banner_image')
+            except ValueError as exc: flash(str(exc),'error'); image=''
+            if image:
+                db.session.add(PromoBanner(title=request.form.get('title','').strip()[:160],image_url=image,target_url=request.form.get('target_url','').strip()[:500],sort_order=request.form.get('sort_order',0,type=int),is_active=request.form.get('is_active')=='on'))
+                db.session.commit(); flash('تمت إضافة البنر.', 'success')
+        elif action=='toggle':
+            item=db.session.get(PromoBanner,request.form.get('banner_id',type=int))
+            if item: item.is_active=not item.is_active; db.session.commit(); flash('تم تحديث حالة البنر.', 'success')
+        elif action=='delete':
+            item=db.session.get(PromoBanner,request.form.get('banner_id',type=int))
+            if item: db.session.delete(item); db.session.commit(); flash('تم حذف البنر.', 'success')
+        return redirect(url_for('admin_banners'))
+    return render_template('admin_banners.html',banners=PromoBanner.query.order_by(PromoBanner.sort_order.asc(),PromoBanner.id.desc()).all())
+
+@app.route('/admin/requests', methods=['GET','POST'])
+@admin_required
+def admin_requests():
+    if request.method=='POST':
+        kind=request.form.get('kind'); rid=request.form.get('request_id',type=int); action=request.form.get('action')
+        if kind=='merchant':
+            item=db.session.get(MerchantRequest,rid)
+            if item and item.status=='approved' and action=='update_weekly':
+                item.weekly_amount=max(0,request.form.get('weekly_amount',0,type=float)); db.session.commit(); flash('تم تحديث الدفعة الأسبوعية.', 'success')
+            elif item and item.status=='pending':
+                if action=='approve':
+                    item.status='approved'; item.reviewed_at=datetime.utcnow(); item.user.role='merchant'; item.user.is_trusted_merchant=True
+                    item.weekly_amount=max(0,request.form.get('weekly_amount',0,type=float)); item.last_weekly_paid=datetime.utcnow()
+                    if item.weekly_amount:
+                        item.user.balance_usd += item.weekly_amount
+                        db.session.add(WalletTransaction(user_id=item.user_id,admin_id=current_user().id,transaction_type='weekly_merchant_grant',amount=item.weekly_amount,reason='دفعة أسبوعية أولى للتاجر'))
+                    send_user_notification(item.user_id,'تم قبول طلب التاجر','تمت الموافقة على طلب حساب التاجر الخاص بك. السعر مطابق لسعر العميل العادي.',url_for('profile'))
+                    flash('تم قبول طلب التاجر.', 'success')
+                else:
+                    item.status='rejected'; item.reviewed_at=datetime.utcnow(); send_user_notification(item.user_id,'رفض طلب التاجر','نعتذر، لم تتم الموافقة على طلب التاجر.',url_for('profile')); flash('تم رفض طلب التاجر.', 'success')
+                db.session.commit()
+        elif kind=='api':
+            item=db.session.get(ApiRequest,rid)
+            if item and item.status=='pending':
+                item.status='approved' if action=='approve' else 'rejected'; item.reviewed_at=datetime.utcnow()
+                if action=='approve':
+                    raw='nova_'+base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip('=')
+                    db.session.add(CustomerApiKey(user_id=item.user_id,key_hash=hashlib.sha256(raw.encode()).hexdigest(),key_encrypted=protect_api_key(raw),key_prefix=raw[:12]))
+                    send_user_notification(item.user_id,'تم قبول طلب API','تم إصدار مفتاح API. افتح الملف الشخصي لعرضه واستخدامه.',url_for('profile'))
+                    flash('تم قبول طلب API وإصدار المفتاح.', 'success')
+                else:
+                    send_user_notification(item.user_id,'رفض طلب API','نعتذر، لم تتم الموافقة على طلب API.',url_for('profile')); flash('تم رفض الطلب.', 'success')
+                db.session.commit()
+        return redirect(url_for('admin_requests'))
+    return render_template('admin_requests.html',merchant_requests=MerchantRequest.query.order_by(MerchantRequest.id.desc()).all(),api_requests=ApiRequest.query.order_by(ApiRequest.id.desc()).all(),api_keys=CustomerApiKey.query.order_by(CustomerApiKey.id.desc()).all())
+
+@app.route('/admin/api_key_action',methods=['POST'])
+@admin_required
+def admin_api_key_action():
+    key=db.session.get(CustomerApiKey,request.form.get('key_id',type=int))
+    if key: key.is_active=request.form.get('action')=='enable'; db.session.commit(); flash('تم تحديث حالة المفتاح.', 'success')
+    return redirect(url_for('admin_requests'))
+
+@app.route('/api/v1/services',methods=['GET'])
+def public_api_services():
+    key=request.headers.get('Authorization','').replace('Bearer ','').strip()
+    if not key: return jsonify({'error':'API key required'}),401
+    hashed=hashlib.sha256(key.encode()).hexdigest(); auth=CustomerApiKey.query.filter_by(key_hash=hashed,is_active=True).first()
+    if not auth or auth.user.is_banned: return jsonify({'error':'Invalid, disabled, or suspended API key'}),401
+    services=Service.query.filter_by(is_available=True).order_by(Service.sort_order.asc(),Service.id.asc()).all()
+    return jsonify({'ok':True,'services':[{'id':x.id,'name':x.name,'category_id':x.category_id,'type':x.service_type,'price':x.price,'price_per_1000':x.price_per_1000,'min':x.min_quantity,'max':x.max_quantity,'input_label':x.input_label} for x in services]})
+
+@app.route('/api/v1/orders',methods=['POST'])
+def public_api_order():
+    token=request.headers.get('Authorization','').replace('Bearer ','').strip()
+    auth=CustomerApiKey.query.filter_by(key_hash=hashlib.sha256(token.encode()).hexdigest(),is_active=True).first() if token else None
+    if not auth or auth.user.is_banned: return jsonify({'error':'Invalid, disabled, or suspended API key'}),401
+    data=request.get_json(silent=True) or {};
+    try: service_id=int(data.get('service_id',0))
+    except (TypeError,ValueError): return jsonify({'error':'invalid service_id'}),400
+    service=Service.query.get(service_id)
+    if not service or not service.is_available: return jsonify({'error':'Service unavailable'}),404
+    link=str(data.get('link','')).strip();
+    if not link: return jsonify({'error':'link is required'}),400
+    if service.service_type in ('manual','smm_fixed'): quantity=1; total=service.price
+    else:
+        try: quantity=int(data.get('quantity',service.min_quantity or 1))
+        except (TypeError,ValueError): return jsonify({'error':'invalid quantity'}),400
+        if quantity < (service.min_quantity or 1) or quantity > (service.max_quantity or 10000): return jsonify({'error':'quantity outside allowed range'}),400
+        total=(service.price_per_1000 or service.price)*quantity/1000
+    user=auth.user
+    if user.balance_usd < total: return jsonify({'error':'insufficient balance','balance':round(user.balance_usd,2)}),402
+    provider_order_id=''
+    if service.service_type in ('smm','smm_fixed'):
+        provider=SMMProvider.query.filter_by(id=service.api_provider_id,is_active=True).first() if service.api_provider_id else None
+        if not provider or not service.api_service_id: return jsonify({'error':'provider not configured'}),503
+        try:
+            resp=requests.post(provider.api_url,data={'key':reveal_api_key(provider.api_key),'action':'add','service':str(service.api_service_id),'link':link,'quantity':str(quantity)},headers={'Content-Type':'application/x-www-form-urlencoded'},timeout=25)
+            resp.raise_for_status(); result=resp.json()
+            if not isinstance(result,dict) or result.get('error') or not result.get('order'): return jsonify({'error':'provider rejected order'}),502
+            provider_order_id=str(result['order'])
+        except Exception as exc:
+            app.logger.warning('Customer API order provider error: %s',exc); return jsonify({'error':'provider temporarily unavailable'}),503
+    user.balance_usd-=total
+    order=Order(user_id=user.id,service_id=service.id,service_name=service.name,link=link,quantity=quantity,total_price=total,status='قيد التنفيذ' if service.service_type in ('smm','smm_fixed') else 'قيد المراجعة',provider_order_id=provider_order_id)
+    db.session.add(order); db.session.commit()
+    notify_admins(f'طلب API جديد #{order.id}',f'{user.username} طلب {service.name} عبر API بمبلغ ${format_money(total)}',url_for('admin'));db.session.commit()
+    return jsonify({'ok':True,'order_id':order.id,'status':order.status,'charged':round(total,2),'balance':round(user.balance_usd,2)}),201
 
 @app.route('/profile/change_password', methods=['POST'])
 @login_required

@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Y-N Store</title>
-    <meta name="description" content="Y-N Store - منصتك للخدمات الرقمية وشحن الألعاب وخدمات التواصل الاجتماعي بسرعة وأمان.">
+    <title>NOVA STORE</title>
+    <meta name="description" content="NOVA STORE - منصتك للخدمات الرقمية وشحن الألعاب وخدمات التواصل الاجتماعي بسرعة وأمان.">
     <meta name="theme-color" content="#08091b">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -43,7 +43,7 @@
         body.light-theme nav span, body.light-theme nav a { color:#475569 !important; }
     
 
-/* Y-N Store: realistic royal-blue theme (solid colors, restrained shadows) */
+/* NOVA STORE: realistic royal-blue theme (solid colors, restrained shadows) */
 :root{--yn-blue:#2457d6;--yn-blue-hover:#1d4ed8;--yn-blue-soft:#93c5fd;--yn-bg:#0b1220;--yn-panel:#111c2e;--yn-panel-2:#16243a;--yn-border:#263b60;--yn-text:#e8eef8;--yn-muted:#a8b6cc}
 html{color-scheme:dark}
 body{background-color:var(--yn-bg)!important;color:var(--yn-text)}
@@ -74,20 +74,12 @@ body.light-theme main .text-gray-400,body.light-theme main .text-gray-500{color:
 body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#253047!important}
 
 
-        /* Y-N Store branded loading overlay */
-        #ynLoadingOverlay{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(7,13,27,.72);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,visibility .18s ease}
-        #ynLoadingOverlay.yn-loading-visible{opacity:1;visibility:visible;pointer-events:auto}
-        #ynLoadingOverlay .yn-loading-card{display:flex;flex-direction:column;align-items:center;gap:15px;padding:26px 30px;border:1px solid rgba(96,145,255,.25);border-radius:24px;background:#101b2d;box-shadow:0 16px 48px rgba(0,0,0,.25);min-width:150px}
-        #ynLoadingOverlay .yn-loading-mark{width:58px;height:58px;border-radius:18px;background:#2457d6;color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Cairo',sans-serif;font-weight:900;font-size:17px;letter-spacing:-.7px;box-shadow:0 4px 12px rgba(36,87,214,.18)}
-        #ynLoadingOverlay .yn-spinner{position:absolute;width:78px;height:78px;border:3px solid rgba(147,197,253,.18);border-top-color:#4d7df0;border-left-color:#4d7df0;border-radius:50%;animation:ynSpin .8s linear infinite}
-        #ynLoadingOverlay .yn-loading-logo-wrap{width:78px;height:78px;display:flex;align-items:center;justify-content:center;position:relative}
-        #ynLoadingOverlay .yn-loading-text{font-size:12px;font-weight:700;color:#dbe7ff;letter-spacing:.1px}
-        body.light-theme #ynLoadingOverlay{background:rgba(235,241,250,.76)}
-        body.light-theme #ynLoadingOverlay .yn-loading-card{background:#fff;border-color:#d5dfed;box-shadow:0 16px 48px rgba(30,50,85,.15)}
-        body.light-theme #ynLoadingOverlay .yn-loading-text{color:#253047}
-        @keyframes ynSpin{to{transform:rotate(360deg)}}
-        @media (prefers-reduced-motion: reduce) { #ynLoadingOverlay .yn-spinner { animation-duration: 2s; } }
-
+:root{--nova-blue:#4f7cff;--nova-purple:#8b5cf6;--nova-border:rgba(120,150,220,.22)}
+body{background-image:radial-gradient(ellipse at 10% 0%,rgba(57,88,190,.10),transparent 35%),radial-gradient(ellipse at 90% 10%,rgba(114,60,190,.08),transparent 32%);}
+.nova-glass{background:rgba(15,22,38,.86);border:1px solid var(--nova-border);box-shadow:0 15px 45px rgba(0,0,0,.18);backdrop-filter:blur(18px)}
+.nova-banner-wrap{position:relative;overflow:hidden;border-radius:20px;border:1px solid var(--nova-border);background:#0b1220;aspect-ratio:3.6/1;min-height:120px}
+.nova-banner-slide{position:absolute;inset:0;opacity:0;transition:opacity .7s ease;pointer-events:none}.nova-banner-slide.active{opacity:1;pointer-events:auto}.nova-banner-slide img{width:100%;height:100%;object-fit:cover}.nova-banner-slide.no-image{display:flex;align-items:center;justify-content:center;background:linear-gradient(125deg,#0a1020,#152c56,#25194b);color:white;font-weight:900;font-size:clamp(18px,4vw,34px)}
+.nova-dot{width:7px;height:7px;border-radius:50%;background:#64748b}.nova-dot.active{background:#7c9cff;width:20px;border-radius:99px}
 </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
@@ -99,9 +91,9 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
         <div>
             <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-800">
                 <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-400 font-black">Y-N</div>
+                    <div class="w-12 h-12 rounded-2xl overflow-hidden border border-blue-500/30"><img src="{{ url_for('static', filename='images/nova-symbol.svg') }}" alt="NOVA" class="w-full h-full object-cover"></div>
                     <div>
-                        <h3 class="text-sm font-black text-white">Y-N Store</h3>
+                        <h3 class="text-sm font-black text-white">NOVA STORE</h3>
                         <p class="text-[11px] text-gray-400">الخدمات الرقمية</p>
                     </div>
                 </div>
@@ -150,7 +142,7 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
             {% if current_user %}
             <a href="/logout" class="block bg-rose-500/10 border border-rose-500/30 text-rose-400 py-3 rounded-2xl text-xs font-bold mb-3">تسجيل الخروج</a>
             {% endif %}
-            <p class="text-[10px] text-gray-500">© 2026 Y-N Store</p>
+            <p class="text-[10px] text-gray-500">© 2026 NOVA STORE</p>
         </div>
     </div>
 
@@ -162,7 +154,7 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
                 <a href="/" class="text-sm font-black text-white flex items-center gap-1.5">
-                    <span>Y-N Store</span>
+                    <img src="{{ url_for('static', filename='images/nova-symbol.svg') }}" alt="" class="h-7 w-7 rounded-lg"><span>NOVA STORE</span>
                     {% if current_user and current_user.is_verified %}
                     <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.25a.75.75 0 00-1.14-.976l-3.36 3.92-1.74-1.74a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.12-.08l4-4.5z"/></svg>
                     {% endif %}
@@ -175,6 +167,7 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
                     <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="15" rx="2.5"/><path d="M3 9h18M16 14h2M6 6V4.8A1.8 1.8 0 017.8 3h10.4A1.8 1.8 0 0120 4.8V6"/></svg>
                     <span>${{ "%.2f"|format(current_user.balance_usd) }}</span>
                 </a>
+                <a href="/notifications" aria-label="الإشعارات" class="relative inline-flex items-center justify-center h-9 w-9 rounded-xl border border-gray-700 bg-gray-900 text-white">🔔{% if unread_notification_count %}<span class="absolute -top-1 -left-1 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-[9px] font-black text-white flex items-center justify-center">{{ unread_notification_count }}</span>{% endif %}</a>
                 {% if current_user.role == 'admin' %}
                 <a href="/admin" class="bg-amber-500 text-gray-950 px-3 py-1.5 rounded-xl text-xs font-black">لوحة التحكم</a>
                 {% endif %}
@@ -249,7 +242,7 @@ function hideStoreUnavailable(){const el=document.getElementById('storeUnavailab
 document.addEventListener('keydown',function(e){if(e.key==='Escape')hideStoreUnavailable();});
 </script>
 
-<!-- مساعد Y-N Store العائم: هوية محادثة بنفسجي/نيلي مستقلة عن ألوان المتجر -->
+<!-- مساعد NOVA STORE العائم: هوية محادثة بنفسجي/نيلي مستقلة عن ألوان المتجر -->
 <style>
  #owjBotButton{background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:1px solid #c4b5fd;box-shadow:0 12px 32px rgba(99,102,241,.38)}
  #owjBotWindow{background:#111126;border:1px solid rgba(167,139,250,.42);box-shadow:0 24px 70px rgba(20,12,55,.58)}
@@ -264,18 +257,18 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')hideStoreUna
  #owjBotMessages .quick-question{background:#30285b;border:1px solid #6d5ca8;color:#ddd6fe}
  @media(max-width:480px){ #owjBotWindow{bottom:6.1rem;left:.75rem;width:calc(100vw - 1.5rem);max-width:none}#owjBotMessages{height: min(56vh,390px)}}
 </style>
-<button id="owjBotButton" type="button" aria-label="فتح مساعد Y-N Store" aria-controls="owjBotWindow" aria-expanded="false" class="fixed bottom-24 left-4 z-50 w-14 h-14 rounded-full flex items-center justify-center active:scale-95 transition">
+<button id="owjBotButton" type="button" aria-label="فتح مساعد NOVA STORE" aria-controls="owjBotWindow" aria-expanded="false" class="fixed bottom-24 left-4 z-50 w-14 h-14 rounded-full flex items-center justify-center active:scale-95 transition">
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-7 h-7"><rect x="3" y="7" width="18" height="13" rx="4"/><path d="M12 3v4M8 13h.01M16 13h.01M9 17h6"/></svg>
  <span class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#111126]"></span>
 </button>
-<section id="owjBotWindow" dir="rtl" role="dialog" aria-label="مساعد Y-N Store" aria-modal="false" class="fixed bottom-40 left-4 z-50 w-[calc(100vw-2rem)] max-w-sm hidden overflow-hidden rounded-3xl">
+<section id="owjBotWindow" dir="rtl" role="dialog" aria-label="مساعد NOVA STORE" aria-modal="false" class="fixed bottom-40 left-4 z-50 w-[calc(100vw-2rem)] max-w-sm hidden overflow-hidden rounded-3xl">
  <header class="owj-bot-head flex items-center justify-between p-4">
-  <div class="flex items-center gap-3"><div class="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-black text-xs">Y-N</div><div><h2 class="text-sm font-black text-white">مساعد Y-N Store</h2><p class="text-[10px] text-violet-200 flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span> جاهز لمساعدتك</p></div></div>
+  <div class="flex items-center gap-3"><div class="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-black text-xs">NOVA</div><div><h2 class="text-sm font-black text-white">مساعد NOVA STORE</h2><p class="text-[10px] text-violet-200 flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span> جاهز لمساعدتك</p></div></div>
   <button id="owjBotClose" type="button" aria-label="إغلاق المحادثة" class="w-9 h-9 rounded-xl bg-white/10 text-white hover:bg-white/20 text-xl">×</button>
  </header>
  <div class="px-4 py-2 bg-[#1c1938] text-[10px] text-violet-200 border-b border-violet-400/10">اسأل عن الخدمات أو الطلبات أو شحن المحفظة</div>
  <div id="owjBotMessages" aria-live="polite" class="h-80 overflow-y-auto p-4 space-y-3 text-xs">
-  <div class="bot-msg max-w-[92%] p-3 leading-6">أهلاً بك في Y-N Store 👋<br>أنا مساعدك الرقمي، كيف فيني أساعدك اليوم؟
+  <div class="bot-msg max-w-[92%] p-3 leading-6">أهلاً بك في NOVA STORE 👋<br>أنا مساعدك الرقمي، كيف فيني أساعدك اليوم؟
    <div class="mt-3 flex flex-wrap gap-2"><button type="button" data-question="كيف أطلب خدمة؟" class="quick-question rounded-xl px-3 py-2">🛍️ طريقة الطلب</button><button type="button" data-question="كيف أشحن رصيدي؟" class="quick-question rounded-xl px-3 py-2">💳 شحن الرصيد</button><button type="button" data-question="كيف أتابع طلباتي؟" class="quick-question rounded-xl px-3 py-2">📦 متابعة الطلبات</button></div>
   </div>
  </div>
@@ -311,168 +304,5 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')hideStoreUna
             document.getElementById('sidebarOverlay').classList.toggle('open');
         }
     </script>
-
-    <div id="ynLoadingOverlay" aria-hidden="true" role="status" aria-live="polite">
-      <div class="yn-loading-card">
-        <div class="yn-loading-logo-wrap"><div class="yn-spinner" aria-hidden="true"></div><div class="yn-loading-mark" aria-label="Y-N Store">Y-N</div></div>
-        <span class="yn-loading-text">يرجى الانتظار...</span>
-      </div>
-    </div>
-    <script>
-    (() => {
-      const overlay = document.getElementById('ynLoadingOverlay');
-      if (!overlay) return;
-
-      const STORAGE_KEY = 'ynLongOperationPending';
-      let showTimer = null;
-      let hideTimer = null;
-      let isShown = false;
-      let activeUserRequests = 0;
-      let lastUserIntent = 0;
-      let pendingLongOperationNavigation = false;
-
-      function showLoading() {
-        if (hideTimer) clearTimeout(hideTimer);
-        hideTimer = null;
-        if (isShown) return;
-        isShown = true;
-        overlay.classList.add('yn-loading-visible');
-        overlay.setAttribute('aria-hidden', 'false');
-      }
-
-      function scheduleLoading(delay = 280) {
-        if (showTimer) clearTimeout(showTimer);
-        if (hideTimer) clearTimeout(hideTimer);
-        showTimer = setTimeout(() => {
-          showTimer = null;
-          if (activeUserRequests > 0 || pendingLongOperationNavigation) showLoading();
-        }, delay);
-      }
-
-      function hideLoading() {
-        if (showTimer) clearTimeout(showTimer);
-        if (hideTimer) clearTimeout(hideTimer);
-        showTimer = null;
-        hideTimer = null;
-        isShown = false;
-        overlay.classList.remove('yn-loading-visible');
-        overlay.setAttribute('aria-hidden', 'true');
-      }
-
-      function scheduleHide(delay = 850) {
-        if (activeUserRequests > 0) return;
-        if (hideTimer) clearTimeout(hideTimer);
-        hideTimer = setTimeout(() => {
-          hideTimer = null;
-          if (activeUserRequests === 0) hideLoading();
-        }, delay);
-      }
-
-      function hasOutcomeMessage() {
-        return !!document.querySelector('.owj-toast, [role="alert"], .alert-success, .alert-danger, .alert-error');
-      }
-
-      // Long forms (uploads, backup restore, etc.) carry the loading state across
-      // the redirect, so the indicator does not disappear during the operation.
-      document.addEventListener('submit', (event) => {
-        const form = event.target;
-        if (!(form instanceof HTMLFormElement)) return;
-        lastUserIntent = Date.now();
-        const hasFileUpload = !!form.querySelector('input[type="file"]');
-        const isLongOperation = form.dataset.longOperation === 'true' || form.hasAttribute('data-long-operation');
-        if ((hasFileUpload || isLongOperation) && !form.dataset.noPageLoader) {
-          pendingLongOperationNavigation = true;
-          try { sessionStorage.setItem(STORAGE_KEY, '1'); } catch (_) {}
-          setTimeout(() => {
-            if (event.defaultPrevented) {
-              pendingLongOperationNavigation = false;
-              try { sessionStorage.removeItem(STORAGE_KEY); } catch (_) {}
-              return;
-            }
-            scheduleLoading(280);
-          }, 0);
-        }
-      }, true);
-
-      document.addEventListener('click', (event) => {
-        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        lastUserIntent = Date.now();
-      }, true);
-      document.addEventListener('change', (event) => {
-        if (event.target && event.target.matches && event.target.matches('input[type="file"]')) lastUserIntent = Date.now();
-      }, true);
-
-      // Track user-triggered fetches. Keep the loader alive until the request has
-      // settled AND the page has had time to render its success/failure message.
-      if (window.fetch) {
-        const nativeFetch = window.fetch.bind(window);
-        window.fetch = function(...args) {
-          const shouldTrack = Date.now() - lastUserIntent < 2200;
-          if (!shouldTrack) return nativeFetch(...args);
-          activeUserRequests++;
-          scheduleLoading(280);
-          let request;
-          try { request = nativeFetch(...args); }
-          catch (error) {
-            activeUserRequests = Math.max(0, activeUserRequests - 1);
-            if (activeUserRequests === 0) scheduleHide(850);
-            throw error;
-          }
-          return request.then(
-            response => {
-              activeUserRequests = Math.max(0, activeUserRequests - 1);
-              if (activeUserRequests === 0) scheduleHide(850);
-              return response;
-            },
-            error => {
-              activeUserRequests = Math.max(0, activeUserRequests - 1);
-              if (activeUserRequests === 0) scheduleHide(850);
-              throw error;
-            }
-          );
-        };
-      }
-
-      // If a success/failure toast is rendered, let it appear first and then close
-      // the overlay. This is the primary end signal for AJAX actions.
-      const outcomeSelector = '.owj-toast, [role="alert"], .alert-success, .alert-danger, .alert-error';
-      const outcomeObserver = new MutationObserver((records) => {
-        const newOutcome = records.some(record => Array.from(record.addedNodes || []).some(node => {
-          if (!(node instanceof Element)) return false;
-          return node.matches(outcomeSelector) || !!node.querySelector(outcomeSelector);
-        }));
-        if (newOutcome && isShown && activeUserRequests === 0) scheduleHide(350);
-      });
-      outcomeObserver.observe(document.documentElement, { childList: true, subtree: true });
-
-      window.addEventListener('beforeunload', () => {
-        if (pendingLongOperationNavigation) showLoading();
-      });
-      window.addEventListener('pageshow', () => {
-        pendingLongOperationNavigation = false;
-        let carried = false;
-        try {
-          carried = sessionStorage.getItem(STORAGE_KEY) === '1';
-          if (carried) sessionStorage.removeItem(STORAGE_KEY);
-        } catch (_) {}
-        if (carried) {
-          showLoading();
-          // Wait for the redirected page's flash message. A safety timeout avoids
-          // leaving the overlay stuck if the server returns no message at all.
-          if (hasOutcomeMessage()) scheduleHide(450);
-          else scheduleHide(1400);
-        } else {
-          hideLoading();
-        }
-      });
-      window.addEventListener('pagehide', () => { if (showTimer) clearTimeout(showTimer); });
-
-      // Optional explicit hooks for long tasks implemented in page-specific JS.
-      window.ynShowLoading = () => { lastUserIntent = Date.now(); showLoading(); };
-      window.ynHideLoading = hideLoading;
-      window.ynFinishLoading = (delay = 350) => scheduleHide(delay);
-    })();
-    </script>
-
 </body>
 </html>

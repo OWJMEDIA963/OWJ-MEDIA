@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}الرئيسية - Y-N Store
+{% block title %}الرئيسية - NOVA STORE
 
 
 {% endblock %}
@@ -39,13 +39,24 @@
 .owj-category-card:hover{border-color:rgba(34,211,238,.75)!important;box-shadow:0 8px 22px rgba(8,145,178,.18)!important;}
 .owj-category-card:hover .owj-category-image{transform:scale(1.045)!important;}
 @media(min-width:640px){.owj-category-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:16px!important}.owj-category-card{border-radius:18px!important}.owj-category-name{font-size:14px!important}.owj-category-count{font-size:12px!important}}
-.yn-store-banner{width:100%;max-height:110px;background:#05051b;line-height:0;display:flex;align-items:center;justify-content:center}.yn-store-banner img{display:block;width:100%;height:110px;max-width:100%;object-fit:contain;object-position:center}
-  @media(min-width:640px){.yn-store-banner{max-height:170px}.yn-store-banner img{height:170px}}
+.nova-market-intro{width:100%;max-height:110px;background:#05051b;line-height:0;display:flex;align-items:center;justify-content:center}.nova-market-intro img{display:block;width:100%;height:110px;max-width:100%;object-fit:contain;object-position:center}
+  @media(min-width:640px){.nova-market-intro{max-height:170px}.nova-market-intro img{height:170px}}
+
+/* Royal blue homepage cards: solid, natural colors without AI-like neon gradients */
+.owj-category-card{background:#111c2e!important;border:1px solid #263b60!important;box-shadow:0 4px 14px rgba(0,0,0,.20)!important}
+.owj-category-image-wrap{background:#16243a!important}
+.owj-category-image-wrap:after{display:none!important}
+.owj-category-placeholder{background:#1d3767!important;color:#bfdbfe!important}
+.owj-category-count{color:#93c5fd!important}
+.owj-category-card:hover{border-color:#4777df!important;box-shadow:0 5px 16px rgba(10,35,85,.28)!important}
+.owj-search-result{border-color:#263b60!important;background:#111c2e!important}
+.owj-search-result:active,.owj-search-result:hover{border-color:#4777df!important}
+
 </style>
 <div class="max-w-7xl mx-auto px-3 sm:px-5 py-4 sm:py-6 space-y-4 sm:space-y-6">
- <section class="yn-store-banner overflow-hidden rounded-2xl border border-violet-500/20 shadow-2xl" aria-label="Y-N Store">
-  <img src="{{ url_for('static', filename='images/yn-store-banner.webp') }}" alt="Y-N Store - منصتك للخدمات الرقمية" fetchpriority="high" decoding="async" width="1080" height="281">
- </section>
+ <section class="mb-5 overflow-hidden rounded-3xl border border-blue-400/15 bg-gradient-to-l from-slate-950 via-blue-950/40 to-slate-900 p-5 md:p-7">
+  <div class="flex items-center gap-4 md:gap-6"><div class="w-14 h-14 md:w-16 md:h-16 shrink-0 rounded-2xl bg-blue-500/10 border border-blue-300/20 flex items-center justify-center"><img src="{{ url_for('static',filename='images/nova-symbol.svg') }}" class="w-11 h-11" alt="NOVA"></div><div class="min-w-0"><div class="text-[10px] md:text-xs tracking-[.22em] font-bold text-blue-300">NOVA DIGITAL MARKET</div><h2 class="text-lg md:text-2xl font-black mt-1">كل خدماتك الرقمية في مكان واحد</h2><p class="text-xs md:text-sm text-slate-400 mt-1">تجربة شراء واضحة، خدمات متنوعة، ودعم يتابع طلبك.</p></div><div class="hidden md:block mr-auto"><svg class="w-20 h-20 text-blue-300/40" viewBox="0 0 100 100" fill="none"><path d="M20 72 50 20 80 72" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M32 72h36M42 52h16" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="50" r="42" stroke="currentColor" stroke-dasharray="3 8"/></svg></div></div>
+</section>
 
  <section class="space-y-3" aria-label="البحث عن خدمة">
   <div><h2 class="text-base font-black text-white">ابحث عن خدمة</h2><p class="mt-1 text-xs text-gray-400">اكتب اسم الخدمة أو القسم للوصول إليها بسرعة.</p></div>

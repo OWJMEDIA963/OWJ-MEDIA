@@ -130,6 +130,7 @@ class DigitalAccountProduct(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(180), nullable=False)
     game = db.Column(db.String(100), default='')
+    platform = db.Column(db.String(40), default='other')
     account_email = db.Column(db.String(240), nullable=False)
     encrypted_password = db.Column(db.Text, nullable=False)
     account_username = db.Column(db.String(240), default='')
@@ -532,11 +533,13 @@ def admin_digital_accounts():
             password=request.form.get('account_password','').strip()
             account_username=request.form.get('account_username','').strip()
             username_password=request.form.get('username_password','').strip()
+            platform=request.form.get('platform','other').strip().lower()
+            if platform not in ('instagram','facebook','other'): platform='other'
             price=float(request.form.get('price','0'))
             if not title or not email or not password or price<0: raise ValueError('أدخل بيانات الحساب والسعر بشكل صحيح.')
             if (account_username and not username_password) or (username_password and not account_username): raise ValueError('أدخل يوزر الحساب وكلمة مروره معاً.')
             image=save_uploaded_image('image_file') or request.form.get('image_url','').strip()
-            product=DigitalAccountProduct(title=title,game=request.form.get('game','').strip(),account_email=email,
+            product=DigitalAccountProduct(title=title,game=request.form.get('game','').strip(),platform=platform,account_email=email,
                 encrypted_password=encrypt_store_secret(password),account_username=account_username,
                 encrypted_username_password=encrypt_store_secret(username_password) if username_password else '',account_id=request.form.get('account_id','').strip(),
                 image_url=image,price=price,description=request.form.get('description','').strip())
@@ -562,6 +565,21 @@ def delete_digital_account(product_id):
     else:
         db.session.delete(item); db.session.commit(); flash('تم حذف الحساب.','success')
     return redirect(url_for('admin_digital_accounts'))
+
+@app.route('/robots.txt')
+def robots_txt():
+    from flask import Response
+    site = os.environ.get('SITE_URL', request.url_root).rstrip('/')
+    body = f"User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /profile\nDisallow: /notifications\nDisallow: /support\nDisallow: /api/\nSitemap: {site}/sitemap.xml\n"
+    return Response(body, mimetype='text/plain')
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    from flask import Response
+    site = os.environ.get('SITE_URL', request.url_root).rstrip('/')
+    urls = ['/', '/about', '/login', '/register']
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join(f'<url><loc>{site}{u}</loc></url>' for u in urls) + '</urlset>'
+    return Response(xml, mimetype='application/xml')
 
 @app.route('/')
 def index():
@@ -1933,6 +1951,8 @@ with app.app_context():
             db.session.execute(db.text("ALTER TABLE digital_account_product ADD COLUMN account_username VARCHAR(240) DEFAULT ''"))
         if 'encrypted_username_password' not in digital_columns:
             db.session.execute(db.text("ALTER TABLE digital_account_product ADD COLUMN encrypted_username_password TEXT DEFAULT ''"))
+        if 'platform' not in digital_columns:
+            db.session.execute(db.text("ALTER TABLE digital_account_product ADD COLUMN platform VARCHAR(40) DEFAULT 'other'"))
         db.session.commit()
     except Exception:
         db.session.rollback()

@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /notifications
+Disallow: /support
+Disallow: /api/
+Sitemap: https://YOUR-DOMAIN-HERE/sitemap.xml

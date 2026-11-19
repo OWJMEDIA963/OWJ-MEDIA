@@ -82,9 +82,17 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
 .nova-premium-card{border:1px solid rgba(93,139,218,.22);background:linear-gradient(145deg,rgba(17,29,49,.96),rgba(12,19,34,.98));box-shadow:0 12px 35px rgba(0,0,0,.15)}
 @media(min-width:1024px){
   body > main{width:100%;max-width:1560px;margin-left:auto;margin-right:auto;padding-left:28px;padding-right:28px}
-  #owjBotWindow{width:440px;max-width:calc(100vw - 3rem)}
-  #owjBotMessages{height:min(62vh,620px)}
+  #owjBotWindow{width:460px;max-width:calc(100vw - 3rem)}
+  #owjBotMessages{height:min(66vh,680px)}
+  .ai-page{width:min(1120px,calc(100% - 48px))!important;max-width:1120px!important;margin:0 auto!important;padding:34px 0 48px!important}
+  .ai-shell{min-height:680px;display:flex;flex-direction:column}
+  .ai-feed{height:min(68vh,680px)!important;min-height:460px!important;flex:1}
+  .ai-head{padding:26px 30px!important}
+  .ai-form{padding:18px 22px!important}
+  .ai-form input{font-size:16px!important;padding:16px 18px!important}
+  .ai-form button{min-width:116px}
 }
+@media(min-width:1440px){body>main{max-width:1680px;padding-left:44px;padding-right:44px}.ai-page{width:min(1240px,calc(100% - 64px))!important;max-width:1240px!important}}
 </style></head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
 <div id="novaLoading" aria-live="polite"><div class="nova-loader"><img src="{{ url_for('static',filename='images/nova-symbol.svg') }}" alt="NOVA"><div class="nova-spin"></div><div class="text-white text-sm font-black">NOVA STORE</div><div class="text-slate-400 text-xs mt-2">جاري إتمام العملية...</div></div></div>
@@ -296,7 +304,7 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
     </script>
 <script>
 (function(){const overlay=document.getElementById('novaLoading');if(!overlay)return;
-document.addEventListener('submit',e=>{if(e.target.matches('form')&&!e.target.dataset.noLoader&&!e.target.closest('#owjBotWindow')){overlay.classList.add('active');}});
+document.addEventListener('submit',e=>{if(e.target.matches('form')&&!e.target.dataset.noLoader&&!['owjBotForm','fullChatForm'].includes(e.target.id)&&!e.target.closest('#owjBotWindow')){overlay.classList.add('active');}});
 document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(a&&!a.target&&!a.href.startsWith('javascript:')&&!a.href.includes('#')&&a.origin===location.origin){overlay.classList.add('active');}});
 window.addEventListener('pageshow',()=>overlay.classList.remove('active'));
 })();

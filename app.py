@@ -132,6 +132,8 @@ class DigitalAccountProduct(db.Model):
     game = db.Column(db.String(100), default='')
     account_email = db.Column(db.String(240), nullable=False)
     encrypted_password = db.Column(db.Text, nullable=False)
+    account_username = db.Column(db.String(240), default='')
+    encrypted_username_password = db.Column(db.Text, default='')
     account_id = db.Column(db.String(160), default='')
     image_url = db.Column(db.String(500), default='')
     price = db.Column(db.Float, default=0.0)
@@ -491,7 +493,7 @@ def my_digital_accounts():
 @login_required
 def my_digital_account(purchase_id):
     purchase=DigitalAccountPurchase.query.filter_by(id=purchase_id,user_id=current_user().id).first_or_404()
-    return render_template('digital_account_purchase.html',purchase=purchase,account_password=decrypt_store_secret(purchase.product.encrypted_password))
+    return render_template('digital_account_purchase.html',purchase=purchase,account_password=decrypt_store_secret(purchase.product.encrypted_password),username_password=decrypt_store_secret(purchase.product.encrypted_username_password))
 
 @app.route('/admin/digital-accounts',methods=['GET','POST'])
 @admin_required
@@ -501,11 +503,15 @@ def admin_digital_accounts():
             title=request.form.get('title','').strip()
             email=request.form.get('account_email','').strip()
             password=request.form.get('account_password','').strip()
+            account_username=request.form.get('account_username','').strip()
+            username_password=request.form.get('username_password','').strip()
             price=float(request.form.get('price','0'))
             if not title or not email or not password or price<0: raise ValueError('أدخل بيانات الحساب والسعر بشكل صحيح.')
+            if (account_username and not username_password) or (username_password and not account_username): raise ValueError('أدخل يوزر الحساب وكلمة مروره معاً.')
             image=save_uploaded_image('image_file') or request.form.get('image_url','').strip()
             product=DigitalAccountProduct(title=title,game=request.form.get('game','').strip(),account_email=email,
-                encrypted_password=encrypt_store_secret(password),account_id=request.form.get('account_id','').strip(),
+                encrypted_password=encrypt_store_secret(password),account_username=account_username,
+                encrypted_username_password=encrypt_store_secret(username_password) if username_password else '',account_id=request.form.get('account_id','').strip(),
                 image_url=image,price=price,description=request.form.get('description','').strip())
             db.session.add(product); db.session.commit(); flash('تم إضافة الحساب للمتجر.','success')
         except Exception as exc:
@@ -992,6 +998,8 @@ def ai_chat():
         reply = 'يمكنك إدارة بيانات الدخول من صفحة «حسابي» ثم خيار تغيير كلمة المرور. إذا فقدت إمكانية الدخول، استخدم خيار استعادة الحساب إن كان متاحاً أو تواصل مع مؤسس الموقع: 963952169815. لا تشارك كلمة مرورك مع أحد.'
     elif any(x in m for x in ['حساب', 'تسجيل', 'انشاء حساب', 'انشاء', 'دخول', 'تسجيل الدخول']):
         reply = 'أنشئ حساباً من صفحة التسجيل باستخدام بيانات صحيحة، ثم سجّل الدخول لمتابعة الطلبات والمحفظة والإشعارات. حافظ على كلمة المرور ولا تشاركها مع أي شخص.'
+    elif any(x in m for x in ['حساب انستا', 'حساب انست', 'حسابات انستا', 'حسابات انست', 'شراء حساب', 'متجر الحسابات']):
+        reply = 'تجد الحسابات الرقمية المتاحة في «المتجر» من الشريط السفلي. افتح الحساب لقراءة الوصف والسعر، ثم اضغط شراء الآن. بعد إتمام الشراء ستظهر بيانات الدخول التي أضافها المتجر، مثل البريد وكلمة مروره واسم المستخدم وكلمة مروره إن كانت متوفرة.'
     elif any(x in m for x in ['api', 'مفتاح', 'تاجر', 'طلب تاجر']):
         reply = 'طلبات التاجر وAPI تخضع لمراجعة الإدارة. افتح صفحة «حسابي» للوصول إلى أزرار طلب التاجر وطلب API، ثم أرسل البيانات المطلوبة وانتظر الموافقة.'
     elif any(x in m for x in ['مرحبا', 'السلام', 'اهلا', 'هاي', 'هلا', 'صباح', 'مساء']):
@@ -1878,6 +1886,17 @@ with app.app_context():
         order_columns = {column['name'] for column in inspect(db.engine).get_columns('order')}
         if 'provider_order_id' not in order_columns:
             db.session.execute(db.text("ALTER TABLE \"order\" ADD COLUMN provider_order_id VARCHAR(120) DEFAULT ''"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    # Add Instagram/account username credentials without disturbing existing products.
+    try:
+        from sqlalchemy import inspect
+        digital_columns = {column['name'] for column in inspect(db.engine).get_columns('digital_account_product')}
+        if 'account_username' not in digital_columns:
+            db.session.execute(db.text("ALTER TABLE digital_account_product ADD COLUMN account_username VARCHAR(240) DEFAULT ''"))
+        if 'encrypted_username_password' not in digital_columns:
+            db.session.execute(db.text("ALTER TABLE digital_account_product ADD COLUMN encrypted_username_password TEXT DEFAULT ''"))
         db.session.commit()
     except Exception:
         db.session.rollback()

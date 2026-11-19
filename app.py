@@ -449,6 +449,33 @@ def admin_required(fn):
 def current_user():
     return db.session.get(User, session.get('user_id')) if session.get('user_id') else None
 
+
+def process_weekly_merchant_bonus(user):
+    """Credit an approved merchant's weekly bonus at most once per 7 days."""
+    application = (MerchantApplication.query
+                   .filter_by(user_id=user.id, status='approved')
+                   .order_by(MerchantApplication.id.desc())
+                   .first())
+    if not application:
+        return
+    try:
+        bonus = max(0.0, float(application.weekly_bonus or 0))
+    except (TypeError, ValueError):
+        app.logger.exception('Invalid weekly merchant bonus for user %s', user.id)
+        return
+    if bonus <= 0:
+        return
+    now = datetime.utcnow()
+    # Older approved requests may not have a timestamp; start their first cycle now.
+    if not application.last_bonus_at:
+        application.last_bonus_at = now
+        db.session.commit()
+        return
+    if now - application.last_bonus_at >= timedelta(days=7):
+        user.balance_usd = float(user.balance_usd or 0) + bonus
+        application.last_bonus_at = now
+        db.session.commit()
+
 @app.before_request
 def enforce_account_ban():
     user_id = session.get('user_id')
@@ -644,7 +671,11 @@ def admin_merchant_application(req_id):
     action=request.form.get('action')
     if action=='approve':
         req.status='approved'; req.user.is_trusted_merchant=True
-        req.weekly_bonus=max(0,float(request.form.get('weekly_bonus',req.weekly_bonus or 0)))
+        
+        try:
+            req.weekly_bonus=max(0.0,float(request.form.get('weekly_bonus',req.weekly_bonus or 0) or 0))
+        except (TypeError, ValueError):
+            req.weekly_bonus=0.0
         req.last_bonus_at=datetime.utcnow()
         if req.weekly_bonus:
             req.user.balance_usd+=req.weekly_bonus

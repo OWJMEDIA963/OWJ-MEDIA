@@ -936,6 +936,7 @@ def ai_bot(): return render_template('ai_bot.html', user_name=current_user().ful
 
 @app.route('/api/ai_chat', methods=['POST'])
 def ai_chat():
+    """Knowledge-based NOVA assistant. Works without any external AI/API key."""
     if not session.get('user_id') or not db.session.get(User, session.get('user_id')):
         return jsonify(reply='انتهت جلسة تسجيل الدخول. سجّل الدخول مجدداً.'), 401
     user = db.session.get(User, session.get('user_id'))
@@ -943,74 +944,63 @@ def ai_chat():
     message = str(data.get('message', '')).strip()[:1000]
     if not message:
         return jsonify(reply='اكتب سؤالك أولاً.'), 400
-    m = message.lower().strip()
-    if any(x in m for x in ['رصيدي','كم رصيدي','رصيد حسابي','المحفظة']):
-        reply = f'رصيدك الحالي هو ${format_money(user.balance_usd)}. يمكنك شحن المحفظة من قسم الشحن وإرسال إثبات التحويل.'
-    elif any(x in m for x in ['طلباتي','طلباتي','حالة الطلب','وين طلبي','الطلبات']):
-        orders = Order.query.filter_by(user_id=user.id).order_by(Order.id.desc()).limit(5).all()
-        if orders:
-            lines = [f'#{o.id} · {o.service_name} · {o.status}' for o in orders]
-            reply = 'آخر طلباتك:\n' + '\n'.join(lines) + '\nيمكنك فتح صفحة «طلباتي» للتفاصيل.'
+
+    # Normalize common Arabic spelling variants to improve keyword matching.
+    m = message.lower().replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا').replace('ى', 'ي')
+    contacts = (
+        'للتواصل عبر واتساب:\n'
+        '• مؤسس ومبرمج الموقع: 963952169815\n'
+        '• دعم الشحن والإبلاغ عن مشكلة: 963984727823\n'
+        '• الطلبات وتسريع الطلب أو الإبلاغ عن خطأ: 963951287267\n'
+        'احفظ الرقم المناسب وافتح محادثة واتساب معه.'
+    )
+
+    if any(x in m for x in ['تواصل', 'اتواصل', 'واتساب', 'واتس', 'رقم', 'ارقام', 'المؤسس', 'مبرمج', 'الدعم', 'دعم', 'شكوى', 'مشكلة', 'خطا', 'ابلاغ']):
+        if any(x in m for x in ['مؤسس', 'مبرمج', 'صاحب', 'ادارة', 'الاداره']):
+            reply = 'للتواصل مع مؤسس ومبرمج الموقع عبر واتساب: 963952169815'
+        elif any(x in m for x in ['شحن', 'ايداع', 'دفع', 'تحويل']):
+            reply = 'لدعم الشحن والإبلاغ عن مشكلة في الشحن عبر واتساب: 963984727823'
+        elif any(x in m for x in ['طلب', 'تسريع', 'تاخير', 'متاخر']):
+            reply = 'للطلبات أو تسريع طلب أو الإبلاغ عن خطأ عبر واتساب: 963951287267'
         else:
-            reply = 'ما عندك طلبات مسجلة حالياً. تصفح الأقسام واختر الخدمة المناسبة.'
-    elif any(x in m for x in ['كيف اطلب','كيف أطلب','طريقة الطلب','اطلب خدمة','أطلب خدمة']):
-        reply = 'طريقة الطلب بسيطة: افتح القسم المناسب، اختر المنتج، اقرأ الوصف والحدود، أدخل الرابط أو المعرّف والكمية المطلوبة، ثم أكد الطلب. تأكد من صحة البيانات قبل الإرسال لأن تنفيذ الطلب قد يبدأ تلقائياً.'
-    elif any(x in m for x in ['شحن','دفع','تحويل','إيداع','ايداع','كاش','باركود']):
+            reply = contacts
+    elif any(x in m for x in ['رصيدي', 'كم رصيد', 'رصيد حسابي', 'المحفظة', 'محفظتي']):
+        reply = f'رصيدك الحالي هو ${format_money(user.balance_usd)}. لشحن المحفظة افتح قسم «شحن المحفظة»، اختر طريقة الدفع، وأرسل إثبات التحويل وانتظر مراجعة الإدارة.'
+    elif any(x in m for x in ['طلباتي', 'حالة الطلب', 'وين طلبي', 'طلبي', 'الطلبات']):
+        orders = Order.query.filter_by(user_id=user.id).order_by(Order.id.desc()).limit(7).all()
+        if orders:
+            lines = [f'#{o.id} · {o.service_name} · الحالة: {o.status}' for o in orders]
+            reply = 'هذه أحدث طلباتك المسجلة:\n' + '\n'.join(lines) + '\nللتفاصيل افتح صفحة «طلباتي». إذا أردت تسريع طلب تواصل مع 963951287267.'
+        else:
+            reply = 'لا توجد طلبات مسجلة في حسابك حالياً. افتح الأقسام، اختر الخدمة، ثم أرسل طلبك بعد التأكد من الرابط والكمية.'
+    elif any(x in m for x in ['كيف اطلب', 'طريقة الطلب', 'اطلب خدمة', 'شراء', 'اشتري', 'طلب خدمة']):
+        reply = 'لطلب خدمة: 1) افتح القسم المناسب. 2) اختر الخدمة أو المنتج. 3) اقرأ الوصف والحدود والسعر. 4) أدخل الرابط أو المعرّف والكمية المطلوبة. 5) راجع البيانات ثم أكد الطلب. تابع التنفيذ من صفحة «طلباتي». لا ترسل كلمة مرور حسابك لأي شخص.'
+    elif any(x in m for x in ['شحن', 'دفع', 'تحويل', 'ايداع', 'كاش', 'اشحن']):
         methods = PaymentMethod.query.order_by(PaymentMethod.id.desc()).all()
-        names = '، '.join(x.name for x in methods[:5]) if methods else 'لا توجد طرق دفع منشورة حالياً'
-        reply = f'لشحن محفظتك افتح قسم «الشحن»، اختر طريقة الدفع وأرسل صورة الإشعار. طرق الدفع المتاحة: {names}. تتم مراجعة الطلب من الإدارة.'
-    elif any(x in m for x in ['سعر','خدمة','منتج','متابع','لايك','مشاهد','انستغرام','انستا','تيك توك','يوتيوب','تلغرام','تليجرام','فيس']):
-        available = Service.query.filter_by(is_available=True).order_by(Service.sort_order.asc(), Service.id.desc()).limit(8).all()
+        names = '، '.join(x.name for x in methods[:8]) if methods else 'راجع طرق الدفع الظاهرة في صفحة الشحن'
+        reply = f'لشحن المحفظة افتح «شحن المحفظة»، اختر طريقة الدفع المتاحة ({names})، أدخل المبلغ وارفق إثبات التحويل. لا تعتبر المحفظة مشحونة حتى يظهر الرصيد بعد مراجعة الطلب. لمشاكل الشحن واتساب: 963984727823.'
+    elif any(x in m for x in ['سعر', 'اسعار', 'خدمات', 'منتجات', 'متابع', 'لايك', 'مشاهد', 'انستغرام', 'انستا', 'تيك توك', 'يوتيوب', 'تلغرام', 'تليجرام', 'فيس', 'العاب', 'ببجي', 'فري فاير']):
+        available = Service.query.filter_by(is_available=True).order_by(Service.sort_order.asc(), Service.id.desc()).limit(12).all()
         if available:
             lines = [f'• {x.name}: ${format_money(x.price)}' for x in available]
-            reply = 'هذه بعض الخدمات المتوفرة حالياً:\n' + '\n'.join(lines) + '\nافتح المنتج لمعرفة تفاصيل الكمية والسعر النهائي.'
+            reply = 'هذه عينة من الخدمات المتاحة حالياً وأسعارها بالدولار:\n' + '\n'.join(lines) + '\nقد تختلف التفاصيل والحدود حسب المنتج؛ افتح الخدمة لقراءة وصفها والسعر النهائي.'
         else:
-            reply = 'لا توجد منتجات متاحة حالياً. تابع المتجر لاحقاً أو تواصل مع الدعم.'
-    elif any(x in m for x in ['مرحبا','السلام','اهلا','أهلا','هاي','هلا']):
-        reply = f'أهلاً {user.full_name or user.username} أنا مساعد NOVA STORE. أقدر أساعدك بمعلومات الرصيد والطلبات والشحن والخدمات.'
-    elif any(x in m for x in ['دعم','مشكلة','شكوى','اتواصل','تواصل']):
-        reply = 'للتواصل مع فريق الدعم افتح «تواصل مع الدعم» من القائمة، واكتب مشكلتك برسالة. ستبقى المحادثة محفوظة في حسابك.'
+            reply = 'لا تظهر خدمات متاحة حالياً. تحقق من الأقسام لاحقاً أو تواصل مع الدعم.'
+    elif any(x in m for x in ['الغاء', 'الغاء الطلب', 'استرجاع', 'استرداد', 'تاخر', 'متاخر', 'ما وصل', 'لم يصل', 'فشل']):
+        reply = 'إذا تأخر طلبك أو لم يصل، افتح «طلباتي» وتأكد من حالته ورقم الطلب. لا ترسل طلباً مكرراً قبل التحقق. للمتابعة أو طلب التسريع عبر واتساب: 963951287267.'
+    elif any(x in m for x in ['كلمة المرور', 'كلمه المرور', 'باسورد', 'نسيت كلمة', 'نسيت كلمه', 'تغيير كلمة']):
+        reply = 'يمكنك إدارة بيانات الدخول من صفحة «حسابي» ثم خيار تغيير كلمة المرور. إذا فقدت إمكانية الدخول، استخدم خيار استعادة الحساب إن كان متاحاً أو تواصل مع مؤسس الموقع: 963952169815. لا تشارك كلمة مرورك مع أحد.'
+    elif any(x in m for x in ['حساب', 'تسجيل', 'انشاء حساب', 'انشاء', 'دخول', 'تسجيل الدخول']):
+        reply = 'أنشئ حساباً من صفحة التسجيل باستخدام بيانات صحيحة، ثم سجّل الدخول لمتابعة الطلبات والمحفظة والإشعارات. حافظ على كلمة المرور ولا تشاركها مع أي شخص.'
+    elif any(x in m for x in ['api', 'مفتاح', 'تاجر', 'طلب تاجر']):
+        reply = 'طلبات التاجر وAPI تخضع لمراجعة الإدارة. افتح صفحة «حسابي» للوصول إلى أزرار طلب التاجر وطلب API، ثم أرسل البيانات المطلوبة وانتظر الموافقة.'
+    elif any(x in m for x in ['مرحبا', 'السلام', 'اهلا', 'هاي', 'هلا', 'صباح', 'مساء']):
+        reply = f'أهلاً {user.full_name or user.username} 👋 أنا مساعد NOVA STORE. بقدر أساعدك بالطلبات والشحن والرصيد والخدمات والحساب والتواصل. اكتب سؤالك بشكل مباشر.'
+    elif any(x in m for x in ['من نحن', 'عن الموقع', 'نوفا', 'nova store', 'ما هو الموقع']):
+        reply = 'NOVA STORE متجر للخدمات الرقمية وشحن الألعاب والحسابات والخدمات المرتبطة بمنصات التواصل. هدفنا تسهيل الطلب ومتابعته وتوفير قنوات واضحة للدعم. تفاصيل التواصل موجودة في صفحة «من نحن».'
     else:
-        reply = 'أنا المساعد التجريبي لـ NOVA STORE. اسألني مثلاً: كم رصيدي؟ أين طلبي؟ كيف أشحن المحفظة؟ أو ما الخدمات المتوفرة؟ وللاستفسارات الخاصة استخدم الدعم المباشر.'
-    # Optional AI response through OpenRouter. Keep the API key in the server environment only.
-    api_key = os.environ.get('OPENROUTER_API_KEY', '').strip()
-    if api_key:
-        try:
-            import requests as _requests
-            context = (
-                'You are the NOVA STORE customer-support assistant. '
-                'Reply in concise, natural Arabic (prefer Syrian dialect). '
-                'Help with services, orders, wallet deposits, and store navigation. '
-                'Never claim you completed an action or changed account data. '
-                'For account-specific facts, rely only on the supplied context. '
-                f'User: {user.username}; current balance: {format_money(user.balance_usd)} USD.'
-            )
-            headers = {
-                'Authorization': 'Bearer ' + api_key,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': os.environ.get('APP_URL', 'https://nova-store.local'),
-                'X-Title': 'NOVA STORE'
-            }
-            response = _requests.post(
-                'https://openrouter.ai/api/v1/chat/completions',
-                headers=headers,
-                json={
-                    'model': os.environ.get('OPENROUTER_MODEL', 'openrouter/auto'),
-                    'messages': [
-                        {'role': 'system', 'content': context},
-                        {'role': 'user', 'content': message}
-                    ],
-                    'max_tokens': 450,
-                    'temperature': 0.5
-                },
-                timeout=20
-            )
-            if response.ok:
-                generated = response.json().get('choices', [{}])[0].get('message', {}).get('content', '').strip()
-                if generated:
-                    reply = generated
-        except Exception:
-            pass
+        reply = ('فهمت سؤالك، لكن ما عندي معلومة مؤكدة كافية لأعطيك جواباً دقيقاً. أقدر أساعدك بالطلبات والشحن والرصيد والخدمات والحساب وطلبات API. '
+                 'إذا كانت المشكلة خاصة بحسابك أو طلبك، تواصل مع الرقم المناسب:\n' + contacts)
     return jsonify(reply=reply)
 
 

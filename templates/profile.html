@@ -106,6 +106,40 @@
       </div>
     </div>
 
+    <details class="group mt-5 overflow-hidden rounded-2xl border border-amber-400/25 bg-amber-500/5">
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-black text-amber-200">
+        <span class="flex items-center gap-3"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15 text-lg">🔐</span> قفل الموقع بكلمة مرور</span>
+        <span class="text-lg transition-transform group-open:rotate-180">⌄</span>
+      </summary>
+      <div class="border-t border-amber-400/10 p-4">
+        {% if site_lock_enabled %}
+          <p class="mb-3 text-sm text-emerald-300">قفل الموقع مفعّل على حسابك. سيُطلب رمز القفل عند فتح الموقع بعد تسجيل الدخول.</p>
+          <form method="post" action="{{ url_for('configure_site_lock') }}" class="space-y-3">
+            <input type="hidden" name="action" value="disable">
+            <input name="account_password" type="password" autocomplete="current-password" required placeholder="كلمة مرور حسابك للتأكيد" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
+            <button class="w-full rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm font-black text-rose-300">إيقاف قفل الموقع</button>
+          </form>
+          <form method="post" action="{{ url_for('configure_site_lock') }}" class="mt-4 space-y-3">
+            <input type="hidden" name="action" value="enable">
+            <p class="text-xs text-gray-400">لتغيير كلمة مرور القفل، أدخل كلمة مرور حسابك ثم كلمة المرور الجديدة.</p>
+            <input name="account_password" type="password" autocomplete="current-password" required placeholder="كلمة مرور حسابك" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
+            <input name="site_password" type="password" minlength="8" autocomplete="new-password" required placeholder="كلمة مرور القفل الجديدة (8 أحرف على الأقل)" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
+            <input name="confirm_site_password" type="password" minlength="8" autocomplete="new-password" required placeholder="تأكيد كلمة مرور القفل" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
+            <button class="w-full rounded-xl bg-amber-500 p-3 text-sm font-black text-gray-950">تغيير كلمة مرور القفل</button>
+          </form>
+        {% else %}
+          <p class="mb-3 text-xs leading-6 text-gray-400">عند تفعيل القفل، لن تظهر صفحات المتجر بعد تسجيل الدخول حتى تدخل كلمة مرور القفل. كلمة المرور تُخزّن بشكل مشفّر تجزئياً على السيرفر.</p>
+          <form method="post" action="{{ url_for('configure_site_lock') }}" class="space-y-3">
+            <input type="hidden" name="action" value="enable">
+            <input name="account_password" type="password" autocomplete="current-password" required placeholder="كلمة مرور حسابك للتأكيد" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
+            <input name="site_password" type="password" minlength="8" autocomplete="new-password" required placeholder="كلمة مرور قفل الموقع (8 أحرف على الأقل)" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
+            <input name="confirm_site_password" type="password" minlength="8" autocomplete="new-password" required placeholder="تأكيد كلمة مرور القفل" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
+            <button class="w-full rounded-xl bg-amber-500 p-3 text-sm font-black text-gray-950">تفعيل قفل الموقع</button>
+          </form>
+        {% endif %}
+      </div>
+    </details>
+
     <a href="/store/accounts/my" class="mt-4 flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-gray-300">مشتريات متجر الحسابات</a>
 
     <div class="mt-5 border-t border-gray-800 pt-5">

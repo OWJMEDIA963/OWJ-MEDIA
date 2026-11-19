@@ -125,11 +125,21 @@ class User(db.Model):
     def check_password(self, password): return check_password_hash(self.password_hash, password)
 
 
+class SiteLock(db.Model):
+    __tablename__ = 'site_lock'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, unique=True, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user = db.relationship('User')
+
+
 class DigitalAccountProduct(db.Model):
     __tablename__ = 'digital_account_product'
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(180), nullable=False)
     game = db.Column(db.String(100), default='')
+    platform = db.Column(db.String(40), default='other')
     account_email = db.Column(db.String(240), nullable=False)
     encrypted_password = db.Column(db.Text, nullable=False)
     account_username = db.Column(db.String(240), default='')
@@ -487,6 +497,11 @@ def enforce_account_ban():
     if user and user.is_banned and request.endpoint not in {'banned_account', 'submit_ban_appeal', 'logout', 'static'}:
         session.clear()
         return redirect(url_for('banned_account', user_id=user.id))
+    # Optional per-account site lock. All pages stay inaccessible until unlocked.
+    if user and request.endpoint not in {'static', 'site_lock', 'site_lock_unlock', 'logout'}:
+        lock = SiteLock.query.filter_by(user_id=user.id).first()
+        if lock and session.get('site_unlocked_user_id') != user.id:
+            return redirect(url_for('site_lock'))
     return None
 
 
@@ -532,11 +547,13 @@ def admin_digital_accounts():
             password=request.form.get('account_password','').strip()
             account_username=request.form.get('account_username','').strip()
             username_password=request.form.get('username_password','').strip()
+            platform=request.form.get('platform','other').strip().lower()
+            if platform not in ('instagram','facebook','other'): platform='other'
             price=float(request.form.get('price','0'))
             if not title or not email or not password or price<0: raise ValueError('أدخل بيانات الحساب والسعر بشكل صحيح.')
             if (account_username and not username_password) or (username_password and not account_username): raise ValueError('أدخل يوزر الحساب وكلمة مروره معاً.')
             image=save_uploaded_image('image_file') or request.form.get('image_url','').strip()
-            product=DigitalAccountProduct(title=title,game=request.form.get('game','').strip(),account_email=email,
+            product=DigitalAccountProduct(title=title,game=request.form.get('game','').strip(),platform=platform,account_email=email,
                 encrypted_password=encrypt_store_secret(password),account_username=account_username,
                 encrypted_username_password=encrypt_store_secret(username_password) if username_password else '',account_id=request.form.get('account_id','').strip(),
                 image_url=image,price=price,description=request.form.get('description','').strip())
@@ -562,6 +579,21 @@ def delete_digital_account(product_id):
     else:
         db.session.delete(item); db.session.commit(); flash('تم حذف الحساب.','success')
     return redirect(url_for('admin_digital_accounts'))
+
+@app.route('/robots.txt')
+def robots_txt():
+    from flask import Response
+    site = os.environ.get('SITE_URL', request.url_root).rstrip('/')
+    body = f"User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /profile\nDisallow: /notifications\nDisallow: /support\nDisallow: /api/\nSitemap: {site}/sitemap.xml\n"
+    return Response(body, mimetype='text/plain')
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    from flask import Response
+    site = os.environ.get('SITE_URL', request.url_root).rstrip('/')
+    urls = ['/', '/about', '/login', '/register']
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join(f'<url><loc>{site}{u}</loc></url>' for u in urls) + '</urlset>'
+    return Response(xml, mimetype='application/xml')
 
 @app.route('/')
 def index():
@@ -618,6 +650,101 @@ def register():
 def logout():
     session.clear(); return redirect(url_for('index'))
 
+@app.route('/site-lock', methods=['GET'])
+def site_lock():
+    user = current_user()
+    if not user:
+        return redirect(url_for('login'))
+    lock = SiteLock.query.filter_by(user_id=user.id).first()
+    if not lock:
+        session['site_unlocked_user_id'] = user.id
+        return redirect(url_for('index'))
+    if session.get('site_unlocked_user_id') == user.id:
+        return redirect(url_for('index'))
+    return render_template('site_lock.html', user=user)
+
+
+@app.route('/site-lock/unlock', methods=['POST'])
+def site_lock_unlock():
+    user = current_user()
+    if not user:
+        return redirect(url_for('login'))
+    lock = SiteLock.query.filter_by(user_id=user.id).first()
+    if not lock:
+        session['site_unlocked_user_id'] = user.id
+        return redirect(url_for('index'))
+    now = datetime.utcnow().timestamp()
+    blocked_until = float(session.get('site_lock_blocked_until', 0) or 0)
+    if now < blocked_until:
+        flash('محاولات كثيرة. انتظر دقيقة ثم حاول مجدداً.', 'error')
+        return redirect(url_for('site_lock'))
+    if check_password_hash(lock.password_hash, request.form.get('site_password', '')):
+        session['site_unlocked_user_id'] = user.id
+        session.pop('site_lock_attempts', None)
+        session.pop('site_lock_blocked_until', None)
+        return redirect(url_for('index'))
+    attempts = int(session.get('site_lock_attempts', 0) or 0) + 1
+    session['site_lock_attempts'] = attempts
+    if attempts >= 5:
+        session['site_lock_attempts'] = 0
+        session['site_lock_blocked_until'] = now + 60
+    flash('كلمة مرور قفل الموقع غير صحيحة.', 'error')
+    return redirect(url_for('site_lock'))
+
+
+@app.route('/site-lock/recover', methods=['POST'])
+def recover_site_lock():
+    user = current_user()
+    if not user:
+        return redirect(url_for('login'))
+    if not user.check_password(request.form.get('account_password', '')):
+        flash('كلمة مرور حسابك غير صحيحة.', 'error')
+        return redirect(url_for('site_lock'))
+    lock = SiteLock.query.filter_by(user_id=user.id).first()
+    if lock:
+        db.session.delete(lock)
+        db.session.commit()
+    session['site_unlocked_user_id'] = user.id
+    session.pop('site_lock_attempts', None)
+    session.pop('site_lock_blocked_until', None)
+    flash('تم إلغاء قفل الموقع بعد التحقق من كلمة مرور حسابك.', 'success')
+    return redirect(url_for('index'))
+
+
+@app.route('/profile/site-lock', methods=['POST'])
+@login_required
+def configure_site_lock():
+    user = current_user()
+    if not user.check_password(request.form.get('account_password', '')):
+        flash('كلمة مرور حسابك غير صحيحة، لم يتم تغيير إعداد القفل.', 'error')
+        return redirect(url_for('profile'))
+    lock = SiteLock.query.filter_by(user_id=user.id).first()
+    action = request.form.get('action', 'enable')
+    if action == 'disable':
+        if lock:
+            db.session.delete(lock)
+            db.session.commit()
+        session['site_unlocked_user_id'] = user.id
+        flash('تم إيقاف قفل الموقع.', 'success')
+        return redirect(url_for('profile'))
+    password = request.form.get('site_password', '')
+    confirm = request.form.get('confirm_site_password', '')
+    if len(password) < 8:
+        flash('اجعل كلمة مرور قفل الموقع 8 أحرف على الأقل.', 'error')
+    elif password != confirm:
+        flash('تأكيد كلمة المرور غير مطابق.', 'error')
+    else:
+        if not lock:
+            lock = SiteLock(user_id=user.id, password_hash=generate_password_hash(password))
+            db.session.add(lock)
+        else:
+            lock.password_hash = generate_password_hash(password)
+        db.session.commit()
+        session.pop('site_unlocked_user_id', None)
+        flash('تم تفعيل قفل الموقع. أدخل كلمة مرور القفل للمتابعة.', 'success')
+    return redirect(url_for('profile'))
+
+
 @app.route('/profile', methods=['GET','POST'])
 @login_required
 def profile():
@@ -627,7 +754,7 @@ def profile():
         user.email = request.form.get('email', user.email).strip()
         user.phone = request.form.get('phone', user.phone).strip()
         db.session.commit(); flash('تم تحديث بياناتك.', 'success'); return redirect(url_for('profile'))
-    return render_template('profile.html', user=user,
+    return render_template('profile.html', user=user, site_lock_enabled=SiteLock.query.filter_by(user_id=user.id).first() is not None,
         merchant_application=MerchantApplication.query.filter_by(user_id=user.id).order_by(MerchantApplication.id.desc()).first(),
         api_application=ApiApplication.query.filter_by(user_id=user.id).order_by(ApiApplication.id.desc()).first(),
         api_key=decrypt_store_secret(ApiApplication.query.filter_by(user_id=user.id,status='approved').order_by(ApiApplication.id.desc()).first().encrypted_key) if ApiApplication.query.filter_by(user_id=user.id,status='approved').order_by(ApiApplication.id.desc()).first() else '')
@@ -739,6 +866,94 @@ def public_api_balance():
     user=api_user_from_request()
     if not user: return jsonify(error='unauthorized'),401
     return jsonify(user_id=user.id,balance=round(user.balance_usd,2),currency='USD')
+
+
+@app.route('/api/v1/order', methods=['POST'])
+def public_api_create_order():
+    """Create a NOVA order for an approved API customer and debit their NOVA wallet."""
+    user = api_user_from_request()
+    if not user:
+        return jsonify(success=False, error='unauthorized', message='مفتاح API غير صحيح أو غير معتمد.'), 401
+    data = request.get_json(silent=True) or request.form
+    try:
+        service_id = int(data.get('service_id', 0))
+    except (TypeError, ValueError):
+        return jsonify(success=False, error='invalid_service_id'), 400
+    service = Service.query.get(service_id)
+    if not service or not service.is_available:
+        return jsonify(success=False, error='service_unavailable', message='الخدمة غير موجودة أو غير متاحة.'), 404
+    link = str(data.get('link', '')).strip()
+    if not link:
+        return jsonify(success=False, error='missing_link', message='حقل link مطلوب.'), 400
+    if service.service_type in ('manual', 'smm_fixed'):
+        quantity = 1
+        total = float(service.price or 0)
+    else:
+        try:
+            quantity = int(data.get('quantity', service.min_quantity or 1))
+        except (TypeError, ValueError):
+            return jsonify(success=False, error='invalid_quantity'), 400
+        minimum, maximum = int(service.min_quantity or 1), int(service.max_quantity or 10000)
+        if quantity < minimum or quantity > maximum:
+            return jsonify(success=False, error='quantity_out_of_range', minimum=minimum, maximum=maximum), 400
+        total = float(service.price_per_1000 or service.price or 0) * quantity / 1000
+    if total <= 0:
+        return jsonify(success=False, error='invalid_service_price'), 409
+    # Check balance before contacting a provider; debit only after provider acceptance.
+    if float(user.balance_usd or 0) + 1e-9 < total:
+        return jsonify(success=False, error='insufficient_balance', balance=round(float(user.balance_usd or 0), 2), required=round(total, 4), currency='USD'), 402
+    provider_order_id = ''
+    if service.service_type in ('smm', 'smm_fixed'):
+        provider = SMMProvider.query.filter_by(id=service.api_provider_id, is_active=True).first() if service.api_provider_id else None
+        if not provider or not service.api_service_id:
+            return jsonify(success=False, error='provider_not_configured', message='الخدمة غير مربوطة بمزوّد بشكل صحيح.'), 409
+        try:
+            payload = {'key': reveal_api_key(provider.api_key), 'action': 'add', 'service': str(service.api_service_id), 'link': link, 'quantity': str(quantity)}
+            response = requests.post(provider.api_url, data=payload, headers={'Content-Type': 'application/x-www-form-urlencoded'}, timeout=30)
+            response.raise_for_status()
+            result = response.json()
+            if not isinstance(result, dict) or result.get('error') or result.get('order') in (None, ''):
+                raise ValueError(str(result.get('error') if isinstance(result, dict) else 'Invalid provider response'))
+            provider_order_id = str(result['order'])
+        except Exception as exc:
+            app.logger.warning('API customer provider order failed: %s', exc)
+            return jsonify(success=False, error='provider_rejected', message='المزوّد لم يقبل الطلب. لم يتم خصم رصيدك.'), 502
+    # Recheck balance immediately before debit to reduce concurrent overspending.
+    db.session.refresh(user)
+    if float(user.balance_usd or 0) + 1e-9 < total:
+        return jsonify(success=False, error='insufficient_balance', message='الرصيد لم يعد كافياً. لم يتم تسجيل الطلب.'), 402
+    user.balance_usd = float(user.balance_usd or 0) - total
+    order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link,
+                  quantity=quantity, total_price=total,
+                  status=('قيد التنفيذ' if service.service_type in ('smm', 'smm_fixed') else 'قيد المراجعة'),
+                  provider_order_id=provider_order_id)
+    db.session.add(order)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Could not save API order after provider response')
+        return jsonify(success=False, error='order_save_failed', message='تعذر حفظ الطلب. تواصل مع الدعم قبل إعادة المحاولة.'), 500
+    notify_admins(f'طلب API جديد #{order.id}', f'المستخدم {user.username} (#{user.id}) أرسل طلب API للخدمة {service.name} بقيمة ${format_money(total)}.', url_for('admin'))
+    db.session.commit()
+    return jsonify(success=True, order_id=order.id, service_id=service.id, service=service.name,
+                   quantity=quantity, charge=round(total, 4), balance=round(float(user.balance_usd), 2),
+                   currency='USD', status=order.status, provider_order_id=provider_order_id), 201
+
+
+@app.route('/api/v1/orders', methods=['GET'])
+def public_api_orders():
+    user = api_user_from_request()
+    if not user:
+        return jsonify(success=False, error='unauthorized'), 401
+    try:
+        limit = min(max(int(request.args.get('limit', 50)), 1), 100)
+    except (TypeError, ValueError):
+        limit = 50
+    orders = Order.query.filter_by(user_id=user.id).order_by(Order.id.desc()).limit(limit).all()
+    return jsonify(success=True, orders=[{'order_id': o.id, 'service_id': o.service_id, 'service': o.service_name,
+        'link': o.link, 'quantity': o.quantity, 'charge': round(o.total_price, 4), 'status': o.status,
+        'created_at': o.created_at.isoformat() if o.created_at else None} for o in orders])
 
 @app.route('/profile/change_password', methods=['POST'])
 @login_required
@@ -1933,6 +2148,8 @@ with app.app_context():
             db.session.execute(db.text("ALTER TABLE digital_account_product ADD COLUMN account_username VARCHAR(240) DEFAULT ''"))
         if 'encrypted_username_password' not in digital_columns:
             db.session.execute(db.text("ALTER TABLE digital_account_product ADD COLUMN encrypted_username_password TEXT DEFAULT ''"))
+        if 'platform' not in digital_columns:
+            db.session.execute(db.text("ALTER TABLE digital_account_product ADD COLUMN platform VARCHAR(40) DEFAULT 'other'"))
         db.session.commit()
     except Exception:
         db.session.rollback()

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow"><title>قفل NOVA STORE</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:#0b1220;color:#e8eef8;font-family:Tahoma,Arial,sans-serif}
+    .card{width:min(100%,410px);padding:30px;border:1px solid #263b60;border-radius:24px;background:#111c2e;box-shadow:0 24px 70px #0008;text-align:center}
+    .lock{width:64px;height:64px;margin:0 auto 18px;display:grid;place-items:center;border-radius:20px;background:#2457d622;color:#93c5fd;font-size:30px}
+    h1{font-size:23px;margin:0 0 8px}p{color:#a8b6cc;font-size:14px;line-height:1.8;margin:0 0 22px}
+    input{width:100%;padding:14px;border-radius:12px;border:1px solid #263b60;background:#0b1220;color:#fff;font-size:16px;text-align:center;outline:none}
+    button{width:100%;margin-top:12px;padding:14px;border:0;border-radius:12px;background:#2457d6;color:#fff;font-weight:bold;font-size:15px;cursor:pointer}
+    .flash{margin-bottom:14px;color:#fda4af;font-size:13px}
+  </style>
+</head>
+<body><main class="card">
+  <div class="lock">🔒</div><h1>NOVA STORE مقفل</h1>
+  <p>أدخل كلمة مرور قفل الموقع للمتابعة، {{ user.full_name or user.username }}.</p>
+  {% with messages = get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="flash">{{ message }}</div>{% endfor %}{% endwith %}
+  <form method="post" action="{{ url_for('site_lock_unlock') }}">
+    <input type="password" name="site_password" placeholder="كلمة مرور القفل" autocomplete="current-password" required autofocus>
+    <button type="submit">فتح الموقع</button>
+  </form>
+  <details style="margin-top:18px;text-align:right"><summary style="cursor:pointer;color:#93c5fd;font-size:13px">نسيت كلمة مرور القفل؟</summary>
+    <form method="post" action="{{ url_for('recover_site_lock') }}" style="margin-top:12px">
+      <p style="margin-bottom:10px">يمكنك إلغاء القفل بعد التحقق بكلمة مرور حسابك الأساسية.</p>
+      <input type="password" name="account_password" placeholder="كلمة مرور حسابك" autocomplete="current-password" required>
+      <button type="submit">التحقق وإلغاء قفل الموقع</button>
+    </form>
+  </details>
+</main></body></html>

@@ -972,21 +972,43 @@ def ai_chat():
         reply = 'للتواصل مع فريق الدعم افتح «تواصل مع الدعم» من القائمة، واكتب مشكلتك برسالة. ستبقى المحادثة محفوظة في حسابك.'
     else:
         reply = 'أنا المساعد التجريبي لـ NOVA STORE. اسألني مثلاً: كم رصيدي؟ أين طلبي؟ كيف أشحن المحفظة؟ أو ما الخدمات المتوفرة؟ وللاستفسارات الخاصة استخدم الدعم المباشر.'
-    # Optional free-tier model via Groq. Set GROQ_API_KEY in deployment environment.
-    api_key=os.environ.get('GROQ_API_KEY','').strip()
+    # Optional AI response through OpenRouter. Keep the API key in the server environment only.
+    api_key = os.environ.get('OPENROUTER_API_KEY', '').strip()
     if api_key:
         try:
             import requests as _requests
-            context='NOVA STORE: digital-services shop. Help in Arabic/Syrian dialect, concise. Do not claim to perform actions. For account-specific info use provided context. User context: '+(
-                f'username={user.username}, balance={format_money(user.balance_usd)}' if user else 'guest')
-            response=_requests.post('https://api.groq.com/openai/v1/chat/completions',
-                headers={'Authorization':'Bearer '+api_key,'Content-Type':'application/json'},
-                json={'model':os.environ.get('GROQ_MODEL','llama-3.1-8b-instant'),
-                      'messages':[{'role':'system','content':context},{'role':'user','content':message}],
-                      'max_tokens':350,'temperature':0.5},timeout=12)
+            context = (
+                'You are the NOVA STORE customer-support assistant. '
+                'Reply in concise, natural Arabic (prefer Syrian dialect). '
+                'Help with services, orders, wallet deposits, and store navigation. '
+                'Never claim you completed an action or changed account data. '
+                'For account-specific facts, rely only on the supplied context. '
+                f'User: {user.username}; current balance: {format_money(user.balance_usd)} USD.'
+            )
+            headers = {
+                'Authorization': 'Bearer ' + api_key,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': os.environ.get('APP_URL', 'https://nova-store.local'),
+                'X-Title': 'NOVA STORE'
+            }
+            response = _requests.post(
+                'https://openrouter.ai/api/v1/chat/completions',
+                headers=headers,
+                json={
+                    'model': os.environ.get('OPENROUTER_MODEL', 'openrouter/auto'),
+                    'messages': [
+                        {'role': 'system', 'content': context},
+                        {'role': 'user', 'content': message}
+                    ],
+                    'max_tokens': 450,
+                    'temperature': 0.5
+                },
+                timeout=20
+            )
             if response.ok:
-                generated=response.json().get('choices',[{}])[0].get('message',{}).get('content','').strip()
-                if generated: reply=generated
+                generated = response.json().get('choices', [{}])[0].get('message', {}).get('content', '').strip()
+                if generated:
+                    reply = generated
         except Exception:
             pass
     return jsonify(reply=reply)

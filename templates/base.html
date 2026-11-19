@@ -4,13 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NOVA STORE</title>
-    <meta name="description" content="NOVA STORE - متجر رقمي لشراء الخدمات الرقمية وشحن الألعاب وحسابات التواصل الاجتماعي مع دعم فني ومتابعة الطلبات.">
-    <meta name="robots" content="index,follow,max-image-preview:large">
-    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}{{ request.path }}">
-    <meta property="og:type" content="website"><meta property="og:site_name" content="NOVA STORE">
-    <meta property="og:title" content="NOVA STORE | المتجر الرقمي">
-    <meta property="og:description" content="خدمات رقمية وشحن ألعاب وحسابات تواصل اجتماعي ودعم فني.">
-    <meta property="og:url" content="{{ request.url }}">
+    <meta name="description" content="NOVA STORE - منصتك للخدمات الرقمية وشحن الألعاب وخدمات التواصل الاجتماعي بسرعة وأمان.">
     <meta name="theme-color" content="#08091b">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -99,8 +93,6 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
   .ai-form button{min-width:116px}
 }
 @media(min-width:1440px){body>main{max-width:1680px;padding-left:44px;padding-right:44px}.ai-page{width:min(1240px,calc(100% - 64px))!important;max-width:1240px!important}}
-@media(min-width:1024px){ #sidebarMenu{width:292px;padding:22px}#sidebarMenu .space-y-4>a{padding-top:.68rem!important;padding-bottom:.68rem!important}body>main{max-width:1320px!important;padding-left:28px!important;padding-right:28px!important}header>div{max-width:1320px!important}}
-#novaSortableMenu>a{cursor:grab}#novaSortableMenu>a.nova-dragging{opacity:.45;cursor:grabbing}#novaSortableMenu>a.nova-drop-target{outline:1px dashed #60a5fa;outline-offset:3px}
 </style></head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
 <div id="novaLoading" aria-live="polite"><div class="nova-loader"><img src="{{ url_for('static',filename='images/nova-symbol.svg') }}" alt="NOVA"><div class="nova-spin"></div><div class="text-white text-sm font-black">NOVA STORE</div><div class="text-slate-400 text-xs mt-2">جاري إتمام العملية...</div></div></div>
@@ -125,7 +117,7 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
             </div>
             
             <button type="button" onclick="toggleTheme()" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 text-xs font-bold mb-4"><span>المظهر: ليلي / نهاري</span><span id="themeToggleIcon">☀️</span></button>
-            <div id="novaSortableMenu" class="space-y-4" aria-label="روابط القائمة القابلة لإعادة الترتيب">
+            <div class="space-y-4">
                 <a href="/" class="flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800">
                     <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                     <span>الرئيسية</span>
@@ -316,11 +308,5 @@ document.addEventListener('submit',e=>{if(e.target.matches('form')&&!e.target.da
 document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(a&&!a.target&&!a.href.startsWith('javascript:')&&!a.href.includes('#')&&a.origin===location.origin){overlay.classList.add('active');}});
 window.addEventListener('pageshow',()=>overlay.classList.remove('active'));
 })();
-</script><script>
-(()=>{const box=document.getElementById('novaSortableMenu');if(!box)return;let drag=null;const key='nova-menu-order-v1';
-function restore(){try{const order=JSON.parse(localStorage.getItem(key)||'[]');if(!Array.isArray(order))return;const items=[...box.children];order.forEach(h=>{const el=items.find(x=>x.getAttribute('href')===h);if(el)box.appendChild(el)});}catch(e){}}
-function save(){try{localStorage.setItem(key,JSON.stringify([...box.children].map(x=>x.getAttribute('href'))));}catch(e){}}
-[...box.children].forEach(el=>{el.draggable=true;el.addEventListener('dragstart',e=>{drag=el;el.classList.add('nova-dragging');e.dataTransfer.effectAllowed='move';});el.addEventListener('dragend',()=>{el.classList.remove('nova-dragging');box.querySelectorAll('.nova-drop-target').forEach(x=>x.classList.remove('nova-drop-target'));save();});el.addEventListener('dragover',e=>{if(!drag||drag===el)return;e.preventDefault();el.classList.add('nova-drop-target');});el.addEventListener('dragleave',()=>el.classList.remove('nova-drop-target'));el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('nova-drop-target');if(!drag||drag===el)return;const r=el.getBoundingClientRect();box.insertBefore(drag,e.clientY>r.top+r.height/2?el.nextSibling:el);});});restore();})();
-</script>
-</body>
+</script></body>
 </html>

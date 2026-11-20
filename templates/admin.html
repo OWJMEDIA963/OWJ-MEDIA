@@ -33,17 +33,13 @@
         </div>
         <div class="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
             <a href="/admin/export_backup" class="bg-cyan-500 hover:bg-cyan-400 text-gray-950 px-4 py-2.5 rounded-2xl text-xs font-black transition shadow text-center">
-                تنزيل نسخة احتياطية كاملة (ZIP)
-            </a>
-            <a href="/admin/export_backup_csv" class="border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-200 px-4 py-2.5 rounded-2xl text-xs font-bold transition text-center">
-                تنزيل CSV قديم (بدون صور)
+                تنزيل نسخة احتياطية كاملة (CSV)
             </a>
             <form action="/admin/import_backup" method="POST" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-2 rounded-2xl border border-gray-700 bg-gray-950 p-2">
-                <input type="file" name="backup_file" accept=".zip,.csv,application/zip,text/csv" required class="max-w-full text-[10px] text-gray-300 file:mr-2 file:rounded-lg file:border-0 file:bg-gray-800 file:px-3 file:py-2 file:text-white">
+                <input type="file" name="backup_file" accept=".csv,text/csv" required class="max-w-full text-[10px] text-gray-300 file:mr-2 file:rounded-lg file:border-0 file:bg-gray-800 file:px-3 file:py-2 file:text-white">
                 <button type="submit" onclick="return confirm('تحذير: ستستبدل هذه العملية بيانات قاعدة الموقع الحالية بالكامل بالبيانات الموجودة في النسخة الاحتياطية، بما فيها الحسابات والأرصدة والطلبات والخدمات والوكلاء والشكاوى. خذ نسخة احتياطية حالية أولاً. هل تريد المتابعة؟')" class="bg-amber-400 hover:bg-amber-300 text-gray-950 px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap">استعادة النسخة الكاملة</button>
             </form>
         </div>
-        <p class="text-[11px] leading-6 text-gray-400">نسخة ZIP تشمل قاعدة البيانات وكامل ملفات مجلد static، بما فيها صور المنتجات والأقسام والبنرات والملفات المرفوعة. يمكن استعادة ملفات CSV القديمة، لكنها لا تتضمن الصور.</p>
         <div class="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
             <a href="/admin/support" class="bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-2xl text-xs font-black text-center">الشكاوى ورسائل الدعم</a>
         </div>

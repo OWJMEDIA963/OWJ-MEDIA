@@ -157,6 +157,33 @@
 /* Royal-blue category detail styling */
 .category-card,.service-card{background:#111c2e!important;border-color:#263b60!important;box-shadow:0 4px 14px rgba(0,0,0,.18)!important}
 </style>
+
+<style>
+/* Desktop category layout only. No mobile selectors are changed. */
+@media (min-width:1024px) {
+  .owj-products-grid {
+    grid-template-columns:repeat(auto-fill,minmax(230px,270px))!important;
+    justify-content:center!important;
+    gap:22px!important;
+    align-items:stretch!important;
+  }
+  .owj-service-card { border-radius:18px!important; }
+  .owj-service-media { aspect-ratio: 5/4!important; }
+  .owj-service-content { min-height:104px!important; padding:13px 14px 9px!important; }
+  .owj-service-content h3 { font-size:15px!important; }
+  .owj-service-card button { min-height:40px!important; font-size:13px!important; }
+  .owj-subcategory-grid {
+    grid-template-columns:repeat(auto-fill,minmax(210px,250px))!important;
+    justify-content:center!important;
+    gap:22px!important;
+  }
+  .max-w-7xl.mx-auto { max-width:1180px!important; }
+}
+@media (min-width:1440px) {
+  .owj-products-grid { grid-template-columns:repeat(auto-fill,minmax(240px,280px))!important; }
+  .owj-subcategory-grid { grid-template-columns:repeat(auto-fill,minmax(220px,260px))!important; }
+}
+</style>
 <div class="max-w-7xl mx-auto px-3 sm:px-5 py-5 sm:py-7 space-y-6">
     <div class="bg-gray-900 border border-gray-800 rounded-2xl py-3 px-4 text-center shadow">
         <h1 class="text-base sm:text-xl font-black text-white">{{ category.name }}</h1>

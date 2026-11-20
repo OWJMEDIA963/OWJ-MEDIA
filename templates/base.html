@@ -101,6 +101,20 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
 @media(min-width:1440px){body>main{max-width:1680px;padding-left:44px;padding-right:44px}.ai-page{width:min(1240px,calc(100% - 64px))!important;max-width:1240px!important}}
 @media(min-width:1024px){ #sidebarMenu{width:292px;padding:22px}#sidebarMenu .space-y-4>a{padding-top:.68rem!important;padding-bottom:.68rem!important}body>main{max-width:1320px!important;padding-left:28px!important;padding-right:28px!important}header>div{max-width:1320px!important}}
 #novaSortableMenu>a{cursor:grab}#novaSortableMenu>a.nova-dragging{opacity:.45;cursor:grabbing}#novaSortableMenu>a.nova-drop-target{outline:1px dashed #60a5fa;outline-offset:3px}
+
+/* NOVA desktop-only layout polish: mobile rules remain untouched */
+@media (min-width: 1024px) {
+  body { min-height:100vh; }
+  body > main { width:min(1180px, calc(100% - 64px))!important; max-width:1180px!important; margin:0 auto!important; padding:28px 0 56px!important; }
+  header > div { width:min(1180px, calc(100% - 64px))!important; max-width:1180px!important; min-height:68px!important; }
+  #sidebarMenu { width:300px!important; padding:24px!important; }
+  #owjBotWindow { width:390px!important; max-width:calc(100vw - 48px)!important; }
+  nav[aria-label], body > nav { max-width:100%!important; }
+}
+@media (min-width: 1440px) {
+  body > main { width:min(1240px, calc(100% - 96px))!important; max-width:1240px!important; }
+  header > div { width:min(1240px, calc(100% - 96px))!important; max-width:1240px!important; }
+}
 </style></head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
 <div id="novaLoading" aria-live="polite"><div class="nova-loader"><img src="{{ url_for('static',filename='images/nova-symbol.svg') }}" alt="NOVA"><div class="nova-spin"></div><div class="text-white text-sm font-black">NOVA STORE</div><div class="text-slate-400 text-xs mt-2">جاري إتمام العملية...</div></div></div>

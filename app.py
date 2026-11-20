@@ -166,11 +166,19 @@ class MerchantApplication(db.Model):
     id=db.Column(db.Integer,primary_key=True)
     user_id=db.Column(db.Integer,db.ForeignKey('user.id'),nullable=False)
     details=db.Column(db.Text,default='')
+    facebook_url=db.Column(db.String(500),default='')
+    instagram_url=db.Column(db.String(500),default='')
     status=db.Column(db.String(20),default='pending')
     weekly_bonus=db.Column(db.Float,default=0.0)
     last_bonus_at=db.Column(db.DateTime,default=None)
     created_at=db.Column(db.DateTime,default=datetime.utcnow)
     user=db.relationship('User')
+
+class SocialLink(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    platform = db.Column(db.String(30), unique=True, nullable=False)
+    url = db.Column(db.String(500), default='')
+
 
 class ApiApplication(db.Model):
     id=db.Column(db.Integer,primary_key=True)
@@ -768,9 +776,21 @@ def merchant_request():
     elif MerchantApplication.query.filter_by(user_id=current_user().id,status='pending').first():
         flash('لديك طلب تاجر قيد المراجعة.','warning')
     else:
-        req=MerchantApplication(user_id=current_user().id,details=request.form.get('details','').strip())
+        user = current_user()
+        if float(user.balance_usd or 0) < 1.0:
+            flash('يشترط شحن المحفظة بمبلغ دولار واحد على الأقل قبل طلب صفة تاجر.', 'error')
+            return redirect(url_for('profile'))
+        facebook_url = request.form.get('facebook_url', '').strip()
+        instagram_url = request.form.get('instagram_url', '').strip()
+        def valid_social_url(value):
+            return not value or (value.startswith('https://') and len(value) <= 500)
+        if not facebook_url or not instagram_url or not valid_social_url(facebook_url) or not valid_social_url(instagram_url):
+            flash('أدخل رابط صفحتك على فيسبوك ورابط حسابك على إنستغرام بصيغة https:// صحيحة.', 'error')
+            return redirect(url_for('profile'))
+        req=MerchantApplication(user_id=user.id,details=request.form.get('details','').strip(),
+                                facebook_url=facebook_url, instagram_url=instagram_url)
         db.session.add(req); db.session.commit()
-        notify_admins('طلب حساب تاجر',f'{current_user().username} طلب حساب تاجر.',url_for('admin_requests_extra'))
+        notify_admins('طلب حساب تاجر',f'{user.username} طلب حساب تاجر. فيسبوك: {facebook_url} | إنستغرام: {instagram_url}',url_for('admin_requests_extra'))
         db.session.commit(); flash('تم إرسال طلب التاجر للمراجعة.','success')
     return redirect(url_for('profile'))
 
@@ -1180,8 +1200,25 @@ def deposit():
 
 @app.route('/agents')
 def agents(): return render_template('agents.html', agents=Agent.query.order_by(Agent.id.desc()).all())
+@app.route('/admin/social-links', methods=['POST'])
+@admin_required
+def admin_social_links():
+    for platform in ('whatsapp', 'facebook', 'instagram'):
+        value = request.form.get(platform, '').strip()
+        if value and (not value.startswith('https://') or len(value) > 500):
+            flash('يجب أن يبدأ كل رابط بـ https:// وألا يتجاوز 500 حرف.', 'error')
+            return redirect(url_for('admin'))
+        item = SocialLink.query.filter_by(platform=platform).first()
+        if not item:
+            item = SocialLink(platform=platform)
+            db.session.add(item)
+        item.url = value
+    db.session.commit()
+    flash('تم حفظ روابط التواصل الاجتماعي.', 'success')
+    return redirect(url_for('admin'))
+
 @app.route('/about')
-def about(): return render_template('about.html')
+def about(): return render_template('about.html', social_links={x.platform:x.url for x in SocialLink.query.all()})
 @app.route('/ai_bot')
 @login_required
 def ai_bot(): return render_template('ai_bot.html', user_name=current_user().full_name or current_user().username)
@@ -1393,7 +1430,7 @@ def service_worker():
 def admin_accounts():
     account_lookup_id = request.args.get('account_id', type=int)
     account_lookup = db.session.get(User, account_lookup_id) if account_lookup_id else None
-    return render_template('admin_accounts.html', account_lookup=account_lookup, account_lookup_id=account_lookup_id)
+    return render_template('admin_accounts.html', account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in SocialLink.query.all()})
 
 
 @app.route('/admin')
@@ -1403,7 +1440,7 @@ def admin():
     account_lookup = db.session.get(User, account_lookup_id) if account_lookup_id else None
     all_categories = Category.query.all()
     ordered_categories = sorted(all_categories, key=lambda item: (0 if item.parent_id is None else item.parent_id, item.sort_order or 0, item.id))
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id)
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in SocialLink.query.all()})
 
 
 @app.route('/account-banned/<int:user_id>', methods=['GET'])
@@ -2168,6 +2205,16 @@ with app.app_context():
         service_columns = {column['name'] for column in inspect(db.engine).get_columns('service')}
         if 'extra_details' not in service_columns:
             db.session.execute(db.text("ALTER TABLE service ADD COLUMN extra_details TEXT DEFAULT ''"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    # Add merchant social profile URLs to existing databases.
+    try:
+        from sqlalchemy import inspect
+        merchant_columns = {column['name'] for column in inspect(db.engine).get_columns('merchant_application')}
+        for col in ('facebook_url', 'instagram_url'):
+            if col not in merchant_columns:
+                db.session.execute(db.text(f"ALTER TABLE merchant_application ADD COLUMN {col} VARCHAR(500) DEFAULT ''"))
         db.session.commit()
     except Exception:
         db.session.rollback()

@@ -1,5 +1,15 @@
 {% extends "base.html" %}
-{% block title %}لوحة التحكم الإدارية{% endblock %}
+{% block title %}لوحة التحكم الإدارية<section class="mx-auto my-8 max-w-5xl rounded-3xl border border-cyan-400/20 bg-gray-900 p-6 space-y-4">
+  <h2 class="text-lg font-black text-cyan-300">روابط حسابات NOVA STORE الاجتماعية</h2>
+  <p class="text-xs leading-6 text-gray-400">أضف الروابط لاحقاً أو اترك الحقل فارغاً لإخفاء الأيقونة من صفحة «من نحن».</p>
+  <form method="post" action="{{ url_for('admin_social_links') }}" class="grid gap-3">
+    <label class="text-xs text-gray-300">رابط واتساب <input type="url" name="whatsapp" value="{{ social_links.get('whatsapp','') }}" placeholder="https://wa.me/..." dir="ltr" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label>
+    <label class="text-xs text-gray-300">رابط فيسبوك <input type="url" name="facebook" value="{{ social_links.get('facebook','') }}" placeholder="https://facebook.com/..." dir="ltr" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label>
+    <label class="text-xs text-gray-300">رابط إنستغرام <input type="url" name="instagram" value="{{ social_links.get('instagram','') }}" placeholder="https://instagram.com/..." dir="ltr" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label>
+    <button class="rounded-xl bg-cyan-600 p-3 text-sm font-black text-white">حفظ روابط التواصل</button>
+  </form>
+</section>
+{% endblock %}
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
     <!-- بطاقة إدارة الحسابات: مستقلة وبأعلى الصفحة لتظهر بوضوح على الهاتف -->

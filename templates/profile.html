@@ -47,13 +47,17 @@
           </summary>
           <div class="border-t border-blue-400/10 p-4">
             <p class="text-xs leading-6 text-gray-400">تراجع الإدارة الطلب. بعد الموافقة، يمكن تحديد دفعة أسبوعية، وتبقى الأسعار حسب إعدادات المتجر.</p>
+            <p class="mt-2 text-xs leading-6 text-amber-200">شرط التقديم: شحن محفظتك في الموقع بمبلغ إجمالي لا يقل عن 1 دولار، وإرفاق رابط صفحتك على فيسبوك ورابط حسابك على إنستغرام.</p>
             {% if merchant_application %}
-              <p class="mt-3 text-sm text-gray-200">حالة الطلب:
+              <p class="mt-3 text-sm text-gray-200">آخر طلب:
                 <b class="{% if merchant_application.status == 'approved' %}text-emerald-400{% elif merchant_application.status == 'rejected' %}text-rose-400{% else %}text-amber-300{% endif %}">{{ 'مقبول' if merchant_application.status == 'approved' else ('مرفوض' if merchant_application.status == 'rejected' else 'قيد المراجعة') }}</b>
               </p>
               {% if merchant_application.status == 'approved' %}<p class="mt-2 text-xs text-gray-300">الدفعة الأسبوعية: ${{ merchant_application.weekly_bonus|money }}</p>{% endif %}
-            {% else %}
+            {% endif %}
+            {% if not user.is_trusted_merchant and (not merchant_application or merchant_application.status != 'pending') %}
               <form method="post" action="{{ url_for('merchant_request') }}" class="mt-3 space-y-3">
+                <input type="url" name="facebook_url" required placeholder="رابط صفحتك على Facebook (https://...)" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white" dir="ltr">
+                <input type="url" name="instagram_url" required placeholder="رابط حسابك على Instagram (https://...)" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white" dir="ltr">
                 <textarea name="details" rows="3" placeholder="معلومات إضافية (اختياري)" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white"></textarea>
                 <button class="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-black text-white">إرسال طلب تاجر</button>
               </form>

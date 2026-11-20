@@ -25,7 +25,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('RENDER', '').lower() == 'true'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///owj_media.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 512 * 1024 * 1024
 
 
 def _api_cipher():
@@ -461,6 +461,15 @@ def admin_required(fn):
     def wrapped(*args, **kwargs):
         user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
         if not user or user.role != 'admin': abort(403)
+        return fn(*args, **kwargs)
+    return wrapped
+
+def employee_required(fn):
+    @wraps(fn)
+    def wrapped(*args, **kwargs):
+        user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
+        if not user or user.role not in ('admin', 'employee'):
+            abort(403)
         return fn(*args, **kwargs)
     return wrapped
 
@@ -1443,6 +1452,70 @@ def admin():
     return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in SocialLink.query.all()})
 
 
+@app.route('/employee')
+@login_required
+@employee_required
+def employee_dashboard():
+    return render_template('employee_dashboard.html',
+        tickets=SupportTicket.query.order_by(SupportTicket.updated_at.desc()).all(),
+        merchant_requests=MerchantApplication.query.filter_by(status='pending').order_by(MerchantApplication.id.desc()).all(),
+        users_count=User.query.filter_by(role='user').count())
+
+@app.route('/employee/support/<int:ticket_id>', methods=['POST'])
+@login_required
+@employee_required
+def employee_reply(ticket_id):
+    ticket = SupportTicket.query.get_or_404(ticket_id)
+    content = request.form.get('message','').strip()
+    if not content or len(content) > 5000:
+        flash('اكتب رداً صحيحاً لا يتجاوز 5000 حرفاً.', 'error')
+    else:
+        db.session.add(SupportMessage(ticket_id=ticket.id, sender_id=current_user().id, sender_role='admin', content=content))
+        ticket.status='تم الرد'; ticket.updated_at=datetime.utcnow()
+        send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق NOVA STORE بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
+        db.session.commit(); flash('تم إرسال الرد للعميل.', 'success')
+    return redirect(url_for('employee_dashboard'))
+
+@app.route('/employee/merchant/<int:req_id>', methods=['POST'])
+@login_required
+@employee_required
+def employee_merchant(req_id):
+    req=MerchantApplication.query.get_or_404(req_id)
+    if req.status != 'pending':
+        flash('تمت معالجة هذا الطلب مسبقاً.', 'warning')
+        return redirect(url_for('employee_dashboard'))
+    action=request.form.get('action')
+    if action == 'approve':
+        req.status='approved'; req.user.is_trusted_merchant=True
+        req.weekly_bonus=0.0; req.last_bonus_at=datetime.utcnow()
+        send_user_notification(req.user_id,'تم قبول طلب التاجر','تم توثيق حسابك كتاجر في NOVA STORE.',url_for('profile'))
+    elif action == 'reject':
+        req.status='rejected'
+        send_user_notification(req.user_id,'تم رفض طلب التاجر','يمكنك التواصل مع الدعم لمعرفة التفاصيل.',url_for('support'))
+    else:
+        flash('إجراء غير صالح.', 'error'); return redirect(url_for('employee_dashboard'))
+    db.session.commit(); flash('تم تحديث طلب التاجر.', 'success')
+    return redirect(url_for('employee_dashboard'))
+
+@app.route('/employee/transfer', methods=['POST'])
+@login_required
+@employee_required
+def employee_transfer():
+    username=request.form.get('username','').strip()
+    amount=request.form.get('amount',type=float)
+    reason=request.form.get('reason','').strip()[:500]
+    target=User.query.filter_by(username=username).first()
+    if not target or target.role in ('admin','employee'):
+        flash('لم يتم العثور على زبون صالح بهذا الاسم.', 'error')
+    elif amount is None or not math.isfinite(amount) or amount <= 0 or round(amount,2) != amount:
+        flash('أدخل مبلغاً صحيحاً أكبر من صفر وبحد أقصى منزلتين عشريتين.', 'error')
+    else:
+        target.balance_usd=round(float(target.balance_usd or 0)+amount,2)
+        db.session.add(WalletTransaction(user_id=target.id, admin_id=current_user().id, transaction_type='deposit', amount=amount, reason=reason or 'تحويل رصيد من موظف الدعم'))
+        send_user_notification(target.id,'تمت إضافة رصيد إلى محفظتك',f'تمت إضافة ${format_money(amount)} إلى رصيدك. السبب: {reason or "تحويل من فريق الدعم"}',url_for('profile'))
+        db.session.commit(); flash(f'تم تحويل ${format_money(amount)} إلى {target.username}.', 'success')
+    return redirect(url_for('employee_dashboard'))
+
 @app.route('/account-banned/<int:user_id>', methods=['GET'])
 def banned_account(user_id):
     user = db.session.get(User, user_id)
@@ -1992,9 +2065,74 @@ def delete_service():
     if service: db.session.delete(service); db.session.commit(); flash('تم حذف الخدمة.', 'success')
     return redirect(url_for('admin'))
 
+
 @app.route('/admin/export_backup')
 @admin_required
 def export_backup():
+    """Create a portable ZIP backup containing every DB table and the complete static tree."""
+    import csv, io, json, zipfile, hashlib
+    from flask import Response
+
+    csv_buffer = io.StringIO(newline='')
+    writer = csv.writer(csv_buffer)
+    writer.writerow(['backup_format', 'owj_media_full_backup_v3'])
+    writer.writerow(['table_name', 'row_json'])
+    record_count = 0
+    table_counts = {}
+    for mapper in sorted(db.Model.registry.mappers, key=lambda item: item.local_table.name):
+        model = mapper.class_
+        writer.writerow(['__table__', model.__tablename__])
+        query = model.query.order_by(model.id) if hasattr(model, 'id') else model.query
+        count = 0
+        for obj in query.all():
+            data = {}
+            for column in mapper.columns:
+                value = getattr(obj, column.key)
+                if isinstance(value, datetime):
+                    value = value.isoformat()
+                data[column.key] = value
+            writer.writerow([model.__tablename__, json.dumps(data, ensure_ascii=False, separators=(',', ':'))])
+            record_count += 1
+            count += 1
+        table_counts[model.__tablename__] = count
+
+    static_root = os.path.join(app.root_path, 'static')
+    files_meta = {}
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+        database_bytes = ('\ufeff' + csv_buffer.getvalue()).encode('utf-8')
+        archive.writestr('database.csv', database_bytes)
+        if os.path.isdir(static_root):
+            for current, dirs, filenames in os.walk(static_root, followlinks=False):
+                dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(current, d))]
+                for filename in filenames:
+                    full_path = os.path.join(current, filename)
+                    if os.path.islink(full_path) or not os.path.isfile(full_path):
+                        continue
+                    relative = os.path.relpath(full_path, app.root_path).replace(os.sep, '/')
+                    with open(full_path, 'rb') as source:
+                        content = source.read()
+                    archive.writestr(relative, content)
+                    files_meta[relative] = {'size': len(content), 'sha256': hashlib.sha256(content).hexdigest()}
+        manifest = {
+            'format': 'nova_store_full_backup_zip_v1',
+            'created_at': datetime.utcnow().isoformat() + 'Z',
+            'database_file': 'database.csv',
+            'record_count': record_count,
+            'table_counts': table_counts,
+            'files': files_meta,
+            'file_count': len(files_meta)
+        }
+        archive.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False, indent=2))
+    return Response(archive_buffer.getvalue(), mimetype='application/zip', headers={
+        'Content-Disposition': 'attachment; filename=NOVA_STORE_full_backup.zip',
+        'Cache-Control': 'no-store'
+    })
+
+
+@app.route('/admin/export_backup_csv')
+@admin_required
+def export_backup_csv():
     """Export all mapped application tables into a portable CSV backup."""
     import csv, io, json
     from flask import Response
@@ -2030,7 +2168,8 @@ def export_backup():
 @admin_required
 def import_backup():
     """Validate and atomically restore a complete v2/v3 CSV database backup."""
-    import csv, io, json
+    import csv, io, json, zipfile, tempfile, shutil, hashlib, stat
+    from pathlib import PurePosixPath
     from sqlalchemy import text
     from sqlalchemy.types import DateTime, Integer
 
@@ -2038,14 +2177,80 @@ def import_backup():
     if not file or not file.filename:
         flash('اختر ملف النسخة الاحتياطية CSV أولاً.', 'error')
         return redirect(url_for('admin'))
-    if not file.filename.lower().endswith('.csv'):
-        flash('الملف يجب أن يكون بصيغة CSV.', 'error')
+    if not file.filename.lower().endswith(('.csv', '.zip')):
+        flash('ارفع نسخة ZIP الجديدة أو ملف CSV قديم.', 'error')
         return redirect(url_for('admin'))
 
+    staged_static = None
+    old_static = None
+    static_swapped = False
+    restored_image_count = 0
     ignored_backup_columns = set()
     ignored_backup_tables = set()
     try:
-        raw = file.stream.read().decode('utf-8-sig')
+        uploaded_bytes = file.stream.read()
+        if len(uploaded_bytes) > 512 * 1024 * 1024:
+            raise ValueError('حجم النسخة يتجاوز الحد المسموح (512 ميغابايت).')
+        if file.filename.lower().endswith('.zip'):
+            temp_root = tempfile.mkdtemp(prefix='nova_restore_', dir=app.root_path)
+            staged_static = os.path.join(temp_root, 'static')
+            os.makedirs(staged_static, exist_ok=True)
+            try:
+                archive_bytes = io.BytesIO(uploaded_bytes)
+                with zipfile.ZipFile(archive_bytes, 'r') as archive:
+                    bad_member = archive.testzip()
+                    if bad_member:
+                        raise ValueError('ملف ZIP تالف: فشل فحص أحد الملفات.')
+                    names = archive.namelist()
+                    if len(names) > 20000 or len(names) != len(set(names)):
+                        raise ValueError('النسخة تحتوي عدداً كبيراً جداً من الملفات أو أسماء مكررة.')
+                    if 'manifest.json' not in names or 'database.csv' not in names:
+                        raise ValueError('النسخة لا تحتوي manifest.json أو database.csv.')
+                    if archive.getinfo('manifest.json').file_size > 5 * 1024 * 1024 or archive.getinfo('database.csv').file_size > 200 * 1024 * 1024:
+                        raise ValueError('حجم manifest أو قاعدة البيانات داخل ZIP يتجاوز الحد الآمن.')
+                    manifest = json.loads(archive.read('manifest.json').decode('utf-8'))
+                    if manifest.get('format') != 'nova_store_full_backup_zip_v1':
+                        raise ValueError('إصدار ZIP غير مدعوم.')
+                    declared = manifest.get('files')
+                    if not isinstance(declared, dict) or manifest.get('file_count') != len(declared):
+                        raise ValueError('قائمة ملفات النسخة غير صالحة أو غير مكتملة.')
+                    total_uncompressed = archive.getinfo('database.csv').file_size + archive.getinfo('manifest.json').file_size
+                    if total_uncompressed > 1024 * 1024 * 1024:
+                        raise ValueError('حجم النسخة بعد فك الضغط يتجاوز الحدود الآمنة.')
+                    for info in archive.infolist():
+                        name = info.filename
+                        if name in ('manifest.json', 'database.csv'):
+                            continue
+                        path = PurePosixPath(name)
+                        mode = (info.external_attr >> 16) & 0xFFFF
+                        if '\\' in name or path.is_absolute() or '..' in path.parts or not path.parts or path.parts[0] != 'static' or stat.S_ISLNK(mode):
+                            raise ValueError('النسخة تحتوي مساراً غير آمن: ' + name)
+                        if info.is_dir():
+                            continue
+                        if name not in declared:
+                            raise ValueError('ملف غير معرّف في manifest: ' + name)
+                        total_uncompressed += info.file_size
+                        if info.file_size > 100 * 1024 * 1024 or total_uncompressed > 1024 * 1024 * 1024:
+                            raise ValueError('حجم الملفات بعد فك الضغط يتجاوز الحدود الآمنة.')
+                        content = archive.read(info)
+                        meta = declared[name]
+                        if len(content) != meta.get('size') or hashlib.sha256(content).hexdigest() != meta.get('sha256'):
+                            raise ValueError('فشل التحقق من سلامة الملف: ' + name)
+                        target = os.path.realpath(os.path.join(temp_root, *path.parts))
+                        if os.path.commonpath([os.path.realpath(temp_root), target]) != os.path.realpath(temp_root):
+                            raise ValueError('مسار ملف غير مسموح.')
+                        os.makedirs(os.path.dirname(target), exist_ok=True)
+                        with open(target, 'wb') as destination:
+                            destination.write(content)
+                        if name.startswith('static/uploads/'):
+                            restored_image_count += 1
+                    if set(declared) != {n for n in names if n.startswith('static/') and not n.endswith('/')}:
+                        raise ValueError('قائمة الملفات داخل manifest لا تطابق محتويات ZIP.')
+                    raw = archive.read('database.csv').decode('utf-8-sig')
+            except zipfile.BadZipFile:
+                raise ValueError('ملف ZIP غير صالح أو تالف.')
+        else:
+            raw = uploaded_bytes.decode('utf-8-sig')
         rows = list(csv.reader(io.StringIO(raw)))
         if not rows or len(rows[0]) != 2 or rows[0][0] != 'backup_format' or rows[0][1] not in ('owj_media_full_backup_v2', 'owj_media_full_backup_v3'):
             raise ValueError('صيغة النسخة غير مدعومة. نزّل نسخة جديدة من زر «تنزيل نسخة احتياطية كاملة (CSV)» ثم ارفعها.')
@@ -2145,6 +2350,21 @@ def import_backup():
                             "GREATEST(COALESCE((SELECT MAX(\"" + pk.name + "\") FROM \"" + table + "\"), 1), 1), true)"
                         ), {'table_name': table, 'column_name': pk.name})
 
+            # Install the already-validated static tree before the DB transaction commits.
+            # Keep the previous tree so any exception can restore it.
+            if staged_static:
+                static_root = os.path.join(app.root_path, 'static')
+                old_static = os.path.join(tempfile.mkdtemp(prefix='nova_static_old_', dir=app.root_path), 'static')
+                if os.path.exists(static_root):
+                    os.replace(static_root, old_static)
+                try:
+                    os.replace(staged_static, static_root)
+                    static_swapped = True
+                except Exception:
+                    if os.path.exists(old_static):
+                        os.replace(old_static, static_root)
+                    raise
+
         nonempty_tables = sum(1 for items in grouped.values() if items)
         details = '، '.join(f'{table}: {len(items)}' for table, items in grouped.items() if items)
         message = f'تم التحقق من الاستعادة بنجاح: {total_records} سجلًا في {nonempty_tables} جداول. {details}'
@@ -2160,14 +2380,49 @@ def import_backup():
             if len(ignored_backup_tables) > 8:
                 suffix += ' وغيرها'
             message += suffix + ')'
+        if file.filename.lower().endswith('.zip'):
+            message += f' وتمت استعادة {restored_image_count} ملف صورة/وسائط من مجلدات الموقع.'
+        else:
+            message += ' تنبيه: نسخة CSV القديمة لا تحتوي الصور أو الملفات المرفوعة.'
         flash(message, 'success')
+        if old_static and os.path.exists(old_static):
+            shutil.rmtree(os.path.dirname(old_static), ignore_errors=True)
     except Exception as exc:
         db.session.rollback()
+        if static_swapped:
+            static_root = os.path.join(app.root_path, 'static')
+            failed_static = os.path.join(tempfile.mkdtemp(prefix='nova_static_failed_', dir=app.root_path), 'static')
+            try:
+                if os.path.exists(static_root):
+                    os.replace(static_root, failed_static)
+                if old_static and os.path.exists(old_static):
+                    os.replace(old_static, static_root)
+            finally:
+                if os.path.exists(os.path.dirname(failed_static)):
+                    shutil.rmtree(os.path.dirname(failed_static), ignore_errors=True)
         flash('فشلت الاستعادة ولم تُعتمد أي تغييرات. السبب: ' + str(exc), 'error')
+    finally:
+        if staged_static:
+            shutil.rmtree(os.path.dirname(staged_static), ignore_errors=True)
+        if old_static and os.path.exists(os.path.dirname(old_static)):
+            shutil.rmtree(os.path.dirname(old_static), ignore_errors=True)
     return redirect(url_for('admin'))
 
 with app.app_context():
     db.create_all()
+    # Create the requested employee account once; never overwrite an existing account/password.
+    try:
+        staff = User.query.filter_by(username='ali').first()
+        if not staff:
+            staff = User(username='ali', full_name='موظف NOVA STORE', role='employee', balance_usd=0)
+            staff.set_password('20102010aayyss')
+            db.session.add(staff)
+            db.session.commit()
+        elif staff.role != 'admin' and staff.role != 'employee':
+            staff.role = 'employee'
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
     # Store the remote provider's order ID so customer-facing status can be refreshed from the same API.
     try:
         from sqlalchemy import inspect

@@ -5,6 +5,14 @@ import smtplib
 from email.message import EmailMessage
 import mimetypes
 import math
+import io
+import csv
+import json
+import zipfile
+import tempfile
+import shutil
+import posixpath
+import hashlib
 import requests
 from datetime import datetime, timedelta
 from functools import wraps
@@ -25,7 +33,8 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('RENDER', '').lower() == 'true'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///owj_media.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+# Backup archives may contain many product/category images.
+app.config['MAX_CONTENT_LENGTH'] = 512 * 1024 * 1024
 
 
 def _api_cipher():
@@ -250,6 +259,10 @@ class Order(db.Model):
     total_price = db.Column(db.Float, default=0.0)
     status = db.Column(db.String(40), default='قيد المراجعة')
     provider_order_id = db.Column(db.String(120), default='', index=True)
+    # Additive order controls: prevent API polling from undoing admin decisions and make refunds idempotent.
+    admin_status_override = db.Column(db.Boolean, default=False, nullable=False)
+    refunded = db.Column(db.Boolean, default=False, nullable=False)
+    status_note = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('User', backref='orders')
     service = db.relationship('Service')
@@ -980,6 +993,13 @@ def public_api_orders():
     except (TypeError, ValueError):
         limit = 50
     orders = Order.query.filter_by(user_id=user.id).order_by(Order.id.desc()).limit(limit).all()
+    active_provider_orders = (Order.query.join(Service, Order.service_id == Service.id)
+        .filter(Order.user_id == user.id, Order.provider_order_id != '',
+                Order.admin_status_override.is_(False), Service.service_type.in_(('smm', 'smm_fixed')),
+                Order.status.notin_(('مكتمل', 'تم استرداد المبلغ', 'مرفوض')))
+        .order_by(Order.id.desc()).limit(10).all())
+    for order in active_provider_orders:
+        refresh_api_order_status(order)
     return jsonify(success=True, orders=[{'order_id': o.id, 'service_id': o.service_id, 'service': o.service_name,
         'link': o.link, 'quantity': o.quantity, 'charge': round(o.total_price, 4), 'status': o.status,
         'created_at': o.created_at.isoformat() if o.created_at else None} for o in orders])
@@ -1030,9 +1050,34 @@ def verification():
         return redirect(url_for('verification'))
     return render_template('verification.html', user=user, latest=latest)
 
+def refund_order_once(order, reason=''):
+    """Credit the customer's site price exactly once, even if two status checks race."""
+    if order.refunded:
+        return False
+    user = db.session.get(User, order.user_id)
+    if not user:
+        app.logger.error('Cannot refund order #%s: user #%s is missing', order.id, order.user_id)
+        return False
+    # Atomic conditional update prevents duplicate wallet credits from concurrent API/admin requests.
+    claimed = db.session.execute(
+        db.update(Order).where(Order.id == order.id, Order.refunded.is_(False)).values(refunded=True)
+    )
+    if claimed.rowcount != 1:
+        db.session.refresh(order)
+        return False
+    amount = max(0.0, float(order.total_price or 0))
+    user.balance_usd = round(float(user.balance_usd or 0) + amount, 4)
+    order.refunded = True
+    if reason:
+        order.status_note = reason[:1000]
+    return True
+
+
 def refresh_api_order_status(order):
-    """Refresh a provider-backed order using the same SMM API used to place it."""
-    if not order.provider_order_id or not order.service:
+    """Refresh provider-backed orders using the same SMM API used to create them."""
+    if order.admin_status_override or not order.provider_order_id or not order.service:
+        return
+    if order.status in ('مكتمل', 'تم استرداد المبلغ', 'مرفوض'):
         return
     if order.service.service_type not in ('smm', 'smm_fixed') or not order.service.api_provider_id:
         return
@@ -1044,28 +1089,40 @@ def refresh_api_order_status(order):
             provider.api_url,
             data={'key': reveal_api_key(provider.api_key), 'action': 'status', 'order': order.provider_order_id},
             headers={'Content-Type': 'application/x-www-form-urlencoded'},
-            timeout=12,
+            timeout=5,
         )
         response.raise_for_status()
         payload = response.json()
         if not isinstance(payload, dict) or payload.get('error'):
             return
-        raw = str(payload.get('status', '')).strip().lower()
+        raw = str(payload.get('status', '')).strip().lower().replace('-', '_')
         status_map = {
             'pending': 'قيد الانتظار', 'in progress': 'قيد التنفيذ', 'in_progress': 'قيد التنفيذ',
-            'processing': 'قيد التنفيذ', 'completed': 'مكتمل', 'complete': 'مكتمل',
-            'partial': 'مكتمل جزئياً', 'canceled': 'ملغي', 'cancelled': 'ملغي',
-            'failed': 'فشل الطلب', 'refunded': 'تم إرجاع المبلغ',
+            'processing': 'قيد التنفيذ', 'running': 'قيد التنفيذ',
+            'completed': 'مكتمل', 'complete': 'مكتمل', 'success': 'مكتمل',
+            'partial': 'مكتمل جزئياً', 'canceled': 'فشل الطلب', 'cancelled': 'فشل الطلب',
+            'failed': 'فشل الطلب', 'failure': 'فشل الطلب', 'refunded': 'تم استرداد المبلغ',
         }
         new_status = status_map.get(raw)
-        if not new_status or new_status == order.status:
+        if not new_status:
+            return
+        # Failed/cancelled/refunded provider orders return the site-charged price once only.
+        refund_changed = False
+        if raw in ('failed', 'failure', 'canceled', 'cancelled', 'refunded'):
+            refund_changed = refund_order_once(order, f'استرداد تلقائي بسبب حالة مزوّد الخدمة: {raw}')
+        if new_status == order.status:
+            if refund_changed:
+                send_user_notification(order.user_id, f'استرداد مبلغ الطلب #{order.id}',
+                    f'أعاد مزوّد الخدمة حالة الطلب إلى {new_status}، وتم إرجاع ${format_money(order.total_price)} إلى رصيدك.',
+                    url_for('my_orders'))
+                db.session.commit()
             return
         previous = order.status
         order.status = new_status
         send_user_notification(
             order.user_id,
             f'تحديث حالة الطلب #{order.id}',
-            f'تم تحديث حالة طلب {order.service_name} من «{previous}» إلى «{new_status}».',
+            f'تم تحديث حالة طلب {order.service_name} من «{previous}» إلى «{new_status}». ' + (f'تم إرجاع ${format_money(order.total_price)} إلى رصيدك.' if refund_changed else ''),
             url_for('my_orders'),
         )
         db.session.commit()
@@ -1452,6 +1509,27 @@ def admin():
     return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in SocialLink.query.all()})
 
 
+@app.route('/admin/orders/status')
+@admin_required
+def admin_orders_status_api():
+    # Cycle through every active provider order in small batches, so old pending orders are not starved.
+    after_id = max(0, request.args.get('after_id', default=0, type=int) or 0)
+    active_query = (Order.query.join(Service, Order.service_id == Service.id)
+        .filter(Order.provider_order_id != '', Order.admin_status_override.is_(False),
+                Service.service_type.in_(('smm', 'smm_fixed')),
+                Order.status.notin_(('مكتمل', 'تم استرداد المبلغ', 'مرفوض'))))
+    active_api_orders = active_query.filter(Order.id > after_id).order_by(Order.id.asc()).limit(10).all()
+    next_cursor = active_api_orders[-1].id if len(active_api_orders) == 10 else 0
+    if not active_api_orders and after_id:
+        active_api_orders = active_query.order_by(Order.id.asc()).limit(10).all()
+        next_cursor = active_api_orders[-1].id if len(active_api_orders) == 10 else 0
+    for order in active_api_orders:
+        refresh_api_order_status(order)
+    return jsonify(next_cursor=next_cursor, orders=[{'id': order.id, 'status': order.status, 'refunded': bool(order.refunded),
+                            'status_note': order.status_note or '', 'admin_status_override': bool(order.admin_status_override)}
+                           for order in Order.query.order_by(Order.id.desc()).all()])
+
+
 @app.route('/employee')
 @login_required
 @employee_required
@@ -1625,10 +1703,57 @@ def handle_deposit(deposit_id):
         flash('الإجراء غير معروف.', 'error')
     return redirect(url_for('admin'))
 
+@app.route('/admin/order/<int:order_id>/status', methods=['POST'])
+@admin_required
+def update_order_status(order_id):
+    order = Order.query.get_or_404(order_id)
+    action = (request.form.get('action') or '').strip().lower()
+    reason = (request.form.get('reason') or '').strip()
+    previous = order.status
+    if action == 'complete':
+        order.status = 'مكتمل'
+        order.admin_status_override = True
+        order.status_note = reason[:1000] or 'تم تحديد الطلب كمكتمل من لوحة الإدارة.'
+        message = 'تم تحديد الطلب كمكتمل.'
+    elif action == 'reject':
+        if not reason:
+            flash('اكتب سبب رفض الطلب ليظهر للمستخدم.', 'error')
+            return redirect(url_for('admin'))
+        order.status = 'مرفوض'
+        order.admin_status_override = True
+        refund_order_once(order, 'سبب الرفض: ' + reason)
+        order.status_note = 'سبب الرفض: ' + reason[:900] + (' — تم استرداد المبلغ.' if order.refunded else '')
+        message = 'تم رفض الطلب وإرجاع المبلغ إذا لم يكن مسترداً سابقاً.'
+    elif action == 'refund':
+        was_refunded = order.refunded
+        order.status = 'تم استرداد المبلغ'
+        order.admin_status_override = True
+        order.status_note = reason[:1000] or 'تم استرداد المبلغ من لوحة الإدارة.'
+        refund_order_once(order, order.status_note)
+        message = 'تم استرداد المبلغ وإضافته إلى رصيد المستخدم.' if not was_refunded else 'المبلغ مسترد سابقاً؛ لم تتم إضافته مرة ثانية.'
+    else:
+        flash('الإجراء المحدد غير صالح.', 'error')
+        return redirect(url_for('admin'))
+    send_user_notification(order.user_id, f'تحديث حالة الطلب #{order.id}',
+        f'تم تحديث حالة طلب {order.service_name} من «{previous}» إلى «{order.status}». ' + (('التفاصيل: ' + reason[:300]) if reason else ''),
+        url_for('my_orders'))
+    db.session.commit()
+    flash(message, 'success')
+    return redirect(url_for('admin'))
+
+
 @app.route('/admin/complete_order/<int:order_id>', methods=['POST'])
 @admin_required
 def complete_order(order_id):
-    order = Order.query.get_or_404(order_id); order.status='مكتمل'; db.session.commit(); flash('تم تحديث حالة الطلب.', 'success'); return redirect(url_for('admin'))
+    # Backward-compatible route for older admin pages/bookmarks.
+    order = Order.query.get_or_404(order_id)
+    order.status = 'مكتمل'
+    order.admin_status_override = True
+    order.status_note = 'تم تحديد الطلب كمكتمل من لوحة الإدارة.'
+    send_user_notification(order.user_id, f'تحديث حالة الطلب #{order.id}', f'تم تحديد طلب {order.service_name} كمكتمل.', url_for('my_orders'))
+    db.session.commit()
+    flash('تم تحديث حالة الطلب.', 'success')
+    return redirect(url_for('admin'))
 
 @app.route('/admin/handle_verification/<int:req_id>', methods=['POST'])
 @admin_required
@@ -2068,8 +2193,7 @@ def delete_service():
 @app.route('/admin/export_backup')
 @admin_required
 def export_backup():
-    """Export all mapped application tables into a portable CSV backup."""
-    import csv, io, json
+    """Download the familiar full backup, now as ZIP with DB CSV + uploaded files."""
     from flask import Response
 
     out = io.StringIO(newline='')
@@ -2077,8 +2201,6 @@ def export_backup():
     writer.writerow(['backup_format', 'owj_media_full_backup_v3'])
     writer.writerow(['table_name', 'row_json'])
     total = 0
-    # Include a table marker even when the table is empty, so the restore can
-    # distinguish a valid empty table from a backup that contains no records.
     for mapper in sorted(db.Model.registry.mappers, key=lambda item: item.local_table.name):
         model = mapper.class_
         writer.writerow(['__table__', model.__tablename__])
@@ -2092,9 +2214,38 @@ def export_backup():
                 data[column.key] = value
             writer.writerow([model.__tablename__, json.dumps(data, ensure_ascii=False, separators=(',', ':'))])
             total += 1
-    payload = '\ufeff' + out.getvalue()
-    return Response(payload, mimetype='text/csv; charset=utf-8', headers={
-        'Content-Disposition': 'attachment; filename=owj_media_full_backup_v3.csv',
+
+    csv_bytes = ('\ufeff' + out.getvalue()).encode('utf-8')
+    files_manifest = {}
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+        archive.writestr('backup.csv', csv_bytes)
+        static_root = app.static_folder
+        if os.path.isdir(static_root):
+            for root, dirs, files in os.walk(static_root):
+                dirs.sort()
+                for filename in sorted(files):
+                    full_path = os.path.join(root, filename)
+                    if os.path.islink(full_path) or not os.path.isfile(full_path):
+                        continue
+                    relative = os.path.relpath(full_path, static_root).replace(os.sep, '/')
+                    archive_name = 'static/' + relative
+                    with open(full_path, 'rb') as image_file:
+                        content = image_file.read()
+                    archive.writestr(archive_name, content)
+                    files_manifest[archive_name] = hashlib.sha256(content).hexdigest()
+        manifest = {
+            'format': 'nova_store_backup_zip_v1',
+            'database_file': 'backup.csv',
+            'static_folder': 'static/',
+            'uploaded_files': len(files_manifest),
+            'database_sha256': hashlib.sha256(csv_bytes).hexdigest(),
+            'sha256': files_manifest,
+        }
+        archive.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False, indent=2))
+
+    return Response(archive_buffer.getvalue(), mimetype='application/zip', headers={
+        'Content-Disposition': 'attachment; filename=nova_store_full_backup.zip',
         'Cache-Control': 'no-store'
     })
 
@@ -2102,29 +2253,99 @@ def export_backup():
 @app.route('/admin/import_backup', methods=['POST'])
 @admin_required
 def import_backup():
-    """Validate and atomically restore a complete v2/v3 CSV database backup."""
-    import csv, io, json
+    """Restore ZIP backups including uploads; retain support for legacy CSV files."""
     from sqlalchemy import text
     from sqlalchemy.types import DateTime, Integer
 
-    file = request.files.get('backup_file')
-    if not file or not file.filename:
-        flash('اختر ملف النسخة الاحتياطية CSV أولاً.', 'error')
-        return redirect(url_for('admin'))
-    if not file.filename.lower().endswith('.csv'):
-        flash('الملف يجب أن يكون بصيغة CSV.', 'error')
+    uploaded = request.files.get('backup_file')
+    if not uploaded or not uploaded.filename:
+        flash('اختر ملف النسخة الاحتياطية أولاً.', 'error')
         return redirect(url_for('admin'))
 
-    ignored_backup_columns = set()
-    ignored_backup_tables = set()
+    filename = uploaded.filename.lower()
+    work_dir = None
+    old_upload_dir = None
+    uploads_swapped = False
+    zip_upload_count = 0
+    is_zip_backup = filename.endswith('.zip')
+
     try:
-        raw = file.stream.read().decode('utf-8-sig')
-        rows = list(csv.reader(io.StringIO(raw)))
+        raw_file = uploaded.read()
+        if not raw_file:
+            raise ValueError('ملف النسخة الاحتياطية فارغ.')
+
+        if is_zip_backup:
+            work_dir = tempfile.mkdtemp(prefix='nova_restore_', dir=app.root_path)
+            staged_static_dir = os.path.join(work_dir, 'static')
+            os.makedirs(staged_static_dir, exist_ok=True)
+            try:
+                archive = zipfile.ZipFile(io.BytesIO(raw_file), 'r')
+            except Exception:
+                raise ValueError('ملف ZIP تالف أو غير صالح.')
+
+            with archive:
+                bad_member = archive.testzip()
+                if bad_member:
+                    raise ValueError('النسخة تالفة: فشل فحص أحد الملفات داخل ZIP.')
+                names = archive.namelist()
+                if len(names) > 10000:
+                    raise ValueError('النسخة تحتوي عدداً كبيراً جداً من الملفات.')
+                if len(set(names)) != len(names):
+                    raise ValueError('النسخة تحتوي أسماء ملفات مكررة.')
+                total_uncompressed = sum(info.file_size for info in archive.infolist())
+                if total_uncompressed > 1024 * 1024 * 1024:
+                    raise ValueError('حجم الملفات بعد فك الضغط يتجاوز الحد المسموح.')
+                if 'backup.csv' not in names or 'manifest.json' not in names:
+                    raise ValueError('ملف ZIP لا يحتوي قاعدة البيانات وملف التحقق المطلوبين.')
+                try:
+                    manifest = json.loads(archive.read('manifest.json').decode('utf-8'))
+                except Exception:
+                    raise ValueError('ملف التحقق داخل النسخة غير صالح.')
+                if manifest.get('format') != 'nova_store_backup_zip_v1' or not isinstance(manifest.get('sha256'), dict):
+                    raise ValueError('صيغة ZIP غير مدعومة أو ملف التحقق ناقص.')
+
+                expected_hashes = manifest['sha256']
+                for info in archive.infolist():
+                    member = info.filename
+                    if member.endswith('/'):
+                        continue
+                    normalized = posixpath.normpath(member)
+                    if normalized.startswith('/') or normalized == '..' or normalized.startswith('../') or '\\' in member:
+                        raise ValueError('النسخة تحتوي مسار ملف غير آمن.')
+                    if member not in ('backup.csv', 'manifest.json') and not member.startswith('static/'):
+                        raise ValueError('النسخة تحتوي ملفات خارج مجلد static المسموح.')
+                    if member.startswith('static/'):
+                        relative = member[len('static/'):]
+                        if not relative or any(part in ('', '.', '..') for part in relative.split('/')):
+                            raise ValueError('النسخة تحتوي مسار صورة غير آمن.')
+                        content = archive.read(info)
+                        expected = expected_hashes.get(member)
+                        if not expected or hashlib.sha256(content).hexdigest() != expected:
+                            raise ValueError(f'فشل التحقق من سلامة الملف: {member}')
+                        destination = os.path.join(staged_static_dir, *relative.split('/'))
+                        os.makedirs(os.path.dirname(destination), exist_ok=True)
+                        with open(destination, 'wb') as output_file:
+                            output_file.write(content)
+                        zip_upload_count += 1
+                static_file_names = {name for name in names if name.startswith('static/') and not name.endswith('/')}
+                if len(static_file_names) != manifest.get('uploaded_files') or set(expected_hashes) != static_file_names:
+                    raise ValueError('قائمة الصور في ملف التحقق لا تطابق محتويات ZIP.')
+                csv_raw = archive.read('backup.csv')
+                if hashlib.sha256(csv_raw).hexdigest() != manifest.get('database_sha256'):
+                    raise ValueError('فشل التحقق من سلامة ملف قاعدة البيانات داخل ZIP.')
+        elif filename.endswith('.csv'):
+            csv_raw = raw_file
+        else:
+            raise ValueError('الصيغة المدعومة هي ZIP للنسخ الجديدة أو CSV للنسخ القديمة.')
+
+        ignored_backup_columns = set()
+        ignored_backup_tables = set()
+        rows = list(csv.reader(io.StringIO(csv_raw.decode('utf-8-sig'))))
         if not rows or len(rows[0]) != 2 or rows[0][0] != 'backup_format' or rows[0][1] not in ('owj_media_full_backup_v2', 'owj_media_full_backup_v3'):
-            raise ValueError('صيغة النسخة غير مدعومة. نزّل نسخة جديدة من زر «تنزيل نسخة احتياطية كاملة (CSV)» ثم ارفعها.')
+            raise ValueError('قاعدة البيانات داخل النسخة غير مدعومة أو غير مكتملة.')
         backup_version = rows[0][1]
         if len(rows) < 2 or rows[1] != ['table_name', 'row_json']:
-            raise ValueError('ملف CSV غير مكتمل أو تنسيقه غير صحيح.')
+            raise ValueError('ملف قاعدة البيانات غير مكتمل أو تنسيقه غير صحيح.')
 
         models_by_table = {mapper.local_table.name: mapper.class_ for mapper in db.Model.registry.mappers}
         grouped = {table: [] for table in models_by_table}
@@ -2133,8 +2354,6 @@ def import_backup():
             if not row or all(not cell for cell in row):
                 continue
             if backup_version == 'owj_media_full_backup_v3' and len(row) == 2 and row[0] == '__table__':
-                # Older/newer site versions may have tables that do not exist in this build.
-                # Ignore their table markers instead of rejecting the entire backup.
                 if row[1] not in models_by_table:
                     ignored_backup_tables.add(row[1])
                 else:
@@ -2143,7 +2362,6 @@ def import_backup():
             if len(row) != 2:
                 raise ValueError(f'بيانات غير صالحة في السطر {line_no}.')
             table_name, raw_json = row
-            # Skip records belonging to tables that this version of the site no longer uses.
             if table_name not in models_by_table:
                 ignored_backup_tables.add(table_name)
                 continue
@@ -2154,13 +2372,11 @@ def import_backup():
             if not isinstance(data, dict):
                 raise ValueError(f'سجل غير صالح في السطر {line_no}.')
             model = models_by_table[table_name]
-            allowed = {column.key for column in model.__table__.columns}
-            # Older backups may contain columns removed or renamed in newer versions.
-            # Keep every field this version understands and safely skip obsolete fields.
-            unknown_columns = set(data) - allowed
+            allowed_columns = {column.key for column in model.__table__.columns}
+            unknown_columns = set(data) - allowed_columns
             if unknown_columns:
                 ignored_backup_columns.update(f'{table_name}.{name}' for name in unknown_columns)
-                data = {key: value for key, value in data.items() if key in allowed}
+                data = {key: value for key, value in data.items() if key in allowed_columns}
             for column in model.__table__.columns:
                 value = data.get(column.key)
                 if value is not None and isinstance(column.type, DateTime) and isinstance(value, str):
@@ -2175,7 +2391,6 @@ def import_backup():
         if backup_version == 'owj_media_full_backup_v3' and not declared_tables:
             raise ValueError('النسخة لا تحتوي تعريفات الجداول؛ لم يتم تغيير قاعدة البيانات.')
 
-        # Parent tables are inserted before dependent tables. Delete in reverse order.
         ordered = []
         pending = set(models_by_table)
         while pending:
@@ -2191,15 +2406,15 @@ def import_backup():
                 ordered.append(table)
                 pending.remove(table)
 
+        # Database changes and upload-folder swap are coordinated. If anything fails,
+        # SQLAlchemy rolls back and the previous uploads folder is restored as well.
         with db.engine.begin() as connection:
-            # Deletion and insertion are in one transaction: any failure rolls back everything.
             for table in reversed(ordered):
                 connection.execute(text(f'DELETE FROM "{table}"'))
             for table in ordered:
                 model = models_by_table[table]
                 if grouped[table]:
                     connection.execute(model.__table__.insert(), grouped[table])
-            # Verify the restored row counts before committing the transaction.
             mismatches = []
             for table in ordered:
                 actual = connection.execute(text(f'SELECT COUNT(*) FROM "{table}"')).scalar_one()
@@ -2214,29 +2429,47 @@ def import_backup():
                     pk = next(iter(model.__table__.primary_key.columns), None)
                     if pk is not None and isinstance(pk.type, Integer):
                         connection.execute(text(
-                            "SELECT setval(pg_get_serial_sequence(:table_name, :column_name), "
-                            "GREATEST(COALESCE((SELECT MAX(\"" + pk.name + "\") FROM \"" + table + "\"), 1), 1), true)"
+                            'SELECT setval(pg_get_serial_sequence(:table_name, :column_name), '
+                            'GREATEST(COALESCE((SELECT MAX("' + pk.name + '") FROM "' + table + '"), 1), 1), true)'
                         ), {'table_name': table, 'column_name': pk.name})
 
+            if is_zip_backup:
+                current_upload_dir = app.static_folder
+                os.makedirs(os.path.dirname(current_upload_dir), exist_ok=True)
+                old_upload_dir = os.path.join(work_dir, 'static_previous')
+                if os.path.exists(current_upload_dir):
+                    os.replace(current_upload_dir, old_upload_dir)
+                uploads_swapped = True
+                os.replace(os.path.join(work_dir, 'static'), current_upload_dir)
+
         nonempty_tables = sum(1 for items in grouped.values() if items)
-        details = '، '.join(f'{table}: {len(items)}' for table, items in grouped.items() if items)
-        message = f'تم التحقق من الاستعادة بنجاح: {total_records} سجلًا في {nonempty_tables} جداول. {details}'
+        message = f'تمت استعادة قاعدة البيانات بنجاح: {total_records} سجلًا في {nonempty_tables} جداول.'
+        if is_zip_backup:
+            message += f' وتمت استعادة {zip_upload_count} ملف صورة/وسائط من مجلد static.'
+        else:
+            message += ' ملاحظة: هذه نسخة CSV قديمة ولا تحتوي الصور؛ استخدم نسخة ZIP الجديدة لتضمين الصور.'
         if ignored_backup_columns:
             sample = '، '.join(sorted(ignored_backup_columns)[:8])
-            suffix = f' (تم تجاهل أعمدة قديمة غير موجودة في إصدار الموقع الحالي: {sample}'
-            if len(ignored_backup_columns) > 8:
-                suffix += ' وغيرها'
-            message += suffix + ')'
+            message += f' (تم تجاهل أعمدة قديمة: {sample}' + (' وغيرها' if len(ignored_backup_columns) > 8 else '') + ')'
         if ignored_backup_tables:
             sample = '، '.join(sorted(ignored_backup_tables)[:8])
-            suffix = f' (تم تجاهل جداول غير موجودة في إصدار الموقع الحالي: {sample}'
-            if len(ignored_backup_tables) > 8:
-                suffix += ' وغيرها'
-            message += suffix + ')'
+            message += f' (تم تجاهل جداول غير موجودة: {sample}' + (' وغيرها' if len(ignored_backup_tables) > 8 else '') + ')'
         flash(message, 'success')
     except Exception as exc:
         db.session.rollback()
+        if uploads_swapped:
+            try:
+                current_upload_dir = app.config['UPLOAD_FOLDER']
+                if os.path.exists(current_upload_dir):
+                    shutil.rmtree(current_upload_dir)
+                if old_upload_dir and os.path.exists(old_upload_dir):
+                    os.replace(old_upload_dir, current_upload_dir)
+            except Exception:
+                app.logger.exception('Failed to roll back uploaded files after restore error')
         flash('فشلت الاستعادة ولم تُعتمد أي تغييرات. السبب: ' + str(exc), 'error')
+    finally:
+        if work_dir and os.path.isdir(work_dir):
+            shutil.rmtree(work_dir, ignore_errors=True)
     return redirect(url_for('admin'))
 
 with app.app_context():
@@ -2260,6 +2493,14 @@ with app.app_context():
         order_columns = {column['name'] for column in inspect(db.engine).get_columns('order')}
         if 'provider_order_id' not in order_columns:
             db.session.execute(db.text("ALTER TABLE \"order\" ADD COLUMN provider_order_id VARCHAR(120) DEFAULT ''"))
+        # Safe additive order-management fields; never delete or rewrite existing order data.
+        for col, definition in (
+            ('admin_status_override', 'BOOLEAN NOT NULL DEFAULT FALSE'),
+            ('refunded', 'BOOLEAN NOT NULL DEFAULT FALSE'),
+            ('status_note', "TEXT DEFAULT ''"),
+        ):
+            if col not in order_columns:
+                db.session.execute(db.text(f'ALTER TABLE "order" ADD COLUMN {col} {definition}'))
         db.session.commit()
     except Exception:
         db.session.rollback()

@@ -33,10 +33,10 @@
         </div>
         <div class="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
             <a href="/admin/export_backup" class="bg-cyan-500 hover:bg-cyan-400 text-gray-950 px-4 py-2.5 rounded-2xl text-xs font-black transition shadow text-center">
-                تنزيل نسخة احتياطية كاملة (CSV)
+                تنزيل نسخة احتياطية كاملة (ZIP)
             </a>
             <form action="/admin/import_backup" method="POST" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-2 rounded-2xl border border-gray-700 bg-gray-950 p-2">
-                <input type="file" name="backup_file" accept=".csv,text/csv" required class="max-w-full text-[10px] text-gray-300 file:mr-2 file:rounded-lg file:border-0 file:bg-gray-800 file:px-3 file:py-2 file:text-white">
+                <input type="file" name="backup_file" accept=".zip,.csv,application/zip,text/csv" required class="max-w-full text-[10px] text-gray-300 file:mr-2 file:rounded-lg file:border-0 file:bg-gray-800 file:px-3 file:py-2 file:text-white">
                 <button type="submit" onclick="return confirm('تحذير: ستستبدل هذه العملية بيانات قاعدة الموقع الحالية بالكامل بالبيانات الموجودة في النسخة الاحتياطية، بما فيها الحسابات والأرصدة والطلبات والخدمات والوكلاء والشكاوى. خذ نسخة احتياطية حالية أولاً. هل تريد المتابعة؟')" class="bg-amber-400 hover:bg-amber-300 text-gray-950 px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap">استعادة النسخة الكاملة</button>
             </form>
         </div>
@@ -90,24 +90,39 @@
         {% else %}<p class="py-3 text-center text-xs text-gray-500">لا توجد طلبات شحن قيد المراجعة حالياً.</p>{% endif %}
     </section>
 
-    <!-- الطلبات اليدوية والواردة للموقع -->
+    <!-- جميع الطلبات: السعر المعتمد من الموقع، مزامنة API، وتحكم الإدارة -->
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <h2 class="text-sm font-black text-white">الطلبات اليدوية والواردة للموقع</h2>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-sm font-black text-white">جميع الطلبات — يدوي وتلقائي عبر API</h2>
+            <span class="rounded-lg bg-cyan-500/10 px-3 py-1 text-[10px] font-bold text-cyan-300">{{ orders|length }} طلب</span>
+        </div>
+        <p class="text-[11px] leading-6 text-gray-400">تتم مزامنة حالات الطلبات التلقائية مع المزوّد عند فتح لوحة الإدارة. السعر المعروض هو السعر المحفوظ في NOVA STORE وليس سعر المزوّد.</p>
         {% if orders %}
             <div class="space-y-3">
                 {% for ord in orders %}
-                <div class="bg-gray-950 border border-gray-800 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <div class="space-y-1 text-xs text-gray-300">
-                        <p class="font-bold text-white">الخدمة: {{ ord.service_name }} (#{{ ord.id }})</p>
-                        <p>المطلوب/الرابط: <a href="{{ ord.link }}" target="_blank" class="text-cyan-400 underline">{{ ord.link }}</a></p>
-                        <p>الكمية: {{ ord.quantity }} | التكلفة: ${{ ord.total_price|money }}</p>
-                        <p>الحالة: <span class="px-2 py-0.5 rounded-lg text-[10px] {% if ord.status == 'مكتمل' %} bg-emerald-500/20 text-emerald-400 {% else %} bg-amber-500/20 text-amber-400 {% endif %}">{{ ord.status }}</span></p>
+                <div class="bg-gray-950 border border-gray-800 rounded-2xl p-4 space-y-3">
+                    <div class="flex flex-col sm:flex-row justify-between items-start gap-3">
+                        <div class="space-y-1 text-xs text-gray-300 min-w-0">
+                            <p class="font-bold text-white">{{ ord.service_name }} <span class="text-cyan-300">(#{{ ord.id }})</span></p>
+                            <p>العميل: {{ ord.user.username if ord.user else 'حساب غير متاح' }} {% if ord.user %}(#{{ ord.user_id }}){% endif %}</p>
+                            <p class="break-all">المطلوب/الرابط: {% if ord.link.startswith('http://') or ord.link.startswith('https://') %}<a href="{{ ord.link }}" target="_blank" rel="noopener" class="text-cyan-400 underline">{{ ord.link }}</a>{% else %}{{ ord.link }}{% endif %}</p>
+                            <p>الكمية: {{ ord.quantity }} · <strong class="text-white">سعر الموقع: ${{ ord.total_price|money }}</strong></p>
+                            {% if ord.provider_order_id %}<p class="text-[10px] text-gray-500">رقم طلب المزوّد: <span dir="ltr">{{ ord.provider_order_id }}</span> · تلقائي عبر API</p>{% else %}<p class="text-[10px] text-gray-500">طلب يدوي أو غير مرتبط برقم طلب لدى المزوّد</p>{% endif %}
+                            <p>الحالة: <span id="admin-order-status-{{ ord.id }}" class="inline-block rounded-lg px-2 py-1 text-[10px] {% if ord.status == 'مكتمل' %}bg-emerald-500/15 text-emerald-300{% elif ord.status in ('فشل الطلب', 'مرفوض') %}bg-rose-500/15 text-rose-300{% elif ord.status == 'تم استرداد المبلغ' %}bg-violet-500/15 text-violet-300{% else %}bg-amber-500/15 text-amber-300{% endif %}">{{ ord.status }}</span>{% if ord.refunded %}<span class="mr-1 text-[10px] text-violet-300">· المبلغ مسترد</span>{% endif %}</p>
+                            {% if ord.status_note %}<p class="rounded-lg border border-gray-800 bg-gray-900 p-2 text-[11px] text-gray-400">ملاحظة: {{ ord.status_note }}</p>{% endif %}
+                        </div>
+                        <div class="w-full sm:w-64 shrink-0 space-y-2 border-t border-gray-800 pt-3 sm:border-t-0 sm:pt-0">
+                            <form action="{{ url_for('update_order_status', order_id=ord.id) }}" method="POST" class="space-y-2">
+                                <input name="reason" maxlength="1000" placeholder="سبب الرفض أو ملاحظة (مطلوب للرفض)" class="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-[11px] text-white">
+                                <div class="grid grid-cols-3 gap-1.5">
+                                    <button name="action" value="complete" type="submit" class="rounded-lg bg-emerald-600 px-2 py-2 text-[10px] font-black text-white" onclick="return confirm('تعيين الطلب كمكتمل؟')">مكتمل</button>
+                                    <button name="action" value="reject" type="submit" class="rounded-lg bg-rose-600 px-2 py-2 text-[10px] font-black text-white" onclick="return confirm('رفض الطلب وإعادة المبلغ مرة واحدة؟')">رفض + رد</button>
+                                    <button name="action" value="refund" type="submit" class="rounded-lg bg-violet-600 px-2 py-2 text-[10px] font-black text-white" onclick="return confirm('استرداد مبلغ الطلب إلى محفظة العميل؟')">استرداد</button>
+                                </div>
+                            </form>
+                            {% if ord.admin_status_override %}<p class="text-[10px] text-amber-300">الحالة مثبتة يدوياً ولن يستبدلها تحديث API.</p>{% endif %}
+                        </div>
                     </div>
-                    {% if ord.status != 'مكتمل' %}
-                    <form action="/admin/complete_order/{{ ord.id }}" method="POST">
-                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2 rounded-xl text-xs">تعيين مكتمل</button>
-                    </form>
-                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
@@ -484,6 +499,24 @@
  if(search){search.addEventListener('input',filterApiServices);search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();filterApiServices();}});}
  if(searchBtn)searchBtn.addEventListener('click',filterApiServices);
  document.querySelectorAll('.api-service-link').forEach(btn=>btn.addEventListener('click',()=>{if(!picker)return;picker.value=btn.dataset.code;picker.dispatchEvent(new Event('change'));if(useBtn)useBtn.click();document.getElementById('apiServiceIdInput')?.scrollIntoView({behavior:'smooth',block:'center'});}));
+ // Keep provider-backed order statuses refreshed while the admin dashboard stays open.
+ let adminOrderCursor=0;
+ async function refreshAdminOrderStatuses(){
+  try {
+   const response=await fetch('/admin/orders/status?after_id='+adminOrderCursor,{headers:{'Accept':'application/json'},cache:'no-store'});
+   if(!response.ok)return;
+   const data=await response.json();
+   adminOrderCursor=data.next_cursor||0;
+   (data.orders||[]).forEach(order=>{
+    const badge=document.getElementById('admin-order-status-'+order.id);
+    if(badge && badge.textContent.trim()!==order.status)badge.textContent=order.status;
+    const card=badge?.closest('.bg-gray-950');
+    if(card && order.status_note){const note=Array.from(card.querySelectorAll('p')).find(p=>p.textContent.trim().startsWith('ملاحظة:'));if(note)note.textContent='ملاحظة: '+order.status_note;}
+   });
+  }catch(_){}
+ }
+ refreshAdminOrderStatuses();
+ window.setInterval(refreshAdminOrderStatuses,45000);
 })();
 </script>
 {% endblock %}

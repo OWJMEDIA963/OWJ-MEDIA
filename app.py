@@ -2435,12 +2435,40 @@ def import_backup():
 
             if is_zip_backup:
                 current_upload_dir = app.static_folder
-                os.makedirs(os.path.dirname(current_upload_dir), exist_ok=True)
+                os.makedirs(current_upload_dir, exist_ok=True)
+                # Render may mount static/ on a different filesystem. Never rename the
+                # mount point: copy its contents for rollback, then sync files in place.
                 old_upload_dir = os.path.join(work_dir, 'static_previous')
-                if os.path.exists(current_upload_dir):
-                    os.replace(current_upload_dir, old_upload_dir)
+                if os.path.isdir(current_upload_dir):
+                    shutil.copytree(current_upload_dir, old_upload_dir, dirs_exist_ok=True)
+                else:
+                    os.makedirs(old_upload_dir, exist_ok=True)
                 uploads_swapped = True
-                os.replace(os.path.join(work_dir, 'static'), current_upload_dir)
+
+                def _clear_directory_contents(directory):
+                    os.makedirs(directory, exist_ok=True)
+                    for entry in os.scandir(directory):
+                        path = entry.path
+                        if entry.is_dir(follow_symlinks=False):
+                            shutil.rmtree(path)
+                        else:
+                            os.unlink(path)
+
+                def _copy_directory_contents(source, destination):
+                    os.makedirs(destination, exist_ok=True)
+                    for entry in os.scandir(source):
+                        src_path = entry.path
+                        dst_path = os.path.join(destination, entry.name)
+                        if entry.is_dir(follow_symlinks=False):
+                            shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+                        elif entry.is_symlink():
+                            # Do not restore symlinks from uploaded archives.
+                            continue
+                        else:
+                            shutil.copy2(src_path, dst_path)
+
+                _clear_directory_contents(current_upload_dir)
+                _copy_directory_contents(os.path.join(work_dir, 'static'), current_upload_dir)
 
         nonempty_tables = sum(1 for items in grouped.values() if items)
         message = f'تمت استعادة قاعدة البيانات بنجاح: {total_records} سجلًا في {nonempty_tables} جداول.'
@@ -2459,11 +2487,19 @@ def import_backup():
         db.session.rollback()
         if uploads_swapped:
             try:
-                current_upload_dir = app.config['UPLOAD_FOLDER']
-                if os.path.exists(current_upload_dir):
-                    shutil.rmtree(current_upload_dir)
-                if old_upload_dir and os.path.exists(old_upload_dir):
-                    os.replace(old_upload_dir, current_upload_dir)
+                current_upload_dir = app.static_folder
+                if old_upload_dir and os.path.isdir(old_upload_dir):
+                    os.makedirs(current_upload_dir, exist_ok=True)
+                    for entry in os.scandir(current_upload_dir):
+                        if entry.is_dir(follow_symlinks=False):
+                            shutil.rmtree(entry.path)
+                        else:
+                            os.unlink(entry.path)
+                    for entry in os.scandir(old_upload_dir):
+                        if entry.is_dir(follow_symlinks=False):
+                            shutil.copytree(entry.path, os.path.join(current_upload_dir, entry.name), dirs_exist_ok=True)
+                        elif not entry.is_symlink():
+                            shutil.copy2(entry.path, os.path.join(current_upload_dir, entry.name))
             except Exception:
                 app.logger.exception('Failed to roll back uploaded files after restore error')
         flash('فشلت الاستعادة ولم تُعتمد أي تغييرات. السبب: ' + str(exc), 'error')

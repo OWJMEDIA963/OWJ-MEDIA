@@ -1,5 +1,7 @@
-{% extends "base.html" %}
-{% block title %}لوحة التحكم الإدارية<section class="mx-auto my-8 max-w-5xl rounded-3xl border border-cyan-400/20 bg-gray-900 p-6 space-y-4">
+{% block title %}لوحة التحكم الإدارية{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+<section class="mx-auto my-8 max-w-5xl rounded-3xl border border-cyan-400/20 bg-gray-900 p-6 space-y-4">
   <h2 class="text-lg font-black text-cyan-300">روابط حسابات NOVA STORE الاجتماعية</h2>
   <p class="text-xs leading-6 text-gray-400">أضف الروابط لاحقاً أو اترك الحقل فارغاً لإخفاء الأيقونة من صفحة «من نحن».</p>
   <form method="post" action="{{ url_for('admin_social_links') }}" class="grid gap-3">
@@ -9,9 +11,18 @@
     <button class="rounded-xl bg-cyan-600 p-3 text-sm font-black text-white">حفظ روابط التواصل</button>
   </form>
 </section>
-{% endblock %}
-{% block content %}
-<div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+
+    <section class="mx-4 mb-5 rounded-2xl border border-cyan-500/30 bg-gray-900 p-4 space-y-3">
+      <h2 class="font-black text-cyan-300">إنشاء حساب موظف بصلاحيات محدودة</h2>
+      <p class="text-xs text-gray-400">يمكنه الرد على الشكاوى، عرض الطلبات، ومعالجة طلبات التجار والتوثيق فقط. لا يمكنه إدارة الرصيد أو المنتجات أو الأسعار أو API أو إعدادات الموقع.</p>
+      <form action="/admin/add_employee" method="POST" class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <input name="username" required maxlength="80" placeholder="اسم المستخدم" class="rounded-xl bg-gray-950 border border-gray-800 p-3 text-sm text-white">
+        <input name="full_name" maxlength="120" placeholder="اسم الموظف" class="rounded-xl bg-gray-950 border border-gray-800 p-3 text-sm text-white">
+        <input name="password" type="password" required minlength="8" placeholder="كلمة المرور (8 أحرف على الأقل)" class="rounded-xl bg-gray-950 border border-gray-800 p-3 text-sm text-white">
+        <button class="sm:col-span-3 rounded-xl bg-cyan-500 p-3 font-black text-gray-950">إنشاء حساب الموظف</button>
+      </form>
+    </section>
+
     <!-- بطاقة إدارة الحسابات: مستقلة وبأعلى الصفحة لتظهر بوضوح على الهاتف -->
     <a href="/admin/accounts" class="group block w-full rounded-3xl border-2 border-violet-400 bg-gradient-to-l from-violet-800 to-indigo-700 p-5 text-white shadow-xl transition hover:from-violet-700 hover:to-indigo-600 focus:outline-none focus:ring-4 focus:ring-violet-300/40">
         <div class="flex items-center justify-between gap-3">
@@ -363,7 +374,8 @@
         <form action="/admin/add_service" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input name="name" required placeholder="اسم المنتج" class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white">
             <select name="category_id" required class="sm:col-span-2 w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white"><option value="">اختر القسم الفرعي للمنتج</option>{% for cat in categories if cat.parent_id %}<option value="{{ cat.id }}">{{ cat.parent.name }} ← {{ cat.name }}</option>{% endfor %}</select>
-            <input type="number" step="0.01" min="0" name="price_per_1000" required placeholder="السعر ($)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <input type="number" step="0.01" min="0" name="price_per_1000" required placeholder="سعر العامة ($)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
+            <input type="number" step="0.01" min="0" name="merchant_price" value="0" placeholder="سعر التاجر ($) - صفر = نفس سعر العامة" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
             <select name="service_type" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white"><option value="manual">يدوي بسعر ثابت</option><option value="manual_quantity">يدوي بالكمية</option><option value="smm">تلقائي API بسعر لكل 1000</option><option value="smm_fixed">تلقائي API بسعر ثابت لكل طلب</option></select>
             <input type="number" name="min_quantity" value="1" min="1" required placeholder="الحد الأدنى" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
             <input type="number" name="max_quantity" value="10000" min="1" required placeholder="الحد الأقصى" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-sm text-white">
@@ -382,7 +394,8 @@
             <select name="category_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white outline-none"><option value="">اختر القسم الرئيسي أو الفرعي الذي ستوضع الخدمة بداخله</option>{% for cat in categories %}<option value="{{ cat.id }}">{% if cat.parent_id %}↳ قسم فرعي: {{ cat.parent.name }} / {% else %}قسم رئيسي: {% endif %}{{ cat.name }}</option>{% endfor %}</select>
             
             <div class="grid grid-cols-3 gap-2">
-                <input id="productApiRate" type="number" step="0.01" min="0.00" name="price_per_1000" placeholder="السعر الثابت أو السعر لكل 1000 ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
+                <input id="productApiRate" type="number" step="0.01" min="0.00" name="price_per_1000" placeholder="سعر العامة: ثابت أو لكل 1000 ($)" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
+                <input type="number" step="0.01" min="0" name="merchant_price" value="0" placeholder="سعر التاجر (0 = نفس سعر العامة)" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
                 <input id="productApiMin" type="number" name="min_quantity" placeholder="الحد الأدنى" value="10" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
                 <input id="productApiMax" type="number" name="max_quantity" placeholder="الحد الأقصى" value="10000" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-3 text-xs text-white outline-none">
             </div>
@@ -456,7 +469,8 @@
                 <input name="name" value="{{ s.name }}" required placeholder="اسم المنتج" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
                 <select name="category_id" required class="w-full bg-gray-900 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي أو الفرعي</option>{% for cat in categories %}<option value="{{ cat.id }}" {% if s.category_id == cat.id %}selected{% endif %}>{% if cat.parent_id %}↳ قسم فرعي: {{ cat.parent.name }} / {% else %}قسم رئيسي: {% endif %}{{ cat.name }}</option>{% endfor %}</select>
                 <div class="grid grid-cols-3 gap-2">
-                    <input type="number" step="0.01" min="0" name="price_per_1000" value="{{ s.price_per_1000 if s.service_type in ['smm','manual_quantity'] else s.price }}" required placeholder="السعر" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
+                    <input type="number" step="0.01" min="0" name="price_per_1000" value="{{ s.price_per_1000 if s.service_type in ['smm','manual_quantity'] else s.price }}" required placeholder="سعر العامة" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
+                    <input type="number" step="0.01" min="0" name="merchant_price" value="{{ s.merchant_price or 0 }}" placeholder="سعر التاجر" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
                     <input type="number" min="1" name="min_quantity" value="{{ s.min_quantity or 1 }}" required placeholder="الأدنى" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
                     <input type="number" min="1" name="max_quantity" value="{{ s.max_quantity or 10000 }}" required placeholder="الأقصى" class="min-w-0 w-full bg-gray-900 border border-gray-800 rounded-xl px-2 py-3 text-xs text-white">
                 </div>

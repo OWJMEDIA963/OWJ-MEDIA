@@ -213,6 +213,7 @@ class Service(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     price = db.Column(db.Float, default=1.0) # price per 1000 for SMM, fixed price for manual
     price_per_1000 = db.Column(db.Float, default=1.0)
+    merchant_price = db.Column(db.Float, default=0.0)  # merchant-specific store price; 0 means use public price
     min_quantity = db.Column(db.Integer, default=10)
     max_quantity = db.Column(db.Integer, default=10000)
     input_label = db.Column(db.String(180), default='الرابط أو الآيدي')
@@ -929,7 +930,7 @@ def public_api_create_order():
         return jsonify(success=False, error='missing_link', message='حقل link مطلوب.'), 400
     if service.service_type in ('manual', 'smm_fixed'):
         quantity = 1
-        total = float(service.price or 0)
+        total = float((service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else service.price) or 0)
     else:
         try:
             quantity = int(data.get('quantity', service.min_quantity or 1))
@@ -938,7 +939,8 @@ def public_api_create_order():
         minimum, maximum = int(service.min_quantity or 1), int(service.max_quantity or 10000)
         if quantity < minimum or quantity > maximum:
             return jsonify(success=False, error='quantity_out_of_range', minimum=minimum, maximum=maximum), 400
-        total = float(service.price_per_1000 or service.price or 0) * quantity / 1000
+        rate = service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 or service.price or 0)
+        total = float(rate) * quantity / 1000
     if total <= 0:
         return jsonify(success=False, error='invalid_service_price'), 409
     # Check balance before contacting a provider; debit only after provider acceptance.
@@ -1161,7 +1163,7 @@ def place_order(service_id):
         quantity = 1
         if not link:
             flash('أدخل الآيدي أو البيانات المطلوبة.', 'error'); return redirect(url_for('category_services', category_id=service.category_id))
-        total = service.price
+        total = (service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else service.price)
     else:
         try: quantity = int(request.form.get('quantity', service.min_quantity or 1))
         except ValueError: quantity = 0
@@ -1176,7 +1178,8 @@ def place_order(service_id):
         if quantity > maximum:
             flash(f'الكمية أكبر من الحد المسموح. الحد الأقصى هو {maximum}.', 'error')
             return redirect(url_for('category_services', category_id=service.category_id))
-        total = (service.price_per_1000 or service.price) * quantity / 1000
+        rate = service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 or service.price)
+        total = rate * quantity / 1000
     if user.balance_usd < total:
         flash('رصيدك غير كافٍ. يرجى شحن المحفظة أولاً.', 'error'); return redirect(url_for('deposit'))
     provider_order_id = ''
@@ -1534,10 +1537,12 @@ def admin_orders_status_api():
 @login_required
 @employee_required
 def employee_dashboard():
+    recent_orders = Order.query.order_by(Order.id.desc()).all()
     return render_template('employee_dashboard.html',
         tickets=SupportTicket.query.order_by(SupportTicket.updated_at.desc()).all(),
         merchant_requests=MerchantApplication.query.filter_by(status='pending').order_by(MerchantApplication.id.desc()).all(),
-        users_count=User.query.filter_by(role='user').count())
+        verification_requests=VerificationRequest.query.filter_by(status='pending').order_by(VerificationRequest.id.desc()).all(),
+        orders=recent_orders)
 
 @app.route('/employee/support/<int:ticket_id>', methods=['POST'])
 @login_required
@@ -1575,23 +1580,33 @@ def employee_merchant(req_id):
     db.session.commit(); flash('تم تحديث طلب التاجر.', 'success')
     return redirect(url_for('employee_dashboard'))
 
-@app.route('/employee/transfer', methods=['POST'])
+@app.route('/employee/verification/<int:req_id>', methods=['POST'])
 @login_required
 @employee_required
-def employee_transfer():
-    username=request.form.get('username','').strip()
-    amount=request.form.get('amount',type=float)
-    reason=request.form.get('reason','').strip()[:500]
-    target=User.query.filter_by(username=username).first()
-    if not target or target.role in ('admin','employee'):
-        flash('لم يتم العثور على زبون صالح بهذا الاسم.', 'error')
-    elif amount is None or not math.isfinite(amount) or amount <= 0 or round(amount,2) != amount:
-        flash('أدخل مبلغاً صحيحاً أكبر من صفر وبحد أقصى منزلتين عشريتين.', 'error')
+def employee_verification(req_id):
+    req = VerificationRequest.query.get_or_404(req_id)
+    if req.status != 'pending':
+        flash('تمت معالجة طلب التوثيق مسبقاً.', 'warning')
+        return redirect(url_for('employee_dashboard'))
+    action = request.form.get('action')
+    if action == 'approve':
+        req.user.is_verified = True
+        req.status = 'approved'
+        req.rejection_reason = ''
+        send_user_notification(req.user_id, 'تم توثيق حسابك', 'تمت الموافقة على طلب التوثيق.', url_for('profile'))
+    elif action == 'reject':
+        reason = request.form.get('reject_reason', '').strip()[:500]
+        if not reason:
+            flash('اكتب سبب الرفض.', 'error')
+            return redirect(url_for('employee_dashboard'))
+        req.status = 'rejected'
+        req.rejection_reason = reason
+        send_user_notification(req.user_id, 'تعذر توثيق حسابك', reason, url_for('verification'))
     else:
-        target.balance_usd=round(float(target.balance_usd or 0)+amount,2)
-        db.session.add(WalletTransaction(user_id=target.id, admin_id=current_user().id, transaction_type='deposit', amount=amount, reason=reason or 'تحويل رصيد من موظف الدعم'))
-        send_user_notification(target.id,'تمت إضافة رصيد إلى محفظتك',f'تمت إضافة ${format_money(amount)} إلى رصيدك. السبب: {reason or "تحويل من فريق الدعم"}',url_for('profile'))
-        db.session.commit(); flash(f'تم تحويل ${format_money(amount)} إلى {target.username}.', 'success')
+        flash('إجراء غير صالح.', 'error')
+        return redirect(url_for('employee_dashboard'))
+    db.session.commit()
+    flash('تم تحديث طلب التوثيق.', 'success')
     return redirect(url_for('employee_dashboard'))
 
 @app.route('/account-banned/<int:user_id>', methods=['GET'])
@@ -1801,6 +1816,24 @@ def send_balance():
     user=User.query.get(request.form.get('user_id',type=int)); amount=request.form.get('amount',type=float)
     if not user or amount is None or amount <= 0: flash('تحقق من ID والمبلغ.', 'error')
     else: user.balance_usd += amount; db.session.commit(); flash('تم إرسال الرصيد.', 'success')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/add_employee', methods=['POST'])
+@admin_required
+def add_employee():
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '')
+    full_name = request.form.get('full_name', '').strip()[:120]
+    if not username or len(username) > 80 or len(password) < 8:
+        flash('أدخل اسم مستخدم صحيحاً وكلمة مرور من 8 أحرف على الأقل.', 'error')
+    elif User.query.filter_by(username=username).first():
+        flash('اسم المستخدم مستخدم مسبقاً.', 'error')
+    else:
+        staff = User(username=username, full_name=full_name or 'موظف NOVA STORE', role='employee', balance_usd=0)
+        staff.set_password(password)
+        db.session.add(staff)
+        db.session.commit()
+        flash('تم إنشاء حساب الموظف. صلاحياته محصورة بالدعم والطلبات وطلبات التاجر والتوثيق.', 'success')
     return redirect(url_for('admin'))
 
 @app.route('/admin/add_merchant', methods=['POST'])
@@ -2103,7 +2136,8 @@ def add_service():
     api_service_id = request.form.get('api_service_id', '').strip() if typ in ('smm', 'smm_fixed') else ''
     if typ in ('smm', 'smm_fixed') and (not provider_id or not api_service_id):
         flash('لخدمة SMM تلقائية، اختر مزوّد API وأدخل رقم الخدمة لدى المزوّد.', 'error'); return redirect(url_for('admin'))
-    service=Service(name=name, category_id=cat.id, price=price, price_per_1000=price, min_quantity=(minimum if typ in ('smm', 'manual_quantity') else 1), max_quantity=(maximum if typ in ('smm', 'manual_quantity') else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, api_provider_id=provider_id, api_service_id=api_service_id, image_url=product_image, description=request.form.get('description','').strip(), extra_details=request.form.get('extra_details','').strip(), is_available=(request.form.get('is_available', '1') == '1'))
+    merchant_price=max(0.0, request.form.get('merchant_price', type=float) or 0.0)
+    service=Service(name=name, category_id=cat.id, price=price, price_per_1000=price, merchant_price=merchant_price, min_quantity=(minimum if typ in ('smm', 'manual_quantity') else 1), max_quantity=(maximum if typ in ('smm', 'manual_quantity') else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, api_provider_id=provider_id, api_service_id=api_service_id, image_url=product_image, description=request.form.get('description','').strip(), extra_details=request.form.get('extra_details','').strip(), is_available=(request.form.get('is_available', '1') == '1'))
     db.session.add(service); db.session.commit(); flash('تمت إضافة الخدمة.', 'success'); return redirect(url_for('admin'))
 
 @app.route('/admin/update_service/<int:service_id>', methods=['POST'])
@@ -2145,6 +2179,7 @@ def update_service(service_id):
     service.category_id = category.id
     service.price = price
     service.price_per_1000 = price
+    service.merchant_price = max(0.0, request.form.get('merchant_price', type=float) or 0.0)
     service.min_quantity = minimum if typ in ('smm', 'manual_quantity') else 1
     service.max_quantity = maximum if typ in ('smm', 'manual_quantity') else 1
     service.input_label = request.form.get('input_label', 'الرابط أو الآيدي').strip()
@@ -2526,6 +2561,10 @@ with app.app_context():
     # Store the remote provider's order ID so customer-facing status can be refreshed from the same API.
     try:
         from sqlalchemy import inspect
+        service_columns = {column['name'] for column in inspect(db.engine).get_columns('service')}
+        if 'merchant_price' not in service_columns:
+            db.session.execute(db.text('ALTER TABLE service ADD COLUMN merchant_price FLOAT NOT NULL DEFAULT 0'))
+            db.session.commit()
         order_columns = {column['name'] for column in inspect(db.engine).get_columns('order')}
         if 'provider_order_id' not in order_columns:
             db.session.execute(db.text("ALTER TABLE \"order\" ADD COLUMN provider_order_id VARCHAR(120) DEFAULT ''"))

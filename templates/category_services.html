@@ -206,7 +206,11 @@
             <div class="owj-service-content">
                 <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
                 <div class="owj-service-price-strip" aria-label="السعر">
-                    <span class="owj-price-value">${{ (service.price_per_1000 or service.price if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price)|money }}</span>
+                    {% set public_price = (service.price_per_1000 or service.price if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price) %}
+                    {% if current_user and current_user.is_trusted_merchant and (service.merchant_price or 0) > 0 %}
+                    <span class="text-[9px] sm:text-xs text-gray-400 line-through">${{ public_price|money }}</span>
+                    <span class="owj-price-value">${{ service.merchant_price|money }}</span>
+                    {% else %}<span class="owj-price-value">${{ public_price|money }}</span>{% endif %}
                 </div>
                 {% if not service.is_available %}
                 <span class="owj-unavailable-label">غير متوفرة</span>
@@ -215,7 +219,7 @@
 
             <div class="mt-1 sm:mt-2">
                 {% if service.is_available %}
-                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.price_per_1000 if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}" data-extra-details="{{ (service.extra_details or '')|e }}">
+                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.merchant_price if current_user and current_user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price) }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}" data-extra-details="{{ (service.extra_details or '')|e }}">
                     اطلب الآن
                 </button>
                 {% else %}

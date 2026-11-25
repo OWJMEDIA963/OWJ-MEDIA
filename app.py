@@ -1515,7 +1515,7 @@ def admin():
     all_categories = Category.query.all()
     ordered_categories = sorted(all_categories, key=lambda item: (0 if item.parent_id is None else item.parent_id, item.sort_order or 0, item.id))
     links = SocialLink.query.all()
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in links}, social_usernames={x.platform:x.username for x in links})
+    return render_template('admin.html', employees=User.query.filter_by(role='employee').order_by(User.id.desc()).all(), orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in links}, social_usernames={x.platform:x.username for x in links})
 
 
 @app.route('/admin/orders/status')
@@ -1693,6 +1693,13 @@ def admin_account_action():
             flash(f'تم إرجاع الحساب #{user.id} إلى حساب عام وإلغاء السعر الخاص بالتاجر.', 'success')
         else:
             flash('هذا الحساب عام بالفعل.', 'info')
+    elif action == 'remove_employee':
+        if user.role != 'employee':
+            flash('هذا الحساب ليس موظفاً حالياً.', 'info')
+        else:
+            user.role = 'user'
+            db.session.commit()
+            flash(f'تم إلغاء صلاحيات الموظف للحساب #{user.id} وإعادته إلى حساب عادي.', 'success')
     return redirect(url_for('admin_accounts', account_id=user.id))
 
 @app.route('/admin/handle_deposit/<int:deposit_id>', methods=['POST'])

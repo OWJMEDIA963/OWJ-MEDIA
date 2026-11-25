@@ -36,6 +36,17 @@
       </form>
     </section>
 
+    <section id="employee-management" class="mx-4 mb-5 rounded-2xl border border-amber-400/30 bg-gray-900 p-4 space-y-3">
+      <h2 class="font-black text-amber-300">إدارة الموظفين وإلغاء الصلاحية</h2>
+      <p class="text-xs text-gray-400">يمكنك إلغاء صفة الموظف في أي وقت. سيبقى الحساب موجوداً كحساب عادي ولن تُحذف بياناته.</p>
+      {% for staff in employees %}
+      <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950 p-3">
+        <div><div class="text-sm font-black text-white">{{ staff.full_name or staff.username }}</div><div class="text-xs text-gray-400">@{{ staff.username }} · ID {{ staff.id }}</div></div>
+        <form action="/admin/account_action" method="POST" onsubmit="return confirm('هل تريد إلغاء صلاحيات هذا الموظف وإرجاع حسابه إلى حساب عادي؟')"><input type="hidden" name="user_id" value="{{ staff.id }}"><input type="hidden" name="action" value="remove_employee"><button class="rounded-xl bg-amber-400 px-4 py-2 text-xs font-black text-gray-950">إلغاء صفة الموظف</button></form>
+      </div>
+      {% else %}<p class="text-sm text-gray-400">لا توجد حسابات موظفين حالياً.</p>{% endfor %}
+    </section>
+
     <!-- بطاقة إدارة الحسابات: مستقلة وبأعلى الصفحة لتظهر بوضوح على الهاتف -->
     <a href="/admin/accounts" class="group block w-full rounded-3xl border-2 border-violet-400 bg-gradient-to-l from-violet-800 to-indigo-700 p-5 text-white shadow-xl transition hover:from-violet-700 hover:to-indigo-600 focus:outline-none focus:ring-4 focus:ring-violet-300/40">
         <div class="flex items-center justify-between gap-3">

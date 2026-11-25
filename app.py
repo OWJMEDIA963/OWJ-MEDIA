@@ -1933,17 +1933,41 @@ def delete_agent(agent_id):
     return redirect(url_for('admin'))
 
 def syria_market_request(provider, method, path, payload=None, timeout=25):
-    """Call Syria Market REST API from the server; token never reaches the browser."""
+    """Call Syria Market REST API from the server; never expose credentials to the browser.
+
+    HMAC signing is intentionally not added here: the merchant has disabled the
+    mandatory HMAC switch in Syria Market. Bearer authentication remains required.
+    """
     base = (provider.api_url or 'https://api.syrimarket.com/client/api/v1').rstrip('/')
-    token = reveal_api_key(provider.api_key)
-    response = requests.request(method.upper(), base + '/' + path.lstrip('/'),
-        headers={'Authorization': f'Bearer {token}', 'Accept': 'application/json',
-                 'Content-Type': 'application/json', **({'Idempotency-Key': str(uuid.uuid4())} if method.upper() == 'POST' else {})},
-        json=payload if method.upper() != 'GET' else None, timeout=timeout)
-    response.raise_for_status()
-    data = response.json()
+    token = (reveal_api_key(provider.api_key) or '').strip()
+    if not token:
+        raise ValueError('مفتاح REST API فارغ. أدخل مفتاح API الخاص بالمتجر.')
+    if token.startswith('spk_'):
+        raise ValueError('هذا مفتاح PerfectPanel يبدأ بـ spk_ وهو مخصص للرشق فقط. استخدم مفتاح REST API الذي يبدأ عادةً بـ sst_.')
+    if not base.startswith('https://api.syrimarket.com/client/api/v1'):
+        raise ValueError('رابط API غير صحيح. استخدم https://api.syrimarket.com/client/api/v1')
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    }
+    if method.upper() == 'POST':
+        headers['Idempotency-Key'] = str(uuid.uuid4())
+    response = requests.request(
+        method.upper(), base + '/' + path.lstrip('/'), headers=headers,
+        json=payload if method.upper() != 'GET' else None, timeout=timeout
+    )
+    if not response.ok:
+        # Keep the provider's diagnostic message visible to the administrator;
+        # this makes 401/403/422 issues actionable instead of showing only status.
+        detail = (response.text or '')[:700]
+        raise ValueError(f'Syria Market HTTP {response.status_code}: {detail or response.reason}')
+    try:
+        data = response.json()
+    except ValueError:
+        raise ValueError('استجابة سوريا ماركت ليست JSON صالحاً.')
     if isinstance(data, dict) and (data.get('success') is False or data.get('error')):
-        raise ValueError(str(data.get('message') or data.get('error')))
+        raise ValueError(str(data.get('message') or data.get('error') or data))
     return data
 
 

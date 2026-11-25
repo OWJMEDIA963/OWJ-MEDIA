@@ -327,12 +327,12 @@
     <!-- مزودو SMM API -->
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إعدادات مزوّدي SMM API</h2>
-        <p class="text-xs text-gray-400 leading-6">يدعم ربط Syria Market REST API مع إبقاء مزوّدي SMM التقليديين كما هم. أدخل API Token الخاص بسوريا ماركت، اختبر الاتصال، ثم استورد المنتجات واربط المنتج المطلوب. المفتاح محفوظ مشفّراً ولا يظهر للزوار.</p>
+        <p class="text-xs text-gray-400 leading-6">يدعم ربط Syria Market REST API مع إبقاء مزوّدي SMM التقليديين كما هم. أدخل مفتاح REST API الخاص بالمتجر (sst_). لا تستخدم مفتاح PerfectPanel الذي يبدأ بـ spk_ لأنه مخصص للرشق فقط. المصادقة Bearer؛ توقيع HMAC غير مطلوب ما دمت عطّلته من سوريا ماركت. اختبر الاتصال ثم استورد المنتجات. المفتاح محفوظ مشفّراً ولا يظهر للزوار.</p>
         <form action="/admin/add_smm_provider" method="POST" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input name="provider_name" required placeholder="اسم المزوّد (مثلاً: سوريا ماركت)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
             <select name="api_protocol" id="smmApiProtocol" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="syria_market">Syria Market REST API</option><option value="legacy">SMM / PerfectPanel التقليدي</option></select>
             <input name="api_url" id="smmApiUrl" type="url" placeholder="https://api.syrimarket.com/client/api/v1" value="https://api.syrimarket.com/client/api/v1" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
-            <input name="test_api_key" type="password" autocomplete="new-password" placeholder="مفتاح التجربة (اختياري)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><input name="live_api_key" type="password" required autocomplete="new-password" placeholder="المفتاح الفعلي (Live)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+            <input name="test_api_key" type="password" autocomplete="new-password" placeholder="مفتاح التجربة (اختياري)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><input name="live_api_key" type="password" required autocomplete="new-password" placeholder="REST API Token (sst_...) — وليس spk_" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
             <button class="sm:col-span-2 bg-cyan-500 text-gray-950 font-black py-3 rounded-xl text-xs">حفظ مزوّد API</button>
         </form>
         <script>

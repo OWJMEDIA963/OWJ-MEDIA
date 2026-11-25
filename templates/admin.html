@@ -1,13 +1,25 @@
 {% block title %}لوحة التحكم الإدارية{% endblock %}
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
-<section class="mx-auto my-8 max-w-5xl rounded-3xl border border-cyan-400/20 bg-gray-900 p-6 space-y-4">
+  <!-- Quick navigation added without changing the existing dashboard theme or removing sections -->
+  <nav aria-label="اختصارات لوحة الإدارة" class="rounded-2xl border border-gray-800 bg-gray-900 p-3">
+    <p class="mb-2 text-xs font-black text-cyan-300">وصول سريع — اختر المهمة مباشرة</p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <a href="#add-main-category" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-emerald-400">＋ قسم رئيسي</a>
+      <a href="#add-sub-category" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-cyan-400">＋ قسم فرعي</a>
+      <a href="#add-product" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-cyan-400">＋ منتج / خدمة</a>
+      <a href="#product-order" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-violet-400">ترتيب المنتجات</a>
+      <a href="#social-accounts" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-pink-400">روابط حساباتنا</a>
+      <a href="/admin/accounts" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-violet-400">إدارة الحسابات</a>
+    </div>
+  </nav>
+<section id="social-accounts" class="mx-auto my-8 max-w-5xl rounded-3xl border border-cyan-400/20 bg-gray-900 p-6 space-y-4">
   <h2 class="text-lg font-black text-cyan-300">روابط حسابات NOVA STORE الاجتماعية</h2>
   <p class="text-xs leading-6 text-gray-400">أضف الروابط لاحقاً أو اترك الحقل فارغاً لإخفاء الأيقونة من صفحة «من نحن».</p>
   <form method="post" action="{{ url_for('admin_social_links') }}" class="grid gap-3">
-    <label class="text-xs text-gray-300">رابط واتساب <input type="url" name="whatsapp" value="{{ social_links.get('whatsapp','') }}" placeholder="https://wa.me/..." dir="ltr" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label>
-    <label class="text-xs text-gray-300">رابط فيسبوك <input type="url" name="facebook" value="{{ social_links.get('facebook','') }}" placeholder="https://facebook.com/..." dir="ltr" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label>
-    <label class="text-xs text-gray-300">رابط إنستغرام <input type="url" name="instagram" value="{{ social_links.get('instagram','') }}" placeholder="https://instagram.com/..." dir="ltr" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label>
+    <div class="rounded-xl border border-gray-800 p-3"><label class="text-xs text-gray-300">رابط واتساب <input type="url" name="whatsapp" value="{{ social_links.get('whatsapp','') }}" placeholder="https://wa.me/..." dir="ltr" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label><label class="mt-2 block text-xs text-gray-300">اليوزر / الاسم الظاهر <input name="whatsapp_username" value="{{ social_usernames.get('whatsapp','') }}" placeholder="مثال: NOVA Support" dir="auto" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label></div>
+    <div class="rounded-xl border border-gray-800 p-3"><label class="text-xs text-gray-300">رابط فيسبوك <input type="url" name="facebook" value="{{ social_links.get('facebook','') }}" placeholder="https://facebook.com/..." dir="ltr" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label><label class="mt-2 block text-xs text-gray-300">اليوزر / الاسم الظاهر <input name="facebook_username" value="{{ social_usernames.get('facebook','') }}" placeholder="@username" dir="auto" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label></div>
+    <div class="rounded-xl border border-gray-800 p-3"><label class="text-xs text-gray-300">رابط إنستغرام <input type="url" name="instagram" value="{{ social_links.get('instagram','') }}" placeholder="https://instagram.com/..." dir="ltr" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label><label class="mt-2 block text-xs text-gray-300">يوزر إنستغرام <input name="instagram_username" value="{{ social_usernames.get('instagram','') }}" placeholder="@nova.store" dir="ltr" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label></div>
     <button class="rounded-xl bg-cyan-600 p-3 text-sm font-black text-white">حفظ روابط التواصل</button>
   </form>
 </section>
@@ -333,7 +345,7 @@
     </section>
 
     <!-- إنشاء قسم رئيسي -->
-    <section class="bg-gray-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl space-y-4">
+    <section id="add-main-category" class="bg-gray-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-base font-black text-emerald-300">إنشاء قسم رئيسي</h2>
         <p class="text-xs text-gray-400">أنشئ قسماً رئيسياً جديداً، وبعدها يمكنك إضافة أقسام فرعية ومنتجات بداخله.</p>
         <form action="/admin/add_category" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -345,7 +357,7 @@
     </section>
 
     <!-- إنشاء قسم فرعي -->
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4"><h2 class="text-sm font-black text-white">إضافة قسم فرعي</h2><form action="/admin/add_subcategory" method="POST" enctype="multipart/form-data" class="space-y-3"><select name="parent_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي</option>{% for cat in categories if not cat.parent_id %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select><input name="subcategory_name" required placeholder="اسم القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><label class="block text-[11px] font-bold text-gray-300">صورة القسم الفرعي (اختياري)</label><input type="file" name="subcategory_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><input type="url" name="subcategory_image_url" placeholder="أو رابط صورة القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><button class="w-full rounded-2xl bg-cyan-500 py-3 text-xs font-black text-gray-950">إنشاء القسم الفرعي</button></form></div>
+    <div id="add-sub-category" class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4"><h2 class="text-sm font-black text-white">إضافة قسم فرعي</h2><form action="/admin/add_subcategory" method="POST" enctype="multipart/form-data" class="space-y-3"><select name="parent_id" required class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><option value="">اختر القسم الرئيسي</option>{% for cat in categories if not cat.parent_id %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select><input name="subcategory_name" required placeholder="اسم القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white"><label class="block text-[11px] font-bold text-gray-300">صورة القسم الفرعي (اختياري)</label><input type="file" name="subcategory_image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><input type="url" name="subcategory_image_url" placeholder="أو رابط صورة القسم الفرعي" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><button class="w-full rounded-2xl bg-cyan-500 py-3 text-xs font-black text-gray-950">إنشاء القسم الفرعي</button></form></div>
 
     <!-- إدارة صور وترتيب الأقسام الرئيسية والفرعية -->
     <section class="bg-gray-900 border border-violet-500/30 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
@@ -368,7 +380,7 @@
     </section>
 
     <!-- إضافة منتج مباشرة إلى قسم فرعي -->
-    <section class="bg-gray-900 border border-cyan-500/30 rounded-3xl p-6 shadow-xl space-y-4">
+    <section id="add-product" class="bg-gray-900 border border-cyan-500/30 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-base font-black text-cyan-300">إضافة منتج داخل قسم فرعي مباشرة</h2>
         <p class="text-xs text-gray-400">اختر القسم الفرعي ثم أدخل بيانات المنتج؛ سيظهر المنتج داخل القسم الفرعي المختار.</p>
         <form action="/admin/add_service" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -437,7 +449,7 @@
     </div>
 
     <!-- ترتيب المنتجات بالسحب والإفلات -->
-    <section class="bg-gray-900 border border-violet-500/25 rounded-3xl p-5 shadow-xl space-y-3">
+    <section id="product-order" class="bg-gray-900 border border-violet-500/25 rounded-3xl p-5 shadow-xl space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="text-sm font-black text-white">ترتيب ظهور المنتجات</h2><span class="text-[10px] text-violet-300">اسحب ☰ ثم احفظ</span></div>
         <p class="text-[11px] text-gray-400">اسحب المنتجات للأعلى أو الأسفل. الترتيب المحفوظ ينعكس في الصفحة الرئيسية وصفحات الأقسام دون تغيير أحجام البطاقات.</p>
         <ol id="ynSortableProducts" class="space-y-2">

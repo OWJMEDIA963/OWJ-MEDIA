@@ -187,6 +187,7 @@ class SocialLink(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     platform = db.Column(db.String(30), unique=True, nullable=False)
     url = db.Column(db.String(500), default='')
+    username = db.Column(db.String(120), default='')
 
 
 class ApiApplication(db.Model):
@@ -1274,6 +1275,7 @@ def agents(): return render_template('agents.html', agents=Agent.query.order_by(
 def admin_social_links():
     for platform in ('whatsapp', 'facebook', 'instagram'):
         value = request.form.get(platform, '').strip()
+        username = request.form.get(platform + '_username', '').strip().lstrip('@')[:120]
         if value and (not value.startswith('https://') or len(value) > 500):
             flash('يجب أن يبدأ كل رابط بـ https:// وألا يتجاوز 500 حرف.', 'error')
             return redirect(url_for('admin'))
@@ -1282,12 +1284,15 @@ def admin_social_links():
             item = SocialLink(platform=platform)
             db.session.add(item)
         item.url = value
+        item.username = username
     db.session.commit()
     flash('تم حفظ روابط التواصل الاجتماعي.', 'success')
     return redirect(url_for('admin'))
 
 @app.route('/about')
-def about(): return render_template('about.html', social_links={x.platform:x.url for x in SocialLink.query.all()})
+def about():
+    links = SocialLink.query.all()
+    return render_template('about.html', social_links={x.platform:x.url for x in links}, social_usernames={x.platform:x.username for x in links})
 @app.route('/ai_bot')
 @login_required
 def ai_bot(): return render_template('ai_bot.html', user_name=current_user().full_name or current_user().username)
@@ -1509,7 +1514,8 @@ def admin():
     account_lookup = db.session.get(User, account_lookup_id) if account_lookup_id else None
     all_categories = Category.query.all()
     ordered_categories = sorted(all_categories, key=lambda item: (0 if item.parent_id is None else item.parent_id, item.sort_order or 0, item.id))
-    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in SocialLink.query.all()})
+    links = SocialLink.query.all()
+    return render_template('admin.html', orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in links}, social_usernames={x.platform:x.username for x in links})
 
 
 @app.route('/admin/orders/status')
@@ -1678,11 +1684,15 @@ def admin_account_action():
             db.session.commit()
             flash(f'تم تحويل الحساب #{user.id} إلى تاجر موثوق.', 'success')
     elif action == 'remove_merchant':
-        if user.role == 'merchant':
+        if user.role == 'admin':
+            flash('لا يمكن تغيير نوع حساب المدير.', 'error')
+        elif user.is_trusted_merchant or user.role == 'merchant':
             user.role = 'user'
             user.is_trusted_merchant = False
             db.session.commit()
-            flash(f'تم إلغاء صفة التاجر عن الحساب #{user.id}.', 'success')
+            flash(f'تم إرجاع الحساب #{user.id} إلى حساب عام وإلغاء السعر الخاص بالتاجر.', 'success')
+        else:
+            flash('هذا الحساب عام بالفعل.', 'info')
     return redirect(url_for('admin_accounts', account_id=user.id))
 
 @app.route('/admin/handle_deposit/<int:deposit_id>', methods=['POST'])
@@ -2545,6 +2555,15 @@ def import_backup():
 
 with app.app_context():
     db.create_all()
+    # Add social username fields safely for existing installations.
+    try:
+        from sqlalchemy import inspect
+        social_columns = {column['name'] for column in inspect(db.engine).get_columns('social_link')}
+        if 'username' not in social_columns:
+            db.session.execute(db.text("ALTER TABLE social_link ADD COLUMN username VARCHAR(120) DEFAULT ''"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
     # Create the requested employee account once; never overwrite an existing account/password.
     try:
         staff = User.query.filter_by(username='ali').first()

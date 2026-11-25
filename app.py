@@ -8,7 +8,6 @@ import math
 import io
 import csv
 import json
-import uuid
 import zipfile
 import tempfile
 import shutil
@@ -237,7 +236,6 @@ class SMMProvider(db.Model):
     api_key = db.Column(db.Text, nullable=False)  # encrypted live key (legacy field)
     test_api_key = db.Column(db.Text, default='')
     live_api_key = db.Column(db.Text, default='')
-    api_protocol = db.Column(db.String(30), default='legacy')  # legacy or syria_market
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -955,22 +953,13 @@ def public_api_create_order():
         if not provider or not service.api_service_id:
             return jsonify(success=False, error='provider_not_configured', message='الخدمة غير مربوطة بمزوّد بشكل صحيح.'), 409
         try:
-            if provider.api_protocol == 'syria_market':
-                result = syria_market_request(provider, 'POST', 'orders', {
-                    'product_id': str(service.api_service_id), 'qty': int(quantity),
-                    'params': {'playerId': link}
-                }, timeout=35)
-                body = result.get('data', result) if isinstance(result, dict) else {}
-                remote_id = body.get('order_id', body.get('id', body.get('order'))) if isinstance(body, dict) else None
-            else:
-                payload = {'key': reveal_api_key(provider.api_key), 'action': 'add', 'service': str(service.api_service_id), 'link': link, 'quantity': str(quantity)}
-                response = requests.post(provider.api_url, data=payload, headers={'Content-Type': 'application/x-www-form-urlencoded'}, timeout=30)
-                response.raise_for_status(); result = response.json()
-                if not isinstance(result, dict) or result.get('error'):
-                    raise ValueError(str(result.get('error') if isinstance(result, dict) else 'Invalid provider response'))
-                remote_id = result.get('order')
-            if remote_id in (None, ''): raise ValueError('لم يرجع المزوّد رقم الطلب.')
-            provider_order_id = str(remote_id)
+            payload = {'key': reveal_api_key(provider.api_key), 'action': 'add', 'service': str(service.api_service_id), 'link': link, 'quantity': str(quantity)}
+            response = requests.post(provider.api_url, data=payload, headers={'Content-Type': 'application/x-www-form-urlencoded'}, timeout=30)
+            response.raise_for_status()
+            result = response.json()
+            if not isinstance(result, dict) or result.get('error') or result.get('order') in (None, ''):
+                raise ValueError(str(result.get('error') if isinstance(result, dict) else 'Invalid provider response'))
+            provider_order_id = str(result['order'])
         except Exception as exc:
             app.logger.warning('API customer provider order failed: %s', exc)
             return jsonify(success=False, error='provider_rejected', message='المزوّد لم يقبل الطلب. لم يتم خصم رصيدك.'), 502
@@ -1099,16 +1088,17 @@ def refresh_api_order_status(order):
     if not provider:
         return
     try:
-        if provider.api_protocol == 'syria_market':
-            payload = syria_market_request(provider, 'GET', f'orders/{order.provider_order_id}', timeout=8)
-            payload = payload.get('data', payload) if isinstance(payload, dict) else {}
-        else:
-            response = requests.post(provider.api_url,
-                data={'key': reveal_api_key(provider.api_key), 'action': 'status', 'order': order.provider_order_id},
-                headers={'Content-Type': 'application/x-www-form-urlencoded'}, timeout=5)
-            response.raise_for_status(); payload = response.json()
-        if not isinstance(payload, dict) or payload.get('error'): return
-        raw = str(payload.get('status', payload.get('state', ''))).strip().lower().replace('-', '_')
+        response = requests.post(
+            provider.api_url,
+            data={'key': reveal_api_key(provider.api_key), 'action': 'status', 'order': order.provider_order_id},
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            timeout=5,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict) or payload.get('error'):
+            return
+        raw = str(payload.get('status', '')).strip().lower().replace('-', '_')
         status_map = {
             'pending': 'قيد الانتظار', 'in progress': 'قيد التنفيذ', 'in_progress': 'قيد التنفيذ',
             'processing': 'قيد التنفيذ', 'running': 'قيد التنفيذ',
@@ -1204,24 +1194,25 @@ def place_order(service_id):
         try:
             # SMM providers commonly expect application/x-www-form-urlencoded.
             # requests encodes the data dict accordingly; do not send JSON and form data together.
-            if provider.api_protocol == 'syria_market':
-                api_result = syria_market_request(provider, 'POST', 'orders', {
-                    'product_id': str(service.api_service_id), 'qty': int(quantity),
-                    'params': {'playerId': link}
-                }, timeout=35)
-                body = api_result.get('data', api_result) if isinstance(api_result, dict) else {}
-                remote_id = body.get('order_id', body.get('id', body.get('order'))) if isinstance(body, dict) else None
-            else:
-                response = requests.post(provider.api_url, data={
-                    'key': reveal_api_key(provider.api_key), 'action': 'add',
-                    'service': str(service.api_service_id), 'link': link, 'quantity': str(quantity)},
-                    headers={'Content-Type': 'application/x-www-form-urlencoded'}, timeout=30)
-                response.raise_for_status(); api_result = response.json()
-                if not isinstance(api_result, dict) or api_result.get('error'):
-                    raise ValueError(str(api_result.get('error') or 'استجابة غير متوقعة من مزوّد الخدمة.'))
-                remote_id = api_result.get('order')
-            if remote_id in (None, ''): raise ValueError('لم يرجع المزوّد رقم الطلب.')
-            provider_order_id = str(remote_id)
+            response = requests.post(
+                provider.api_url,
+                data={
+                    'key': reveal_api_key(provider.api_key),
+                    'action': 'add',
+                    'service': str(service.api_service_id),
+                    'link': link,
+                    'quantity': str(quantity),
+                },
+                headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                timeout=30,
+            )
+            response.raise_for_status()
+            api_result = response.json()
+            if not isinstance(api_result, dict):
+                raise ValueError('استجابة غير متوقعة من مزوّد الخدمة.')
+            if api_result.get('error') or api_result.get('order') in (None, ''):
+                raise ValueError(str(api_result.get('error') or 'لم يؤكد مزود الخدمة قبول الطلب.'))
+            provider_order_id = str(api_result['order'])
         except Exception as exc:
             app.logger.warning('SMM provider order failed: %s', exc)
             flash('الخدمة غير متاحة حاليا، حاول بعد 5 دقائق.', 'error')
@@ -1932,111 +1923,34 @@ def delete_agent(agent_id):
         flash('تم حذف الوكيل بنجاح.', 'success')
     return redirect(url_for('admin'))
 
-def syria_market_request(provider, method, path, payload=None, timeout=25):
-    """Call Syria Market REST API from the server; never expose credentials to the browser.
-
-    HMAC signing is intentionally not added here: the merchant has disabled the
-    mandatory HMAC switch in Syria Market. Bearer authentication remains required.
-    """
-    configured = (provider.api_url or 'https://api.syrimarket.com/client/api/v1').strip().rstrip('/')
-    # Accept either the API root, the v1 base URL, or a mistakenly pasted full endpoint;
-    # always normalize to the documented v1 base to avoid appending /catalog/... twice.
-    if configured.startswith('https://api.syrimarket.com'):
-        base = 'https://api.syrimarket.com/client/api/v1'
-    else:
-        raise ValueError('رابط API غير صحيح. استخدم https://api.syrimarket.com أو https://api.syrimarket.com/client/api/v1')
-    token = (reveal_api_key(provider.api_key) or '').strip()
-    if not token:
-        raise ValueError('مفتاح REST API فارغ. أدخل مفتاح API الخاص بالمتجر.')
-    if token.startswith('spk_'):
-        raise ValueError('هذا مفتاح PerfectPanel يبدأ بـ spk_ وهو مخصص للرشق فقط. استخدم مفتاح REST API الخاص بالمتجر.')
-    headers = {
-        'Authorization': f'Bearer {token}',
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-    }
-    if method.upper() == 'POST':
-        headers['Idempotency-Key'] = str(uuid.uuid4())
-    # The catalog tree is documented under API v3, while profile/products/orders
-    # are under API v1. Route v3 explicitly instead of accidentally requesting /v1/catalog/tree.
-    clean_path = path.lstrip('/')
-    if clean_path.startswith('v3/'):
-        endpoint = 'https://api.syrimarket.com/client/api/' + clean_path
-    else:
-        endpoint = base + '/' + clean_path
-    response = requests.request(
-        method.upper(), endpoint, headers=headers,
-        json=payload if method.upper() != 'GET' else None, timeout=timeout
-    )
-    if not response.ok:
-        # Keep the provider's diagnostic message visible to the administrator;
-        # this makes 401/403/422 issues actionable instead of showing only status.
-        detail = (response.text or '')[:700]
-        raise ValueError(f'Syria Market HTTP {response.status_code}: {detail or response.reason}')
-    try:
-        data = response.json()
-    except ValueError:
-        raise ValueError('استجابة سوريا ماركت ليست JSON صالحاً.')
-    if isinstance(data, dict) and (data.get('success') is False or data.get('error')):
-        raise ValueError(str(data.get('message') or data.get('error') or data))
-    return data
-
-
-def unwrap_api_list(data, *keys):
-    if isinstance(data, list):
-        return data
-    if isinstance(data, dict):
-        for key in keys:
-            value = data.get(key)
-            if isinstance(value, list):
-                return value
-            if isinstance(value, dict):
-                nested = unwrap_api_list(value, *keys)
-                if nested:
-                    return nested
-        for key in ('data', 'result', 'catalog'):
-            value = data.get(key)
-            if isinstance(value, dict):
-                found = unwrap_api_list(value, *keys)
-                if found:
-                    return found
-    return []
-
-
 @app.route('/admin/add_smm_provider', methods=['POST'])
 @admin_required
 def add_smm_provider():
     name = request.form.get('provider_name', '').strip()
-    protocol = request.form.get('api_protocol', 'legacy').strip()
     api_url = request.form.get('api_url', '').strip()
-    if protocol == 'syria_market' and not api_url:
-        api_url = 'https://api.syrimarket.com/client/api/v1'
     test_key = request.form.get('test_api_key', '').strip()
     live_key = request.form.get('live_api_key', '').strip() or request.form.get('api_key', '').strip()
     if not name or not api_url.startswith(('https://', 'http://')) or not live_key:
         flash('أدخل اسم المزوّد ورابط API والمفتاح الفعلي.', 'error')
     else:
-        db.session.add(SMMProvider(name=name, api_url=api_url, api_key=protect_api_key(live_key),
-            test_api_key=protect_api_key(test_key), live_api_key=protect_api_key(live_key), api_protocol=protocol))
+        db.session.add(SMMProvider(name=name, api_url=api_url, api_key=protect_api_key(live_key), test_api_key=protect_api_key(test_key), live_api_key=protect_api_key(live_key)))
         db.session.commit()
-        flash('تم حفظ إعدادات سوريا ماركت. المفتاح محفوظ بشكل مشفّر.', 'success')
+        flash('تم حفظ مزوّد API. احتفظ بالمفتاح سرياً.', 'success')
     return redirect(url_for('admin'))
+
 
 @app.route('/admin/test_smm_provider/<int:provider_id>', methods=['POST'])
 @admin_required
 def test_smm_provider(provider_id):
     provider = SMMProvider.query.get_or_404(provider_id)
     try:
-        if provider.api_protocol == 'syria_market':
-            data = syria_market_request(provider, 'GET', 'profile')
-            profile = data.get('data', data) if isinstance(data, dict) else {}
-            balance = profile.get('balance', profile.get('wallet_balance', 'متصل')) if isinstance(profile, dict) else 'متصل'
-            currency = profile.get('currency', 'USD') if isinstance(profile, dict) else ''
-        else:
-            response = requests.post(provider.api_url, data={'key': reveal_api_key(provider.test_api_key or provider.api_key), 'action': 'balance'}, timeout=15)
-            response.raise_for_status(); data = response.json()
-            if data.get('error'): raise ValueError(str(data['error']))
-            balance, currency = data.get('balance', 'غير متاح'), data.get('currency', '')
+        response = requests.post(provider.api_url, data={'key': reveal_api_key(provider.test_api_key or provider.api_key), 'action': 'balance'}, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+        if data.get('error'):
+            raise ValueError(str(data['error']))
+        balance = data.get('balance', 'غير متاح')
+        currency = data.get('currency', '')
         flash(f'نجح اختبار API للمزوّد {provider.name}. الرصيد: {balance} {currency}', 'success')
     except Exception as exc:
         flash(f'فشل اختبار API للمزوّد {provider.name}: {str(exc)[:220]}', 'error')
@@ -2047,69 +1961,37 @@ def test_smm_provider(provider_id):
 def fetch_smm_services(provider_id):
     provider = SMMProvider.query.get_or_404(provider_id)
     try:
-        if provider.api_protocol == 'syria_market':
-            # Try the documented v1 products route first. Some catalog accounts expose
-            # products through the v3 tree / category routes, so a 404 must trigger fallback.
-            items = []
-            catalog_errors = []
-            try:
-                data = syria_market_request(provider, 'GET', 'catalog/products')
-                items = unwrap_api_list(data, 'products', 'items', 'services', 'data')
-            except Exception as exc:
-                catalog_errors.append(str(exc))
-            if not items:
-                try:
-                    tree = syria_market_request(provider, 'GET', 'v3/catalog/tree')
-                    def walk(nodes):
-                        out=[]
-                        for node in nodes if isinstance(nodes, list) else []:
-                            if not isinstance(node, dict): continue
-                            out.extend(node.get('products') or [])
-                            out.extend(walk(node.get('categories') or node.get('children') or []))
-                        return out
-                    roots = unwrap_api_list(tree, 'categories', 'tree', 'items', 'data')
-                    items = walk(roots)
-                except Exception as exc:
-                    catalog_errors.append(str(exc))
-            if not items:
-                try:
-                    data = syria_market_request(provider, 'GET', 'catalog/categories/0')
-                    items = unwrap_api_list(data, 'products', 'items', 'services', 'data')
-                except Exception as exc:
-                    catalog_errors.append(str(exc))
-            if not items and catalog_errors:
-                raise ValueError('تعذر جلب كتالوج سوريا ماركت عبر المسارات الموثقة. ' + ' | '.join(catalog_errors)[:500])
-        else:
-            response = requests.post(provider.api_url, data={'key': reveal_api_key(provider.api_key), 'action': 'services'}, timeout=20)
-            response.raise_for_status(); data = response.json()
-            if isinstance(data, dict) and data.get('error'): raise ValueError(str(data['error']))
-            items = data if isinstance(data, list) else []
-        if not items:
-            raise ValueError('لم يعِد API أي منتجات. تحقق من صلاحية المفتاح ومسار الكتالوج.')
+        response = requests.post(provider.api_url, data={'key': reveal_api_key(provider.api_key), 'action': 'services'}, timeout=20)
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, dict) and data.get('error'):
+            raise ValueError(str(data['error']))
+        if not isinstance(data, list):
+            raise ValueError('استجابة API غير متوقعة؛ يجب أن تكون قائمة خدمات.')
+        # Replace the catalog only after a valid list response. The delete and inserts
+        # remain in one transaction, so a failure rolls the previous catalog back.
         imported_count = 0
         SMMCatalogService.query.filter_by(provider_id=provider.id).delete(synchronize_session=False)
-        for item in items:
-            if not isinstance(item, dict): continue
-            code = item.get('product_id', item.get('productId', item.get('id', item.get('service'))))
-            if code is None: continue
-            pricing = item.get('pricing') if isinstance(item.get('pricing'), dict) else {}
-            rate = item.get('price', item.get('rate', pricing.get('price', pricing.get('base', 0)))) or 0
-            try: rate = float(rate)
-            except (TypeError, ValueError): rate = 0
-            minimum = item.get('min_quantity', item.get('min', 1)) or 1
-            maximum = item.get('max_quantity', item.get('max', 10000)) or 10000
-            try: minimum=max(1,int(minimum)); maximum=max(minimum,int(maximum))
-            except (TypeError,ValueError): minimum,maximum=1,10000
-            db.session.add(SMMCatalogService(provider_id=provider.id, service_code=str(code),
-                name=str(item.get('name') or item.get('title') or code),
-                category_name=str(item.get('category_name') or item.get('category') or ''),
-                rate=rate, min_quantity=minimum, max_quantity=maximum))
+        for item in data:
+            if not isinstance(item, dict) or item.get('service') is None:
+                continue
+            try:
+                rate = float(item.get('rate') or 0)
+                min_q = max(1, int(item.get('min') or 1))
+                max_q = max(min_q, int(item.get('max') or 10000))
+            except (TypeError, ValueError):
+                rate, min_q, max_q = 0, 1, 10000
+            db.session.add(SMMCatalogService(provider_id=provider.id, service_code=str(item.get('service')),
+                name=str(item.get('name') or item.get('service')), category_name=str(item.get('category') or ''),
+                rate=rate, min_quantity=min_q, max_quantity=max_q))
             imported_count += 1
-        if not imported_count: raise ValueError('لم تتضمن الاستجابة معرّفات منتجات صالحة.')
+        if imported_count == 0:
+            raise ValueError('لم تتضمن استجابة السيرفر أي خدمات صالحة؛ لم يتم تحديث الكتالوج.')
         db.session.commit()
-        flash(f'تم استيراد {imported_count} منتج من {provider.name}. اربط المنتجات المطلوبة من نموذج إضافة الخدمة.', 'success')
+        flash(f'تم تحديث وحفظ {imported_count} خدمة من {provider.name}. يمكنك اختيار رقمها عند إضافة المنتج.', 'success')
     except Exception as exc:
-        db.session.rollback(); flash(f'تعذر جلب خدمات API: {str(exc)[:220]}', 'error')
+        db.session.rollback()
+        flash(f'تعذر جلب خدمات API: {str(exc)[:220]}', 'error')
     return redirect(url_for('admin'))
 
 @app.route('/admin/delete_smm_provider/<int:provider_id>', methods=['POST'])
@@ -2829,9 +2711,9 @@ with app.app_context():
     try:
         from sqlalchemy import inspect
         provider_columns = {column['name'] for column in inspect(db.engine).get_columns('smm_provider')}
-        for col in ('test_api_key', 'live_api_key', 'api_protocol'):
+        for col in ('test_api_key', 'live_api_key'):
             if col not in provider_columns:
-                db.session.execute(db.text(f"ALTER TABLE smm_provider ADD COLUMN {col} TEXT DEFAULT 'legacy'" if col == 'api_protocol' else f"ALTER TABLE smm_provider ADD COLUMN {col} TEXT DEFAULT ''"))
+                db.session.execute(db.text(f"ALTER TABLE smm_provider ADD COLUMN {col} TEXT DEFAULT ''"))
         db.session.commit()
     except Exception:
         db.session.rollback()

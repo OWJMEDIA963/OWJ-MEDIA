@@ -1938,14 +1938,18 @@ def syria_market_request(provider, method, path, payload=None, timeout=25):
     HMAC signing is intentionally not added here: the merchant has disabled the
     mandatory HMAC switch in Syria Market. Bearer authentication remains required.
     """
-    base = (provider.api_url or 'https://api.syrimarket.com/client/api/v1').rstrip('/')
+    configured = (provider.api_url or 'https://api.syrimarket.com/client/api/v1').strip().rstrip('/')
+    # Accept either the API root, the v1 base URL, or a mistakenly pasted full endpoint;
+    # always normalize to the documented v1 base to avoid appending /catalog/... twice.
+    if configured.startswith('https://api.syrimarket.com'):
+        base = 'https://api.syrimarket.com/client/api/v1'
+    else:
+        raise ValueError('رابط API غير صحيح. استخدم https://api.syrimarket.com أو https://api.syrimarket.com/client/api/v1')
     token = (reveal_api_key(provider.api_key) or '').strip()
     if not token:
         raise ValueError('مفتاح REST API فارغ. أدخل مفتاح API الخاص بالمتجر.')
     if token.startswith('spk_'):
-        raise ValueError('هذا مفتاح PerfectPanel يبدأ بـ spk_ وهو مخصص للرشق فقط. استخدم مفتاح REST API الذي يبدأ عادةً بـ sst_.')
-    if not base.startswith('https://api.syrimarket.com/client/api/v1'):
-        raise ValueError('رابط API غير صحيح. استخدم https://api.syrimarket.com/client/api/v1')
+        raise ValueError('هذا مفتاح PerfectPanel يبدأ بـ spk_ وهو مخصص للرشق فقط. استخدم مفتاح REST API الخاص بالمتجر.')
     headers = {
         'Authorization': f'Bearer {token}',
         'Accept': 'application/json',
@@ -1953,8 +1957,15 @@ def syria_market_request(provider, method, path, payload=None, timeout=25):
     }
     if method.upper() == 'POST':
         headers['Idempotency-Key'] = str(uuid.uuid4())
+    # The catalog tree is documented under API v3, while profile/products/orders
+    # are under API v1. Route v3 explicitly instead of accidentally requesting /v1/catalog/tree.
+    clean_path = path.lstrip('/')
+    if clean_path.startswith('v3/'):
+        endpoint = 'https://api.syrimarket.com/client/api/' + clean_path
+    else:
+        endpoint = base + '/' + clean_path
     response = requests.request(
-        method.upper(), base + '/' + path.lstrip('/'), headers=headers,
+        method.upper(), endpoint, headers=headers,
         json=payload if method.upper() != 'GET' else None, timeout=timeout
     )
     if not response.ok:
@@ -2037,20 +2048,37 @@ def fetch_smm_services(provider_id):
     provider = SMMProvider.query.get_or_404(provider_id)
     try:
         if provider.api_protocol == 'syria_market':
-            # Syria Market documents the v1 products endpoint; tree is a fallback for catalog layouts.
-            data = syria_market_request(provider, 'GET', 'catalog/products')
-            items = unwrap_api_list(data, 'products', 'items', 'services')
+            # Try the documented v1 products route first. Some catalog accounts expose
+            # products through the v3 tree / category routes, so a 404 must trigger fallback.
+            items = []
+            catalog_errors = []
+            try:
+                data = syria_market_request(provider, 'GET', 'catalog/products')
+                items = unwrap_api_list(data, 'products', 'items', 'services', 'data')
+            except Exception as exc:
+                catalog_errors.append(str(exc))
             if not items:
-                tree = syria_market_request(provider, 'GET', 'catalog/tree')
-                def walk(nodes):
-                    out=[]
-                    for node in nodes if isinstance(nodes, list) else []:
-                        if not isinstance(node, dict): continue
-                        out.extend(node.get('products') or [])
-                        out.extend(walk(node.get('categories') or node.get('children') or []))
-                    return out
-                roots = unwrap_api_list(tree, 'categories', 'tree', 'items')
-                items = walk(roots)
+                try:
+                    tree = syria_market_request(provider, 'GET', 'v3/catalog/tree')
+                    def walk(nodes):
+                        out=[]
+                        for node in nodes if isinstance(nodes, list) else []:
+                            if not isinstance(node, dict): continue
+                            out.extend(node.get('products') or [])
+                            out.extend(walk(node.get('categories') or node.get('children') or []))
+                        return out
+                    roots = unwrap_api_list(tree, 'categories', 'tree', 'items', 'data')
+                    items = walk(roots)
+                except Exception as exc:
+                    catalog_errors.append(str(exc))
+            if not items:
+                try:
+                    data = syria_market_request(provider, 'GET', 'catalog/categories/0')
+                    items = unwrap_api_list(data, 'products', 'items', 'services', 'data')
+                except Exception as exc:
+                    catalog_errors.append(str(exc))
+            if not items and catalog_errors:
+                raise ValueError('تعذر جلب كتالوج سوريا ماركت عبر المسارات الموثقة. ' + ' | '.join(catalog_errors)[:500])
         else:
             response = requests.post(provider.api_url, data={'key': reveal_api_key(provider.api_key), 'action': 'services'}, timeout=20)
             response.raise_for_status(); data = response.json()

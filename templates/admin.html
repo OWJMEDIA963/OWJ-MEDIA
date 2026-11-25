@@ -327,13 +327,17 @@
     <!-- مزودو SMM API -->
     <section class="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
         <h2 class="text-sm font-black text-white">إعدادات مزوّدي SMM API</h2>
-        <p class="text-xs text-gray-400 leading-6">أضف مزوّد SMM متوافقاً مع صيغة PerfectPanel / SMM API: أدخل رابط API ومفتاحه، اختبر الاتصال، ثم اجلب كتالوج الخدمات واربط رقم الخدمة بالمنتج. مثال SyriMarket: https://api.syrimarket.com/client/api/panel/v2 . لا تفعّل إلزام HMAC لدى المزوّد إلا إذا كانت صيغة توقيعه مضافة ومدعومة هنا. المفاتيح تحفظ مشفّرة ولا تظهر للزوار.</p>
+        <p class="text-xs text-gray-400 leading-6">يدعم 3lwan Store وSyria Market ومزوّدي SMM التقليديين. أدخل عنوان API والتوكن، اختبر الاتصال، ثم استورد المنتجات واربط المنتج المطلوب. المفتاح محفوظ مشفّراً ولا يظهر للزوار.</p>
         <form action="/admin/add_smm_provider" method="POST" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input name="provider_name" required placeholder="اسم المزوّد (مثلاً: مزوّد SMM 1)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
-            <input name="api_url" type="url" required placeholder="مثال SyriMarket: https://api.syrimarket.com/client/api/panel/v2" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+            <input name="provider_name" required placeholder="اسم المزوّد (مثلاً: سوريا ماركت)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
+            <select name="api_protocol" id="smmApiProtocol" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="alwan_store">3lwan Store API</option><option value="syria_market">Syria Market REST API</option><option value="legacy">SMM / PerfectPanel التقليدي</option></select>
+            <input name="api_url" id="smmApiUrl" type="url" placeholder="https://3lwan-store.com" value="https://3lwan-store.com" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
             <input name="test_api_key" type="password" autocomplete="new-password" placeholder="مفتاح التجربة (اختياري)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><input name="live_api_key" type="password" required autocomplete="new-password" placeholder="المفتاح الفعلي (Live)" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white">
             <button class="sm:col-span-2 bg-cyan-500 text-gray-950 font-black py-3 rounded-xl text-xs">حفظ مزوّد API</button>
         </form>
+        <script>
+        (function(){const p=document.getElementById('smmApiProtocol'),u=document.getElementById('smmApiUrl');if(p&&u){p.addEventListener('change',()=>{u.value=p.value==='syria_market'?'https://api.syrimarket.com/client/api/v1':(p.value==='alwan_store'?'https://3lwan-store.com':'');u.placeholder=p.value==='syria_market'?'https://api.syrimarket.com/client/api/v1':(p.value==='alwan_store'?'https://3lwan-store.com':'رابط API الكامل للمزوّد التقليدي');u.required=true;});}})();
+        </script>
         {% if smm_providers %}
         <div class="space-y-2">
             {% for provider in smm_providers %}
@@ -442,7 +446,7 @@
                 <div class="sm:col-span-2 rounded-xl border border-sky-500/30 bg-sky-950/20 p-3 space-y-2"><label class="block text-[11px] font-bold text-sky-300">اختيار خدمة جُلبت من API (اختياري)</label><select id="apiCatalogPicker" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"><option value="">اختر خدمة من الكتالوج المحفوظ</option>{% for item in smm_catalog_services %}<option value="{{ item.service_code }}" data-provider="{{ item.provider_id }}" data-name="{{ item.name|e }}" data-rate="{{ item.rate }}" data-min="{{ item.min_quantity }}" data-max="{{ item.max_quantity }}">{{ item.provider.name }} · #{{ item.service_code }} · {{ item.name }} · {{ item.rate }}$ / 1000</option>{% endfor %}</select><button type="button" id="useApiCatalogService" class="rounded-lg bg-sky-500 px-4 py-2 text-xs font-black text-gray-950">استخدام رقم الخدمة في نموذج المنتج</button><p class="text-[10px] text-gray-400">عند الاختيار يتم تعبئة رقم الخدمة والمزوّد والسعر والحدود تلقائياً.</p></div>
                 <div><label class="block text-[11px] font-bold text-gray-300 mb-1">رقم الخدمة لدى مزوّد SMM</label><input id="apiServiceIdInput" name="api_service_id" placeholder="Service ID من لوحة المزوّد" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-3 text-xs text-white"></div>
             </div>
-            <p class="text-[10px] text-amber-300 leading-5">عند اختيار التلقائي API اختر المزوّد ورقم الخدمة. النوع بسعر ثابت يحاسب العميل مرة واحدة لكل طلب ويرسل كمية 1 للمزوّد. الربط يستخدم واجهة SMM المتوافقة مع action=services / balance / add / status؛ مثال SyriMarket: استخدم عنوان PerfectPanel /client/api/panel/v2 إذا كان مفعّلاً لحسابك. لا تفعّل HMAC إلا إذا كان التوثيق يؤكد أن هذا المسار يتطلب التوقيع.</p>
+            <p class="text-[10px] text-amber-300 leading-5">عند اختيار التلقائي API اختر المزوّد ورقم الخدمة. النوع بسعر ثابت يحاسب العميل مرة واحدة لكل طلب ويرسل كمية 1 للمزوّد. الربط يستخدم واجهة API المتوافقة مع صيغة action=add / service / link / quantity.</p>
 
             <label class="block text-xs font-bold text-gray-300">صورة المنتج / الخدمة (اختياري)</label>
             <input type="file" name="image_file" accept="image/png,image/jpeg,image/webp,image/gif" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-4 py-3 text-xs text-white">

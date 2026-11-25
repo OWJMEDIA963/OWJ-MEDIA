@@ -31,6 +31,8 @@
             position: fixed; top: 0; right: 0; bottom: 0; width: 320px; max-width: 88%;
             background-color: #030712; border-left: 1px solid #1f2937; z-index: 60;
             display: flex; flex-direction: column; justify-content: space-between; padding: 28px;
+            max-height: 100vh; max-height: 100dvh; overflow-y: auto; overscroll-behavior-y: contain;
+            -webkit-overflow-scrolling: touch; touch-action: pan-y;
             transform: translateX(100%); transition: transform 0.3s ease-in-out;
         }
         #sidebarMenu.open { transform: translateX(0); }
@@ -100,7 +102,6 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
 }
 @media(min-width:1440px){body>main{max-width:1680px;padding-left:44px;padding-right:44px}.ai-page{width:min(1240px,calc(100% - 64px))!important;max-width:1240px!important}}
 @media(min-width:1024px){ #sidebarMenu{width:292px;padding:22px}#sidebarMenu .space-y-4>a{padding-top:.68rem!important;padding-bottom:.68rem!important}body>main{max-width:1320px!important;padding-left:28px!important;padding-right:28px!important}header>div{max-width:1320px!important}}
-#novaSortableMenu>a{cursor:grab}#novaSortableMenu>a.nova-dragging{opacity:.45;cursor:grabbing}#novaSortableMenu>a.nova-drop-target{outline:1px dashed #60a5fa;outline-offset:3px}
 
 /* NOVA desktop-only layout polish: mobile rules remain untouched */
 @media (min-width: 1024px) {
@@ -139,7 +140,7 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
             </div>
             
             <button type="button" onclick="toggleTheme()" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 text-xs font-bold mb-4"><span>المظهر: ليلي / نهاري</span><span id="themeToggleIcon">☀️</span></button>
-            <div id="novaSortableMenu" class="space-y-4" aria-label="روابط القائمة القابلة لإعادة الترتيب">
+            <div id="novaSortableMenu" class="space-y-4" aria-label="روابط القائمة">
                 <a href="/" class="flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800">
                     <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                     <span>الرئيسية</span>
@@ -330,13 +331,6 @@ document.addEventListener('submit',e=>{if(e.target.matches('form')&&!e.target.da
 document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(a&&!a.target&&!a.href.startsWith('javascript:')&&!a.href.includes('#')&&a.origin===location.origin){overlay.classList.add('active');}});
 window.addEventListener('pageshow',()=>overlay.classList.remove('active'));
 })();
-</script><script>
-(()=>{const box=document.getElementById('novaSortableMenu');if(!box)return;let drag=null;const key='nova-menu-order-v1';
-function items(){return [...box.querySelectorAll(':scope > a')];}
-function save(){try{localStorage.setItem(key,JSON.stringify(items().map(x=>x.getAttribute('href'))));}catch(e){}}
-function move(el,dir){const list=items(),i=list.indexOf(el),target=list[i+dir];if(!target)return;if(dir<0)box.insertBefore(el,target);else box.insertBefore(target,el);save();}
-function restore(){try{const order=JSON.parse(localStorage.getItem(key)||'[]');if(!Array.isArray(order))return;const list=items();order.forEach(h=>{const el=list.find(x=>x.getAttribute('href')===h);if(el)box.appendChild(el)});}catch(e){}}
-items().forEach(el=>{el.draggable=true;el.style.position='relative';const controls=document.createElement('span');controls.className='nova-menu-move-controls';controls.style.cssText='display:inline-flex;flex-direction:column;gap:2px;margin-inline-start:auto;flex-shrink:0';controls.setAttribute('aria-label','تحريك رابط القائمة');[['↑',-1,'تحريك لأعلى'],['↓',1,'تحريك لأسفل']].forEach(([label,dir,title])=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);b.style.cssText='width:24px;height:20px;line-height:16px;border-radius:6px;border:1px solid #334155;background:#17243a;color:#fbbf24;font-weight:900;font-size:12px;cursor:pointer';b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();move(el,dir)});controls.appendChild(b)});el.appendChild(controls);el.addEventListener('dragstart',e=>{if(e.target.closest('button')){e.preventDefault();return}drag=el;el.classList.add('nova-dragging');e.dataTransfer.effectAllowed='move';});el.addEventListener('dragend',()=>{el.classList.remove('nova-dragging');box.querySelectorAll('.nova-drop-target').forEach(x=>x.classList.remove('nova-drop-target'));save();});el.addEventListener('dragover',e=>{if(!drag||drag===el)return;e.preventDefault();el.classList.add('nova-drop-target');});el.addEventListener('dragleave',()=>el.classList.remove('nova-drop-target'));el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('nova-drop-target');if(!drag||drag===el)return;const r=el.getBoundingClientRect();box.insertBefore(drag,e.clientY>r.top+r.height/2?el.nextSibling:el);});});restore();})();
 </script>
 </body>
 </html>

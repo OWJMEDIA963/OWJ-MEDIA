@@ -116,7 +116,112 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
   body > main { width:min(1240px, calc(100% - 96px))!important; max-width:1240px!important; }
   header > div { width:min(1240px, calc(100% - 96px))!important; max-width:1240px!important; }
 }
-</style></head>
+</style>
+<style id="nova-complete-light-theme">
+/* NOVA STORE - complete light appearance: no dark panels left behind */
+body.light-theme{
+  --yn-bg:#f5f7fb;--yn-panel:#ffffff;--yn-panel-2:#f8fafc;--yn-border:#e2e8f0;
+  --yn-text:#172033;--yn-muted:#64748b;--yn-blue:#2457d6;
+  background:#f5f7fb!important;color:#172033!important;color-scheme:light;
+}
+body.light-theme,body.light-theme *{scrollbar-color:#cbd5e1 #f1f5f9}
+body.light-theme header,
+body.light-theme nav,
+body.light-theme #sidebarMenu,
+body.light-theme main,
+body.light-theme footer{color:#172033}
+body.light-theme header,
+body.light-theme nav.fixed,
+body.light-theme #sidebarMenu,
+body.light-theme #owjBotWindow,
+body.light-theme #owjBotForm,
+body.light-theme #owjBotMessages,
+body.light-theme #novaLoading,
+body.light-theme .nova-loader{
+  background:#ffffff!important;color:#172033!important;border-color:#e2e8f0!important;
+}
+body.light-theme #sidebarMenu{box-shadow:0 18px 55px rgba(15,23,42,.12)}
+body.light-theme #sidebarOverlay{background:rgba(15,23,42,.28)!important}
+/* Every dark Tailwind utility used across customer and admin pages */
+body.light-theme [class*="bg-gray-950"],body.light-theme [class*="bg-gray-900"],
+body.light-theme [class*="bg-gray-800"],body.light-theme [class*="bg-slate-950"],
+body.light-theme [class*="bg-slate-900"],body.light-theme [class*="bg-slate-800"],
+body.light-theme [class*="bg-black/"],body.light-theme [class*="bg-[#0"],
+body.light-theme [class*="bg-[#1"],body.light-theme [class*="bg-[#2"]{
+  background-color:#ffffff!important;background-image:none!important;color:#172033!important;
+}
+body.light-theme [class*="border-gray-8"],body.light-theme [class*="border-gray-7"],
+body.light-theme [class*="border-gray-6"],body.light-theme [class*="border-slate-8"],
+body.light-theme [class*="border-slate-7"],body.light-theme [class*="border-violet-"],
+body.light-theme [class*="border-purple-"]{border-color:#e2e8f0!important}
+/* Dark text utilities become readable on white surfaces */
+body.light-theme .text-white,body.light-theme .text-gray-100,
+body.light-theme .text-gray-200,body.light-theme .text-gray-300,
+body.light-theme .text-gray-400,body.light-theme .text-gray-500,
+body.light-theme .text-slate-100,body.light-theme .text-slate-200,
+body.light-theme .text-slate-300,body.light-theme .text-slate-400,
+body.light-theme .text-slate-500{color:#334155!important}
+body.light-theme h1,body.light-theme h2,body.light-theme h3,
+body.light-theme h4,body.light-theme label,body.light-theme p,
+body.light-theme li,body.light-theme td,body.light-theme th,
+body.light-theme small,body.light-theme summary{color:inherit}
+/* Preserve white text on intentionally colored primary/status buttons */
+body.light-theme button[class*="bg-blue-"],body.light-theme a[class*="bg-blue-"],
+body.light-theme button[class*="bg-cyan-"],body.light-theme a[class*="bg-cyan-"],
+body.light-theme button[class*="bg-emerald-"],body.light-theme a[class*="bg-emerald-"],
+body.light-theme button[class*="bg-rose-"],body.light-theme a[class*="bg-rose-"],
+body.light-theme button[class*="bg-amber-"],body.light-theme a[class*="bg-amber-"],
+body.light-theme button[class*="bg-indigo-"],body.light-theme a[class*="bg-indigo-"],
+body.light-theme button[class*="bg-violet-"],body.light-theme a[class*="bg-violet-"],
+body.light-theme button[class*="bg-purple-"],body.light-theme a[class*="bg-purple-"]{color:#ffffff!important}
+body.light-theme input,body.light-theme textarea,body.light-theme select,
+body.light-theme option,body.light-theme .form-control{
+  background:#ffffff!important;color:#172033!important;border-color:#cbd5e1!important;
+}
+body.light-theme input::placeholder,body.light-theme textarea::placeholder{color:#94a3b8!important;opacity:1}
+body.light-theme input:disabled,body.light-theme textarea:disabled,body.light-theme select:disabled{background:#f1f5f9!important;color:#64748b!important}
+body.light-theme table{background:#ffffff!important;color:#172033!important;border-color:#e2e8f0!important}
+body.light-theme thead,body.light-theme tr,body.light-theme td,body.light-theme th{border-color:#e2e8f0!important}
+body.light-theme tr:nth-child(even){background:#f8fafc!important}
+body.light-theme hr{border-color:#e2e8f0!important}
+body.light-theme .shadow-2xl,body.light-theme .shadow-xl,body.light-theme .shadow-lg,
+body.light-theme .nova-premium-card{box-shadow:0 8px 28px rgba(15,23,42,.07)!important}
+body.light-theme .nova-premium-card{background:#ffffff!important;border-color:#e2e8f0!important}
+/* Navigation, sidebar, floating widgets and loading screen */
+body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{background-color:#f8fafc!important;color:#334155!important;border-color:#e2e8f0!important}
+body.light-theme header a,body.light-theme header button,body.light-theme nav a{color:#334155}
+body.light-theme nav .text-cyan-400,body.light-theme nav .text-blue-300{color:#2457d6!important}
+body.light-theme nav .border-\[\#0b0f19\]{border-color:#ffffff!important}
+body.light-theme #owjBotButton{background:linear-gradient(135deg,#2563eb,#4f46e5)!important;color:#fff!important;border-color:#bfdbfe!important}
+body.light-theme #owjBotWindow{background:#fff!important;border:1px solid #dbe5f2!important;box-shadow:0 20px 60px rgba(15,23,42,.18)!important}
+body.light-theme #owjBotWindow .owj-bot-head{background:linear-gradient(110deg,#eff6ff,#eef2ff)!important;border-bottom:1px solid #dbeafe!important}
+body.light-theme #owjBotWindow .owj-bot-head h2{color:#172033!important}
+body.light-theme #owjBotWindow .owj-bot-head p,body.light-theme #owjBotWindow .owj-bot-head button{color:#475569!important}
+body.light-theme #owjBotWindow>div:nth-of-type(1){background:#f8fafc!important;color:#475569!important;border-color:#e2e8f0!important}
+body.light-theme #owjBotMessages{background:#f8fafc!important}
+body.light-theme #owjBotMessages .bot-msg{background:#ffffff!important;border:1px solid #e2e8f0!important;color:#334155!important}
+body.light-theme #owjBotMessages .user-msg{background:#2563eb!important;border:1px solid #2563eb!important;color:#ffffff!important}
+body.light-theme #owjBotMessages .quick-question{background:#eff6ff!important;border:1px solid #bfdbfe!important;color:#1d4ed8!important}
+body.light-theme #owjBotForm{background:#ffffff!important;border-top:1px solid #e2e8f0!important}
+body.light-theme #owjBotInput{background:#ffffff!important;border:1px solid #cbd5e1!important;color:#172033!important}
+body.light-theme #owjBotSend{background:#2457d6!important;color:#ffffff!important}
+body.light-theme #novaLoading{background:rgba(255,255,255,.92)!important;backdrop-filter:blur(10px)}
+body.light-theme .nova-loader{background:#ffffff!important;border:1px solid #dbe5f2!important;box-shadow:0 20px 60px rgba(15,23,42,.14)!important}
+body.light-theme .nova-spin{border-color:#dbeafe!important;border-top-color:#2457d6!important}
+/* Category/product surfaces and generic cards */
+body.light-theme main .owj-category-card,body.light-theme main .owj-subcategory-card,
+body.light-theme main [class*="rounded-"][class*="border"]{border-color:#e2e8f0!important}
+body.light-theme main .owj-category-card,body.light-theme main .owj-subcategory-card{background:#fff!important;color:#172033!important}
+body.light-theme main .owj-category-image-wrap,body.light-theme main .owj-category-image,
+body.light-theme main .owj-subcategory-card img{background:#f1f5f9!important}
+body.light-theme main .text-gray-400,body.light-theme main .text-gray-500{color:#64748b!important}
+body.light-theme .owj-toast{box-shadow:0 12px 32px rgba(15,23,42,.12)}
+/* Remove dark-mode-only fixed overlays while keeping photos and branded imagery intact */
+body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-filter:blur(12px)}
+@media(prefers-reduced-motion:no-preference){body,body *{transition-property:background-color,border-color,color,box-shadow;transition-duration:.18s;transition-timing-function:ease}}
+</style>
+
+</head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
 <div id="novaLoading" aria-live="polite"><div class="nova-loader"><img src="{{ url_for('static',filename='images/nova-symbol.svg') }}" alt="NOVA"><div class="nova-spin"></div><div class="text-white text-sm font-black">NOVA STORE</div><div class="text-slate-400 text-xs mt-2">جاري إتمام العملية...</div></div></div>
 

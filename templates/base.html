@@ -141,8 +141,27 @@ button[class*="bg-cyan-"]:hover,button[class*="bg-sky-"]:hover,button[class*="bg
 .ai-form{background:#0d1f36!important;border-color:#254365!important}
 .ai-form input{background:#071426!important;border-color:#254365!important}
 .ai-quick{background:#173451!important;border-color:#365b83!important;color:#dce9f8!important}
+
 body.light-theme{--yn-bg:#f1f5fa;--yn-panel:#fff;--yn-panel-2:#f7f9fc;--yn-border:#d4deeb;--yn-text:#17243a;--yn-muted:#52627a;--yn-blue:#183b65;--yn-blue-hover:#102a4c;--yn-blue-soft:#315b89;color-scheme:light}
 
+/* Distinctive action accents: light-blue navigation, gold order confirmation */
+.yn-home-nav{color:#b9dcff!important}
+.yn-home-nav-icon{background:#9bd0ff!important;color:#08213d!important;border-color:#071426!important;box-shadow:0 5px 18px rgba(92,166,230,.28)!important}
+.yn-home-nav:hover{color:#e0f1ff!important}
+.yn-home-nav:hover .yn-home-nav-icon{background:#b8e0ff!important}
+body.light-theme .yn-home-nav-icon{border-color:#f1f5fa!important}
+.yn-confirm-order{background:#f5c542!important;color:#172033!important;border-color:#eab52d!important;box-shadow:0 5px 16px rgba(245,197,66,.2)!important}
+.yn-confirm-order:hover{background:#ffda68!important;color:#172033!important}
+
+/* Signature colors for account and assistant navigation */
+.yn-account-menu{background:linear-gradient(110deg,rgba(56,189,248,.16),rgba(30,64,175,.10))!important;border-color:rgba(125,211,252,.42)!important;color:#d8efff!important}
+.yn-account-menu svg{color:#7dd3fc!important}
+.yn-notify-menu{background:linear-gradient(110deg,rgba(245,197,66,.13),rgba(217,119,6,.08))!important;border-color:rgba(245,197,66,.35)!important;color:#ffe7a3!important}
+.yn-notify-menu svg{color:#f5c542!important}
+.yn-purchases-menu{background:linear-gradient(110deg,rgba(167,139,250,.14),rgba(99,102,241,.08))!important;border-color:rgba(167,139,250,.36)!important;color:#e5ddff!important}
+.yn-purchases-menu svg{color:#c4b5fd!important}
+.yn-ai-menu{background:linear-gradient(110deg,rgba(14,165,233,.18),rgba(8,47,73,.3))!important;border-color:rgba(56,189,248,.48)!important;color:#c9f0ff!important}
+.yn-ai-menu svg{color:#67e8f9!important}
 </style>
 <style>
 #novaLoading{position:fixed;inset:0;z-index:9999;background:rgba(5,10,22,.88);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center}
@@ -320,7 +339,7 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
                 <a href="/about" class="flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800">
                     <svg class="w-5 h-5 text-blue-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/></svg><span>من نحن والتواصل</span>
                 </a>
-                <a href="/ai_bot" class="flex items-center gap-4 px-4 py-3.5 bg-cyan-950/40 text-cyan-300 rounded-2xl text-xs font-bold border border-cyan-500/30">
+                <a href="/ai_bot" class="yn-ai-menu flex items-center gap-4 px-4 py-3.5 bg-cyan-950/40 text-cyan-300 rounded-2xl text-xs font-bold border border-cyan-500/30">
                     <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     <span>المساعد الذكي</span>
                 </a>
@@ -328,7 +347,7 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
                 <a href="/support" class="flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800">
                     <svg class="w-5 h-5 text-blue-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4z"/><path d="m4 7 8 6 8-6"/></svg><span>تواصل مع الدعم</span>
                 </a>
-                <a href="/store/accounts/my" class="flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800"><svg class="w-5 h-5 text-blue-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/></svg><span>مشترياتي</span></a>{% if current_user and current_user.role == 'admin' %}<a href="/admin/digital-accounts" class="flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800"><svg class="w-5 h-5 text-blue-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h4"/></svg><span>إدارة متجر الحسابات</span></a>{% endif %}<a href="/notifications" class="flex items-center justify-between gap-3 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800">
+                <a href="/store/accounts/my" class="yn-purchases-menu flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800"><svg class="w-5 h-5 text-blue-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/></svg><span>مشترياتي</span></a>{% if current_user and current_user.role == 'admin' %}<a href="/admin/digital-accounts" class="flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800"><svg class="w-5 h-5 text-blue-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h4"/></svg><span>إدارة متجر الحسابات</span></a>{% endif %}<a href="/notifications" class="yn-notify-menu flex items-center justify-between gap-3 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800">
                     <span class="flex items-center gap-4"><svg class="w-5 h-5 text-blue-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><span>الإشعارات</span></span>
                     {% if unread_notification_count %}<span class="min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-center text-[10px] text-white">{{ unread_notification_count }}</span>{% endif %}
                 </a>
@@ -338,7 +357,7 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
                 </a>
                 {% endif %}
                 {% endif %}
-                <a href="/profile" class="flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800">
+                <a href="/profile" class="yn-account-menu flex items-center gap-4 px-4 py-3.5 bg-gray-900/90 text-gray-200 rounded-2xl text-xs font-bold border border-gray-800">
                     <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                     <span>حسابي الشخصي</span>
                 </a>
@@ -412,8 +431,8 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                 <span>الشحن</span>
             </a>
-            <a href="/" class="text-cyan-400 text-xs font-black flex flex-col items-center gap-1">
-                <div class="w-12 h-12 -mt-6 bg-cyan-500 rounded-full flex items-center justify-center text-gray-950 shadow-2xl border-4 border-[#0b0f19]">
+            <a href="/" class="yn-home-nav text-cyan-400 text-xs font-black flex flex-col items-center gap-1">
+                <div class="yn-home-nav-icon w-12 h-12 -mt-6 bg-cyan-500 rounded-full flex items-center justify-center text-gray-950 shadow-2xl border-4 border-[#0b0f19]">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                 </div>
                 <span>الرئيسية</span>

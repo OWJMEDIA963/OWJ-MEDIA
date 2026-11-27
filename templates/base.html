@@ -273,6 +273,58 @@ body.light-theme main .text-blue-200,body.light-theme main .text-blue-300,body.l
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 
+
+<style id="ynova-final-deep-navy-theme">
+/* Dark mode: deep royal navy. Light mode remains white and is only used when selected. */
+:root{
+ --yn-bg:#071326;--yn-panel:#0d1d35;--yn-panel-2:#122746;
+ --yn-border:#24436b;--yn-text:#edf4ff;--yn-muted:#a9bdd8;
+ --yn-blue:#2563eb;--yn-blue-hover:#1d4ed8;--yn-blue-soft:#8db8ff;
+}
+html{color-scheme:dark}
+body:not(.light-theme){background:var(--yn-bg)!important;color:var(--yn-text)!important}
+body:not(.light-theme) header,
+body:not(.light-theme) nav,
+body:not(.light-theme) #sidebarMenu,
+body:not(.light-theme) .nova-loader{background-color:var(--yn-panel)!important;color:var(--yn-text)!important;border-color:var(--yn-border)!important}
+body:not(.light-theme) #sidebarMenu{background:#08172c!important}
+body:not(.light-theme) main [class*="bg-gray-950"],
+body:not(.light-theme) main [class*="bg-gray-900"],
+body:not(.light-theme) main [class*="bg-gray-800"],
+body:not(.light-theme) main [class*="bg-slate-950"],
+body:not(.light-theme) main [class*="bg-slate-900"],
+body:not(.light-theme) main [class*="bg-slate-800"],
+body:not(.light-theme) .nova-premium-card{background:var(--yn-panel)!important;color:var(--yn-text)!important}
+body:not(.light-theme) main [class*="border-gray-8"],
+body:not(.light-theme) main [class*="border-gray-7"],
+body:not(.light-theme) main [class*="border-slate-8"],
+body:not(.light-theme) main [class*="border-slate-7"]{border-color:var(--yn-border)!important}
+body:not(.light-theme) main .text-gray-400,
+body:not(.light-theme) main .text-gray-500,
+body:not(.light-theme) main .text-slate-400{color:var(--yn-muted)!important}
+body:not(.light-theme) main .text-white,
+body:not(.light-theme) main .text-gray-100,
+body:not(.light-theme) main .text-gray-200{color:var(--yn-text)!important}
+body:not(.light-theme) main [class*="bg-cyan-"],
+body:not(.light-theme) main [class*="bg-sky-"],
+body:not(.light-theme) main [class*="bg-indigo-"],
+body:not(.light-theme) main [class*="bg-violet-"],
+body:not(.light-theme) main [class*="bg-purple-"],
+body:not(.light-theme) main .bg-blue-600,
+body:not(.light-theme) main .bg-blue-700{background:var(--yn-blue)!important;color:#fff!important}
+body:not(.light-theme) main input,
+body:not(.light-theme) main textarea,
+body:not(.light-theme) main select{background:#091a30!important;color:var(--yn-text)!important;border-color:var(--yn-border)!important}
+body:not(.light-theme) main input::placeholder,
+body:not(.light-theme) main textarea::placeholder{color:#8299b8!important}
+body:not(.light-theme) button,
+body:not(.light-theme) a{transition:background-color .2s ease,border-color .2s ease,color .2s ease,transform .2s ease}
+body:not(.light-theme) button:active,
+body:not(.light-theme) a:active{transform:translateY(1px)}
+/* Keep light theme genuinely light, without forcing white into dark mode. */
+body.light-theme{background:#f3f6fb!important;color:#172033!important;color-scheme:light}
+</style>
+
 </head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
 <div id="novaLoading" aria-live="polite"><div class="nova-loader"><img src="{{ url_for('static',filename='images/nova-symbol.svg') }}" alt="NOVA"><div class="nova-spin"></div><div class="text-white text-sm font-black">YNOVA STORE</div><div class="text-slate-400 text-xs mt-2">جاري إتمام العملية...</div></div></div>

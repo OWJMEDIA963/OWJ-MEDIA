@@ -2,6 +2,19 @@
 {% block title %}لوحة التحكم الإدارية{% endblock %}
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <!-- Quick navigation added without changing the existing dashboard theme or removing sections -->
+    <nav aria-label="اختصارات لوحة الإدارة" class="rounded-2xl border border-gray-800 bg-gray-900 p-3">
+      <p class="mb-2 text-xs font-black text-cyan-300">وصول سريع — اختر المهمة مباشرة</p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <a href="#add-main-category" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-emerald-400">＋ قسم رئيسي</a>
+        <a href="#add-sub-category" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-cyan-400">＋ قسم فرعي</a>
+        <a href="#add-product" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-cyan-400">＋ منتج / خدمة</a>
+        <a href="#smm-api-providers" class="rounded-xl border border-sky-500/40 bg-sky-950/40 px-3 py-3 text-center text-xs font-bold text-sky-200 hover:border-sky-300">🔌 مزوّد API</a>
+        <a href="#product-order" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-violet-400">ترتيب المنتجات</a>
+        <a href="#social-accounts" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-pink-400">روابط حساباتنا</a>
+        <a href="/admin/accounts" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-violet-400">إدارة الحسابات</a>
+      </div>
+    </nav>
   <section class="rounded-2xl border border-blue-400/20 bg-gray-900 p-4 space-y-3">
     <h2 class="text-sm font-black text-blue-300">مركز تطوير وإدارة YNOVA</h2>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -35,19 +48,7 @@
     <form method="post" action="/admin/notifications/broadcast" class="space-y-2"><input name="title" maxlength="160" required placeholder="عنوان الإشعار" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white"><textarea name="message" maxlength="500" required placeholder="محتوى الإشعار" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white"></textarea><button onclick="return confirm('سيصل الإشعار إلى جميع الحسابات غير المحظورة. متابعة؟')" class="w-full rounded-xl bg-violet-600 p-3 text-xs font-black text-white">إرسال الإشعار العام</button></form>
   </section>
 
-  <!-- Quick navigation added without changing the existing dashboard theme or removing sections -->
-  <nav aria-label="اختصارات لوحة الإدارة" class="rounded-2xl border border-gray-800 bg-gray-900 p-3">
-    <p class="mb-2 text-xs font-black text-cyan-300">وصول سريع — اختر المهمة مباشرة</p>
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-      <a href="#add-main-category" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-emerald-400">＋ قسم رئيسي</a>
-      <a href="#add-sub-category" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-cyan-400">＋ قسم فرعي</a>
-      <a href="#add-product" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-cyan-400">＋ منتج / خدمة</a>
-      <a href="#smm-api-providers" class="rounded-xl border border-sky-500/40 bg-sky-950/40 px-3 py-3 text-center text-xs font-bold text-sky-200 hover:border-sky-300">🔌 مزوّد API</a>
-      <a href="#product-order" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-violet-400">ترتيب المنتجات</a>
-      <a href="#social-accounts" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-pink-400">روابط حساباتنا</a>
-      <a href="/admin/accounts" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-violet-400">إدارة الحسابات</a>
-    </div>
-  </nav>
+
 <section id="social-accounts" class="mx-auto my-8 max-w-5xl rounded-3xl border border-cyan-400/20 bg-gray-900 p-6 space-y-4">
   <h2 class="text-lg font-black text-cyan-300">روابط حسابات YNOVA STORE الاجتماعية</h2>
   <p class="text-xs leading-6 text-gray-400">أضف الروابط لاحقاً أو اترك الحقل فارغاً لإخفاء الأيقونة من صفحة «من نحن».</p>

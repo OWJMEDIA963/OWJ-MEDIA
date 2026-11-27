@@ -44,7 +44,7 @@
       </div>
     </section>
     {% if service.description %}<div class="product-description">{{ service.description }}</div>{% endif %}
-    <div class="product-meta"><span>◷</span><span><b style="color:#e5edf7">وقت البدء:</b> يختلف حسب الخدمة ومزوّدها</span></div>
+    <div class="product-meta"><span>◷</span><span><b style="color:#e5edf7">وقت البدء:</b> {{ service.start_time or 'يختلف حسب الخدمة ومزوّدها' }}</span></div>
     {% if service.is_available %}
     <form class="product-form" id="productOrderForm" method="POST" action="{{ url_for('place_order', service_id=service.id) }}">
       <div id="productValidation" role="alert" style="display:none;background:rgba(127,29,29,.3);border:1px solid rgba(248,113,113,.4);color:#fca5a5;padding:9px;border-radius:10px;font-size:11px;font-weight:800"></div>

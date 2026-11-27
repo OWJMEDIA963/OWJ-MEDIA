@@ -123,6 +123,9 @@ class User(db.Model):
     role = db.Column(db.String(20), default='user')
     balance_usd = db.Column(db.Float, default=0.0)
     loyalty_points = db.Column(db.Integer, default=0, nullable=False)
+    referral_code = db.Column(db.String(20), unique=True, index=True, default='')
+    referred_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+    referral_rewarded = db.Column(db.Boolean, default=False, nullable=False)
     is_verified = db.Column(db.Boolean, default=False)
     is_trusted_merchant = db.Column(db.Boolean, default=False)
     is_banned = db.Column(db.Boolean, default=False)
@@ -297,6 +300,7 @@ class Order(db.Model):
     # Additive order controls: prevent API polling from undoing admin decisions and make refunds idempotent.
     admin_status_override = db.Column(db.Boolean, default=False, nullable=False)
     refunded = db.Column(db.Boolean, default=False, nullable=False)
+    loyalty_awarded = db.Column(db.Boolean, default=False, nullable=False)
     status_note = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('User', backref='orders')
@@ -404,6 +408,18 @@ class PushSubscription(db.Model):
     auth = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     user = db.relationship('User', backref=db.backref('push_subscriptions', lazy=True, cascade='all, delete-orphan'))
+
+
+class SocialRewardRequest(db.Model):
+    __tablename__ = 'social_reward_request'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    proof = db.Column(db.Text, nullable=False, default='')
+    status = db.Column(db.String(20), nullable=False, default='pending')
+    admin_note = db.Column(db.String(500), default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    reviewed_at = db.Column(db.DateTime)
+    user = db.relationship('User')
 
 
 def send_user_notification(user_id, title, message, url='/notifications'):
@@ -520,6 +536,35 @@ def employee_required(fn):
             abort(403)
         return fn(*args, **kwargs)
     return wrapped
+
+
+def ensure_referral_code(user):
+    if not user.referral_code:
+        alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+        while True:
+            code = ''.join(__import__('secrets').choice(alphabet) for _ in range(8))
+            if not User.query.filter_by(referral_code=code).first():
+                user.referral_code = code
+                break
+    return user.referral_code
+
+def award_completed_order_points(order):
+    if order.loyalty_awarded or order.refunded or order.status != 'مكتمل':
+        return 0
+    buyer = db.session.get(User, order.user_id)
+    if not buyer:
+        return 0
+    buyer.loyalty_points = (buyer.loyalty_points or 0) + 3
+    order.loyalty_awarded = True
+    send_user_notification(buyer.id, 'نقاط ولاء جديدة', f'كسبت 3 نقاط بعد اكتمال طلبك #{order.id}.', '/profile')
+    if buyer.referred_by_id and not buyer.referral_rewarded:
+        inviter = db.session.get(User, buyer.referred_by_id)
+        if inviter:
+            inviter.loyalty_points = (inviter.loyalty_points or 0) + 40
+            buyer.referral_rewarded = True
+            send_user_notification(inviter.id, 'مكافأة دعوة صديق', f'حصلت على 40 نقطة لأن صديقك @{buyer.username} اشترى أول خدمة.', '/profile')
+            send_user_notification(buyer.id, 'تم تفعيل دعوة الصديق', 'تم احتساب عملية الشراء الأولى ضمن برنامج دعوة الأصدقاء.', '/profile')
+    return 3
 
 def current_user():
     return db.session.get(User, session.get('user_id')) if session.get('user_id') else None
@@ -701,8 +746,13 @@ def register():
         elif User.query.filter_by(username=username).first():
             flash('اسم المستخدم مستخدم بالفعل.', 'error')
         else:
-            user = User(username=username, full_name=request.form.get('full_name','').strip(), email=request.form.get('email','').strip(), phone=request.form.get('phone','').strip())
-            user.set_password(password); db.session.add(user); db.session.commit()
+            invite_code = (request.form.get('referral_code') or '').strip().upper()
+            inviter = User.query.filter_by(referral_code=invite_code).first() if invite_code else None
+            if invite_code and (not inviter or inviter.username == username):
+                flash('رمز الدعوة غير صحيح.', 'error')
+                return render_template('register.html')
+            user = User(username=username, full_name=request.form.get('full_name','').strip(), email=request.form.get('email','').strip(), phone=request.form.get('phone','').strip(), referred_by_id=inviter.id if inviter else None)
+            user.set_password(password); ensure_referral_code(user); db.session.add(user); db.session.commit()
             notify_admins('تسجيل حساب جديد', f'تم إنشاء حساب جديد باسم {user.username} ومعرّفه #{user.id}.', url_for('admin_accounts', account_id=user.id))
             db.session.commit()
             session.permanent = True
@@ -819,7 +869,8 @@ def profile():
         user.email = request.form.get('email', user.email).strip()
         user.phone = request.form.get('phone', user.phone).strip()
         db.session.commit(); flash('تم تحديث بياناتك.', 'success'); return redirect(url_for('profile'))
-    return render_template('profile.html', user=user, site_lock_enabled=SiteLock.query.filter_by(user_id=user.id).first() is not None,
+    ensure_referral_code(user); db.session.commit()
+    return render_template('profile.html', user=user, social_links=SocialLink.query.order_by(SocialLink.platform.asc()).all(), social_reward_requests=SocialRewardRequest.query.filter_by(user_id=user.id).order_by(SocialRewardRequest.id.desc()).limit(5).all(), site_lock_enabled=SiteLock.query.filter_by(user_id=user.id).first() is not None,
         merchant_application=MerchantApplication.query.filter_by(user_id=user.id).order_by(MerchantApplication.id.desc()).first(),
         api_application=ApiApplication.query.filter_by(user_id=user.id).order_by(ApiApplication.id.desc()).first(),
         api_key=decrypt_store_secret(ApiApplication.query.filter_by(user_id=user.id,status='approved').order_by(ApiApplication.id.desc()).first().encrypted_key) if ApiApplication.query.filter_by(user_id=user.id,status='approved').order_by(ApiApplication.id.desc()).first() else '')
@@ -1292,12 +1343,7 @@ def place_order(service_id):
     if applied_coupon and discount > 0:
         applied_coupon.used_count = (applied_coupon.used_count or 0) + 1
         db.session.add(CouponUse(coupon_id=applied_coupon.id, user_id=user.id, order_id=order.id, discount=discount))
-    # Loyalty: one point per full USD spent, with a small minimum reward for successful paid orders.
-    earned_points = max(1, int(total)) if total > 0 else 0
-    user.loyalty_points = (user.loyalty_points or 0) + earned_points
     db.session.commit()
-    if earned_points:
-        send_user_notification(user.id, 'نقاط ولاء جديدة', f'كسبت {earned_points} نقطة من طلبك #{order.id}.', '/profile')
     order_kind = 'تلقائي عبر API' if service.service_type in ('smm', 'smm_fixed') else ('يدوي' if service.service_type == 'manual' else 'طلب خدمة')
     notify_admins(f'طلب جديد {order_kind} #{order.id}', f'المستخدم {user.username} (#{user.id}) أرسل طلب {service.name} بقيمة ${format_money(total)}. الحالة: {order.status}.', url_for('admin'))
     db.session.commit()
@@ -1584,6 +1630,46 @@ def admin_accounts():
     account_lookup = db.session.get(User, account_lookup_id) if account_lookup_id else None
     return render_template('admin_accounts.html', account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in SocialLink.query.all()})
 
+
+@app.route('/profile/social-reward', methods=['POST'])
+@login_required
+def submit_social_reward():
+    user = current_user()
+    proof = (request.form.get('proof') or '').strip()
+    if len(proof) < 8 or len(proof) > 1500:
+        flash('أرسل روابط الصفحات التي تابعتها أو رابط/وصف الإثبات بشكل واضح.', 'error')
+    elif SocialRewardRequest.query.filter_by(user_id=user.id, status='pending').first():
+        flash('لديك طلب إثبات قيد المراجعة بالفعل.', 'warning')
+    else:
+        req = SocialRewardRequest(user_id=user.id, proof=proof)
+        db.session.add(req); db.session.commit()
+        notify_admins('طلب نقاط متابعة صفحات', f'المستخدم @{user.username} أرسل إثبات متابعة الصفحات. الطلب #{req.id}.', '/admin/social-rewards')
+        db.session.commit(); flash('تم إرسال الإثبات. ستضاف 15 نقطة بعد مراجعة الإدارة والموافقة.', 'success')
+    return redirect(url_for('profile'))
+
+@app.route('/admin/social-rewards')
+@admin_required
+def admin_social_rewards():
+    requests_list = SocialRewardRequest.query.order_by(SocialRewardRequest.created_at.desc()).all()
+    return render_template('admin_social_rewards.html', requests_list=requests_list)
+
+@app.route('/admin/social-rewards/<int:req_id>', methods=['POST'])
+@admin_required
+def review_social_reward(req_id):
+    req = SocialRewardRequest.query.get_or_404(req_id)
+    action = request.form.get('action')
+    if req.status != 'pending':
+        flash('تمت معالجة هذا الطلب مسبقاً.', 'warning')
+    elif action == 'approve':
+        req.status = 'approved'; req.reviewed_at = datetime.utcnow()
+        req.user.loyalty_points = (req.user.loyalty_points or 0) + 15
+        send_user_notification(req.user_id, 'تم قبول إثبات المتابعة', 'تمت إضافة 15 نقطة إلى حسابك.', '/profile')
+        db.session.commit(); flash('تم قبول الإثبات وإضافة 15 نقطة.', 'success')
+    elif action == 'reject':
+        req.status = 'rejected'; req.reviewed_at = datetime.utcnow(); req.admin_note = (request.form.get('note') or 'لم يتم قبول الإثبات.')[:500]
+        send_user_notification(req.user_id, 'تعذر قبول إثبات المتابعة', req.admin_note, '/profile')
+        db.session.commit(); flash('تم رفض الإثبات.', 'success')
+    return redirect(url_for('admin_social_rewards'))
 
 @app.route('/profile/redeem-points', methods=['POST'])
 @login_required
@@ -1910,6 +1996,7 @@ def update_order_status(order_id):
         order.status = 'مكتمل'
         order.admin_status_override = True
         order.status_note = reason[:1000] or 'تم تحديد الطلب كمكتمل من لوحة الإدارة.'
+        award_completed_order_points(order)
         message = 'تم تحديد الطلب كمكتمل.'
     elif action == 'reject':
         if not reason:
@@ -1946,6 +2033,7 @@ def complete_order(order_id):
     order.status = 'مكتمل'
     order.admin_status_override = True
     order.status_note = 'تم تحديد الطلب كمكتمل من لوحة الإدارة.'
+    award_completed_order_points(order)
     send_user_notification(order.user_id, f'تحديث حالة الطلب #{order.id}', f'تم تحديد طلب {order.service_name} كمكتمل.', url_for('my_orders'))
     db.session.commit()
     flash('تم تحديث حالة الطلب.', 'success')
@@ -2828,6 +2916,15 @@ with app.app_context():
         user_columns = {column['name'] for column in inspect(db.engine).get_columns('user')}
         if 'loyalty_points' not in user_columns:
             db.session.execute(db.text('ALTER TABLE "user" ADD COLUMN loyalty_points INTEGER NOT NULL DEFAULT 0'))
+        if 'referral_code' not in user_columns:
+            db.session.execute(db.text('ALTER TABLE "user" ADD COLUMN referral_code VARCHAR(20)'))
+        if 'referred_by_id' not in user_columns:
+            db.session.execute(db.text('ALTER TABLE "user" ADD COLUMN referred_by_id INTEGER'))
+        if 'referral_rewarded' not in user_columns:
+            db.session.execute(db.text('ALTER TABLE "user" ADD COLUMN referral_rewarded BOOLEAN NOT NULL DEFAULT 0'))
+        order_columns = {column['name'] for column in inspect(db.engine).get_columns('order')}
+        if 'loyalty_awarded' not in order_columns:
+            db.session.execute(db.text('ALTER TABLE "order" ADD COLUMN loyalty_awarded BOOLEAN NOT NULL DEFAULT 0'))
         db.session.commit()
     except Exception:
         db.session.rollback()

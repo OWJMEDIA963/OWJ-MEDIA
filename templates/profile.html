@@ -22,10 +22,38 @@
       <p class="mt-1 text-2xl font-black text-cyan-400">${{ user.balance_usd|money }}</p>
     </div>
 
-    <div class="mb-5 rounded-2xl border border-amber-400/20 bg-amber-400/5 p-4">
-      <div class="flex items-center justify-between gap-3"><div><p class="text-xs text-gray-400">نقاط الولاء</p><p class="mt-1 text-xl font-black text-amber-300">{{ user.loyalty_points or 0 }} نقطة</p><p class="mt-1 text-[10px] text-gray-500">كل 100 نقطة = 1 دولار رصيد</p></div>
-      <form method="post" action="/profile/redeem-points"><button class="rounded-xl bg-amber-400 px-4 py-2 text-xs font-black text-gray-950" {% if (user.loyalty_points or 0) < 100 %}disabled{% endif %}>استبدال النقاط</button></form></div>
+    <div class="mb-5 rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-400/10 to-blue-500/5 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="text-xs font-bold text-amber-200">⭐ نقاط الولاء</p><p class="mt-1 text-2xl font-black text-amber-300">{{ user.loyalty_points or 0 }} نقطة</p><p class="mt-1 text-[11px] text-gray-300">كل 100 نقطة = 1 دولار رصيد</p></div>
+      <form method="post" action="/profile/redeem-points"><button class="rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-black text-gray-950 disabled:opacity-40" {% if (user.loyalty_points or 0) < 100 %}disabled{% endif %}>استبدال النقاط</button></form></div>
+      <details class="mt-4 overflow-hidden rounded-xl border border-blue-300/20 bg-slate-950/40">
+        <summary class="cursor-pointer list-none px-4 py-3 text-center text-xs font-black text-blue-200">🎁 كيف أجمع النقاط؟ اضغط للشرح</summary>
+        <div class="space-y-3 border-t border-blue-300/15 p-4 text-xs leading-6 text-gray-200">
+          <div class="flex items-start justify-between gap-3"><span><b class="text-emerald-300">شراء خدمة</b><br>عند اكتمال أي طلب خدمة في حسابك.</span><b class="shrink-0 text-emerald-300">+3 نقاط</b></div>
+          <div class="flex items-start justify-between gap-3"><span><b class="text-blue-300">دعوة صديق</b><br>أرسل رمزك لصديق. يسجّل به حساباً جديداً ويشتري أول خدمة، وبعد اكتمال طلبه تحصل أنت على المكافأة.</span><b class="shrink-0 text-blue-300">+40 نقطة</b></div>
+          <div class="flex items-start justify-between gap-3"><span><b class="text-amber-300">متابعة صفحاتنا</b><br>تابع صفحات المتجر وأرسل روابطها أو إثبات المتابعة. الإدارة تراجع الإثبات يدوياً.</span><b class="shrink-0 text-amber-300">+15 نقطة</b></div>
+          <p class="rounded-lg bg-blue-500/10 p-3 text-[11px] text-blue-100">تُضاف نقاط الشراء بعد تحويل الطلب إلى «مكتمل»، ومكافأة الدعوة تُمنح مرة واحدة فقط بعد أول طلب مكتمل للصديق. لا ترسل كلمة مرور حساباتك كإثبات.</p>
+        </div>
+      </details>
     </div>
+
+    <section class="mb-5 rounded-2xl border border-blue-400/25 bg-blue-500/5 p-4">
+      <h2 class="text-sm font-black text-white">👥 ادعُ صديقاً واكسب 40 نقطة</h2>
+      <p class="mt-1 text-xs leading-6 text-gray-300">رمز الدعوة الخاص بك. انسخه وأرسله لصديقك ليضعه عند إنشاء حسابه.</p>
+      <div class="mt-3 flex items-center gap-2"><code id="ynReferralCode" class="flex-1 rounded-xl border border-blue-300/20 bg-slate-950 px-3 py-3 text-center text-lg font-black tracking-widest text-blue-200">{{ user.referral_code }}</code><button type="button" onclick="navigator.clipboard.writeText('{{ user.referral_code }}').then(()=>this.textContent='تم النسخ ✓')" class="rounded-xl bg-blue-600 px-4 py-3 text-xs font-black text-white">نسخ الرمز</button></div>
+      <button type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/register?ref={{ user.referral_code }}').then(()=>this.textContent='تم نسخ رابط الدعوة ✓')" class="mt-2 w-full rounded-xl border border-blue-300/30 px-3 py-2 text-xs font-bold text-blue-200">نسخ رابط الدعوة</button>
+      <p class="mt-2 text-[10px] text-gray-400">المكافأة بعد أول شراء مكتمل للصديق، وليس بمجرد التسجيل.</p>
+    </section>
+
+    <section class="mb-5 rounded-2xl border border-amber-400/25 bg-amber-400/5 p-4">
+      <h2 class="text-sm font-black text-white">📣 تابع صفحاتنا واكسب 15 نقطة</h2>
+      <p class="mt-1 text-xs leading-6 text-gray-300">تابع صفحات YNOVA STORE الرسمية، ثم أرسل روابط الصفحات التي تابعتها أو رابط الإثبات. ستُضاف النقاط بعد مراجعة الإدارة.</p>
+      {% if social_links %}<div class="mt-3 flex flex-wrap gap-2">{% for link in social_links if link.url %}<a href="{{ link.url }}" target="_blank" rel="noopener" class="rounded-lg border border-amber-300/20 bg-slate-950/50 px-3 py-2 text-[11px] font-bold text-amber-100">{{ link.platform }} · زيارة الصفحة ↗</a>{% endfor %}</div>{% endif %}
+      <form method="post" action="/profile/social-reward" class="mt-3 space-y-2">
+        <textarea name="proof" required minlength="8" maxlength="1500" rows="3" placeholder="ضع روابط صفحاتنا التي تابعتها أو رابط الإثبات هنا..." class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white"></textarea>
+        <button class="w-full rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-gray-950">إرسال الإثبات للمراجعة (+15 نقطة)</button>
+      </form>
+      {% for req in social_reward_requests %}<div class="mt-2 rounded-lg bg-slate-950/50 p-2 text-[11px] text-gray-300">طلب #{{ req.id }} · {% if req.status == 'pending' %}قيد المراجعة{% elif req.status == 'approved' %}مقبول · أضيفت 15 نقطة{% else %}مرفوض{% endif %}{% if req.admin_note %} · {{ req.admin_note }}{% endif %}</div>{% endfor %}
+    </section>
 
     <form method="post" class="space-y-3">
       <h2 class="mb-2 text-sm font-black text-white">المعلومات الشخصية</h2>

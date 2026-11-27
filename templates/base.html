@@ -81,6 +81,31 @@ body.light-theme main section h2{color:#172033!important}
 body.light-theme main .text-gray-400,body.light-theme main .text-gray-500{color:#64748b!important}
 body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#253047!important}
 
+
+/* YNOVA refreshed palette: calmer navy, teal actions, warm gold rewards, readable contrast */
+:root{--yn-bg:#0d1625;--yn-panel:#152338;--yn-panel-2:#1b2d45;--yn-border:#30445f;--yn-text:#f4f7fb;--yn-muted:#b8c5d8;--yn-blue:#168f9a;--yn-blue-hover:#117984;--yn-blue-soft:#75d5d2}
+html{color-scheme:dark}
+body{background:var(--yn-bg)!important;color:var(--yn-text)!important}
+main{color:var(--yn-text)}
+main .text-gray-400,main .text-gray-500{color:#b8c5d8!important}
+main .text-gray-300{color:#d4deeb!important}
+main .text-gray-200{color:#e5edf7!important}
+main .text-white{color:#f8fafc!important}
+main [class*="bg-gray-950"],main [class*="bg-gray-900"],main [class*="bg-slate-950"],main [class*="bg-slate-900"]{background-color:var(--yn-panel)!important}
+main [class*="border-gray-800"],main [class*="border-gray-700"],main [class*="border-slate-800"],main [class*="border-slate-700"]{border-color:var(--yn-border)!important}
+main .bg-blue-700,main .bg-blue-800,main .bg-blue-900{background:#1c3556!important;color:#f8fafc!important}
+main .bg-blue-600,main .bg-cyan-500{background:#168f9a!important;color:#fff!important}
+main .bg-amber-400,main .bg-yellow-400{background:#f2bd55!important;color:#172033!important}
+main .text-cyan-300,main .text-cyan-400,main .text-sky-300{color:#72d6d1!important}
+main .text-blue-200,main .text-blue-300,main .text-blue-400{color:#a9caff!important}
+main button:disabled{opacity:.42;cursor:not-allowed}
+main input,main textarea,main select{color:#f4f7fb}
+body.light-theme{--yn-bg:#f1f5fa;--yn-panel:#fff;--yn-panel-2:#f7f9fc;--yn-border:#d4deeb;--yn-text:#17243a;--yn-muted:#52627a;color-scheme:light}
+body.light-theme main .text-gray-400,body.light-theme main .text-gray-500{color:#5c6b80!important}
+body.light-theme main .text-white{color:#17243a!important}
+body.light-theme main .bg-blue-700,body.light-theme main .bg-blue-800,body.light-theme main .bg-blue-900{background:#e6eefb!important;color:#17243a!important}
+body.light-theme main .text-blue-200,body.light-theme main .text-blue-300{color:#2457a7!important}
+
 </style>
 <style>
 #novaLoading{position:fixed;inset:0;z-index:9999;background:rgba(5,10,22,.88);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center}

@@ -15,22 +15,22 @@
  .owj-subcategory-card img{aspect-ratio:1/1!important;object-fit:contain!important;padding:7px!important;background:#0c1728!important}
  .owj-subcategory-card>div{padding:7px 4px!important;font-size:clamp(10px,2.8vw,12px)!important}
  .yn-order-overlay{align-items:center!important;justify-content:center!important;padding:12px!important}
- .yn-order-sheet{width:min(100%,340px)!important;max-width:340px!important;max-height:84dvh!important;overflow-y:auto!important;overscroll-behavior:contain!important;border-radius:18px!important;padding:13px!important;border:1px solid rgba(56,189,248,.22)!important;box-shadow:0 12px 36px rgba(0,0,0,.48)!important;gap:10px!important}
+ .yn-order-sheet{width:min(100%,290px)!important;max-width:290px!important;max-height:78dvh!important;overflow-y:auto!important;overscroll-behavior:contain!important;border-radius:15px!important;padding:10px!important;border:1px solid rgba(56,189,248,.22)!important;box-shadow:0 12px 30px rgba(0,0,0,.48)!important;gap:7px!important}
  .yn-order-sheet:before{content:none!important}
  .yn-order-sheet>div:first-child{padding-bottom:8px!important}
- #orderForm{display:flex!important;flex-direction:column!important;gap:9px!important}
+ #orderForm{display:flex!important;flex-direction:column!important;gap:6px!important}
  #orderForm>div{margin:0!important}
  #orderForm label{font-size:10px!important;margin-bottom:3px!important}
- #orderForm input{min-height:36px!important;height:36px!important;padding:7px 10px!important;border-radius:11px!important;font-size:11px!important}
+ #orderForm input{min-height:31px!important;height:31px!important;padding:5px 8px!important;border-radius:9px!important;font-size:10px!important}
  #orderForm #modalServiceDescription{padding:8px!important;line-height:1.5!important}
- #orderForm .rounded-2xl.border.border-cyan-400\/20{padding:10px!important;border-radius:13px!important;gap:7px!important}
- #modalTotal{font-size:23px!important;letter-spacing:0!important}
+ #orderForm .rounded-2xl.border.border-cyan-400\/20{padding:8px!important;border-radius:11px!important;gap:5px!important}
+ #modalTotal{font-size:19px!important;letter-spacing:0!important}
  #modalSavingMessage,#orderForm .rounded-2xl.border.border-cyan-400\/20>p:last-child{display:none!important}
- #orderForm button{min-height:38px!important;height:auto!important;padding:9px 10px!important;border-radius:11px!important;font-size:12px!important}
- #orderExtraDetailsButton{min-height:32px!important;padding:7px!important;font-size:11px!important}
+ #orderForm button{min-height:32px!important;height:auto!important;padding:7px 8px!important;border-radius:9px!important;font-size:11px!important}
+ #orderExtraDetailsButton{min-height:28px!important;padding:5px!important;font-size:10px!important}
  #serviceDetailsModal>div{max-height:88dvh!important;overflow-y:auto!important;border-radius:24px!important}
 }
-@media(min-width:640px){.yn-order-sheet{width:min(100%,360px)!important;max-width:360px!important;max-height:86vh!important;overflow-y:auto!important;padding:15px!important}}
+@media(min-width:640px){.yn-order-sheet{width:min(100%,310px)!important;max-width:310px!important;max-height:82vh!important;overflow-y:auto!important;padding:11px!important;gap:8px!important} #orderForm{gap:7px!important} #orderForm input{min-height:33px!important;height:33px!important;padding:6px 9px!important} #orderForm .rounded-2xl.border.border-cyan-400\/20{padding:9px!important;gap:6px!important} #modalTotal{font-size:21px!important} #orderForm button{min-height:34px!important;padding:8px!important}}
 </style>
 
 {% endblock %}
@@ -305,7 +305,7 @@
             <div class="rounded-2xl border border-cyan-400/20 bg-slate-950/90 p-4 space-y-3 text-xs shadow-inner">
                 <div class="flex justify-between"><span class="text-gray-400">السعر الأصلي:</span><span id="modalOriginalTotal" class="text-gray-300 font-bold">$0.00</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">قيمة الخصم:</span><span id="modalDiscount" class="text-emerald-300 font-bold">$0.00</span></div>
-                <div class="flex flex-wrap justify-between items-center gap-2 border-t border-cyan-400/20 pt-3"><span class="text-white font-black text-sm">السعر النهائي بعد الخصم</span><span id="modalTotal" aria-live="polite" class="text-emerald-300 font-black text-3xl tracking-wide">$0.00</span></div><p id="modalSavingMessage" class="text-[11px] font-bold text-amber-300">أدخل كود خصم لمعرفة مقدار التوفير.</p><p class="text-[10px] leading-5 text-gray-500">سيتم خصم هذا المبلغ فقط من رصيد محفظتك عند تأكيد الطلب.</p>
+                <div class="flex flex-wrap justify-between items-center gap-1 border-t border-cyan-400/20 pt-2"><span class="text-white font-black text-xs">السعر النهائي</span><span id="modalTotal" aria-live="polite" class="text-emerald-300 font-black text-xl tracking-wide">$0.00</span></div><span id="modalSavingMessage" class="hidden" aria-hidden="true"></span>
             </div>
 
             <button type="submit" class="yn-confirm-order w-full bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black py-3.5 rounded-2xl text-sm shadow-xl shadow-emerald-500/10 transition">

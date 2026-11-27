@@ -234,6 +234,25 @@
     {% if not subcategories and not services %}<p class="rounded-xl bg-gray-900 p-4 text-center text-xs text-gray-400">لا توجد منتجات في هذا القسم حالياً.</p>{% endif %}
 </div>
 
+
+<style id="yn-ocean-coupon-modal">
+#orderModal{background:rgba(8,35,58,.58)!important;backdrop-filter:blur(9px)}
+#orderModal>div{max-height:calc(100dvh - 24px);overflow-y:auto;background:linear-gradient(160deg,#fff 0%,#f5faff 100%)!important;border:1px solid #c8e1f0!important;box-shadow:0 24px 70px rgba(13,65,100,.22)!important;color:#17324b!important}
+#orderModal #modalServiceName,#orderModal label{color:#173b58!important}
+#orderModal input{background:#fff!important;color:#17324b!important;border:1px solid #c7dce9!important;min-height:44px}
+#orderModal input::placeholder{color:#8298a8!important}
+#orderModal #couponPanel{background:linear-gradient(145deg,#f1f9fe,#eaf5fc)!important;border:1px solid #c9e3f2!important}
+#orderModal #couponPanel>div{border-color:#d4e7f2!important}
+#orderModal #modalOriginalPrice{color:#294b63!important}
+#orderModal #finalPriceHighlight{background:linear-gradient(110deg,#e2f5ff,#dcecff)!important;border-color:#8bc6e6!important;box-shadow:0 7px 18px rgba(28,100,145,.10)!important}
+#orderModal #finalPriceHighlight>span{color:#17456a!important}
+#orderModal #modalTotal{color:#075985!important;text-shadow:none!important}
+#orderModal #validateCouponButton{background:#1683b5!important;color:#fff!important}
+#orderModal #validateCouponButton:disabled{opacity:.6!important}
+#orderModal .confirm-order-button{background:linear-gradient(110deg,#ffdb70,#f4b82f)!important;color:#332407!important;border:1px solid #e6a91b!important}
+@media(max-width:480px){ #orderModal{align-items:flex-end!important;padding:8px!important}#orderModal>div{width:100%!important;max-width:100%!important;padding:17px!important;border-radius:22px 22px 16px 16px!important;max-height:94dvh!important}}
+</style>
+
 <!-- نافذة الطلب المنبثقة مع تغبيش الخلفية (Modal) والتوجيه التلقائي لطلباتي -->
 <div id="orderModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center px-4">
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
@@ -255,7 +274,7 @@
 
             <div id="quantityContainer" class="space-y-1 hidden">
                 <label class="block text-[11px] font-bold text-gray-300">الكمية</label>
-                <input type="number" id="modalQuantity" name="quantity" value="10" min="1" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none" oninput="calcTotal()">
+                <input type="number" id="modalQuantity" name="quantity" value="10" min="1" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none">
             </div>
 
             <div class="space-y-2 rounded-2xl border border-sky-200/20 bg-slate-950/60 p-3" id="couponPanel">

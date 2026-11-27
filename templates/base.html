@@ -291,6 +291,20 @@ button:focus-visible,a:focus-visible{outline:3px solid rgba(56,189,248,.65);outl
 
 </style>
 
+
+<style id="yn-ocean-account-menu">
+/* Ocean Blue Light: consistent account navigation controls */
+#novaSortableMenu{display:grid!important;grid-template-columns:1fr;gap:9px!important}
+#novaSortableMenu>a{min-height:50px!important;height:auto!important;padding:12px 15px!important;display:flex!important;align-items:center!important;gap:13px!important;border-radius:15px!important;border:1px solid #d7e8f4!important;background:linear-gradient(135deg,#fff 0%,#f1f8fd 100%)!important;color:#17324b!important;box-shadow:0 3px 10px rgba(20,75,110,.055)!important;font-size:12px!important;font-weight:800!important;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease!important}
+#novaSortableMenu>a:hover{transform:translateX(-2px);border-color:#83c5e8!important;box-shadow:0 7px 17px rgba(14,116,144,.12)!important}
+#novaSortableMenu>a svg{width:21px!important;height:21px!important;flex:0 0 21px!important;color:#1683b5!important}
+#novaSortableMenu>a span{line-height:1.5}
+#sidebarMenu{background:linear-gradient(180deg,#fafdff,#eef6fb)!important;border-left:1px solid #d4e6f1!important}
+#sidebarMenu h3{color:#17324b!important}
+#sidebarMenu .text-gray-400{color:#668096!important}
+#sidebarMenu>div:first-child>button[onclick="toggleTheme()"]{min-height:48px!important}
+@media(max-width:520px){ #sidebarMenu{width:min(330px,92vw)!important;padding:16px!important}#novaSortableMenu>a{min-height:48px!important;padding:11px 13px!important}}
+</style>
 </head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
 <div id="novaLoading" aria-live="polite"><div class="nova-loader"><img src="{{ url_for('static',filename='images/nova-symbol.svg') }}" alt="NOVA"><div class="nova-spin"></div><div class="text-white text-sm font-black">YNOVA STORE</div><div class="text-slate-400 text-xs mt-2">جاري إتمام العملية...</div></div></div>

@@ -1392,7 +1392,8 @@ def place_order(service_id):
     user.balance_usd -= total
     order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type in ('smm', 'smm_fixed') else 'قيد المراجعة'), provider_order_id=provider_order_id)
     db.session.add(order); db.session.flush()
-    if applied_coupon and discount > 0:
+    if applied_coupon:
+        # Count each accepted coupon use, even when its effective discount is $0.00.
         applied_coupon.used_count = (applied_coupon.used_count or 0) + 1
         db.session.add(CouponUse(coupon_id=applied_coupon.id, user_id=user.id, order_id=order.id, discount=discount))
     db.session.commit()

@@ -179,7 +179,6 @@ class DigitalAccountPurchase(db.Model):
 class MerchantApplication(db.Model):
     id=db.Column(db.Integer,primary_key=True)
     user_id=db.Column(db.Integer,db.ForeignKey('user.id'),nullable=False)
-    full_name=db.Column(db.String(180),default='')
     details=db.Column(db.Text,default='')
     facebook_url=db.Column(db.String(500),default='')
     instagram_url=db.Column(db.String(500),default='')
@@ -416,20 +415,11 @@ class SocialRewardRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     proof = db.Column(db.Text, nullable=False, default='')
-    proof_images = db.Column(db.Text, nullable=False, default='[]')
     status = db.Column(db.String(20), nullable=False, default='pending')
     admin_note = db.Column(db.String(500), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     reviewed_at = db.Column(db.DateTime)
     user = db.relationship('User')
-
-    @property
-    def proof_image_list(self):
-        try:
-            value = json.loads(self.proof_images or '[]')
-            return value if isinstance(value, list) else []
-        except (TypeError, ValueError):
-            return []
 
 
 def send_user_notification(user_id, title, message, url='/notifications'):
@@ -898,19 +888,14 @@ def merchant_request():
         if float(user.balance_usd or 0) < 1.0:
             flash('يشترط شحن المحفظة بمبلغ دولار واحد على الأقل قبل طلب صفة تاجر.', 'error')
             return redirect(url_for('profile'))
-        full_name = ' '.join((request.form.get('merchant_full_name') or '').split())
         facebook_url = request.form.get('facebook_url', '').strip()
         instagram_url = request.form.get('instagram_url', '').strip()
         def valid_social_url(value):
             return not value or (value.startswith('https://') and len(value) <= 500)
-        if len(full_name.split()) != 3 or any(len(part) < 2 for part in full_name.split()):
-            flash('أدخل الاسم الثلاثي بشكل صحيح (الاسم الأول واسم الأب واسم العائلة).', 'error')
-            return redirect(url_for('profile'))
         if not facebook_url or not instagram_url or not valid_social_url(facebook_url) or not valid_social_url(instagram_url):
             flash('أدخل رابط صفحتك على فيسبوك ورابط حسابك على إنستغرام بصيغة https:// صحيحة.', 'error')
             return redirect(url_for('profile'))
-        user.full_name = full_name
-        req=MerchantApplication(user_id=user.id,full_name=full_name,details=request.form.get('details','').strip(),
+        req=MerchantApplication(user_id=user.id,details=request.form.get('details','').strip(),
                                 facebook_url=facebook_url, instagram_url=instagram_url)
         db.session.add(req); db.session.commit()
         notify_admins('طلب حساب تاجر',f'{user.username} طلب حساب تاجر. فيسبوك: {facebook_url} | إنستغرام: {instagram_url}',url_for('admin_requests_extra'))
@@ -1268,44 +1253,6 @@ def my_orders():
     for order in orders:
         refresh_api_order_status(order)
     return render_template('my_orders.html', orders=orders)
-
-
-@app.route('/coupon/preview/<int:service_id>', methods=['POST'])
-@login_required
-def preview_coupon(service_id):
-    """Validate a coupon and preview the exact discounted price without consuming it."""
-    service = Service.query.get_or_404(service_id)
-    user = current_user()
-    code = (request.form.get('coupon_code') or '').strip().upper()
-    if not code:
-        return jsonify({'valid': True, 'has_coupon': False, 'subtotal': 0, 'discount': 0, 'total': 0, 'message': ''})
-    coupon = Coupon.query.filter_by(code=code, is_active=True).first()
-    if (not coupon or (coupon.max_uses and coupon.used_count >= coupon.max_uses)
-            or (coupon.expires_at and coupon.expires_at <= datetime.utcnow())):
-        return jsonify({'valid': False, 'message': 'كود الخصم غير صالح أو منتهي الصلاحية.'}), 400
-
-    if service.service_type in ('manual', 'smm_fixed'):
-        subtotal = (service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else service.price) or 0
-    else:
-        try:
-            quantity = int(request.form.get('quantity', service.min_quantity or 1))
-        except (TypeError, ValueError):
-            return jsonify({'valid': False, 'message': 'أدخل كمية صحيحة أولاً.'}), 400
-        minimum = service.min_quantity or 1
-        maximum = service.max_quantity or 10000
-        if quantity < minimum or quantity > maximum:
-            return jsonify({'valid': False, 'message': f'الكمية يجب أن تكون بين {minimum} و{maximum}.'}), 400
-        rate = service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 or service.price)
-        subtotal = (rate or 0) * quantity / 1000
-
-    discount = min(float(subtotal), float(subtotal) * (coupon.discount_percent or 0) / 100 + (coupon.discount_fixed or 0))
-    total = max(0.0, float(subtotal) - discount)
-    return jsonify({
-        'valid': True, 'has_coupon': True, 'code': coupon.code,
-        'subtotal': round(float(subtotal), 4), 'discount': round(discount, 4),
-        'total': round(total, 4),
-        'message': 'تم تطبيق الخصم بنجاح'
-    })
 
 @app.route('/order/<int:service_id>', methods=['POST'])
 @login_required
@@ -1689,20 +1636,15 @@ def admin_accounts():
 def submit_social_reward():
     user = current_user()
     proof = (request.form.get('proof') or '').strip()
-    if len(proof) > 1500:
-        flash('وصف الإثبات طويل جداً.', 'error')
+    if len(proof) < 8 or len(proof) > 1500:
+        flash('أرسل روابط الصفحات التي تابعتها أو رابط/وصف الإثبات بشكل واضح.', 'error')
     elif SocialRewardRequest.query.filter_by(user_id=user.id, status='pending').first():
         flash('لديك طلب إثبات قيد المراجعة بالفعل.', 'warning')
     else:
-        try:
-            proof_images = [save_deposit_proof_image(f'proof_image_{i}') for i in range(1, 4)]
-        except ValueError as exc:
-            flash(str(exc), 'error')
-            return redirect(url_for('profile'))
-        req = SocialRewardRequest(user_id=user.id, proof=proof, proof_images=json.dumps(proof_images))
+        req = SocialRewardRequest(user_id=user.id, proof=proof)
         db.session.add(req); db.session.commit()
-        notify_admins('طلب نقاط متابعة صفحات', f'المستخدم @{user.username} أرسل 3 صور لإثبات متابعة الصفحات. الطلب #{req.id}.', '/admin/social-rewards')
-        db.session.commit(); flash('تم إرسال الصور الثلاث. ستضاف 15 نقطة بعد مراجعة الإدارة والموافقة.', 'success')
+        notify_admins('طلب نقاط متابعة صفحات', f'المستخدم @{user.username} أرسل إثبات متابعة الصفحات. الطلب #{req.id}.', '/admin/social-rewards')
+        db.session.commit(); flash('تم إرسال الإثبات. ستضاف 15 نقطة بعد مراجعة الإدارة والموافقة.', 'success')
     return redirect(url_for('profile'))
 
 @app.route('/admin/social-rewards')
@@ -1734,16 +1676,16 @@ def review_social_reward(req_id):
 def redeem_loyalty_points():
     user = current_user()
     points = user.loyalty_points or 0
-    if points < 70:
-        flash('تحتاج إلى 70 نقطة على الأقل لتحويلها إلى دولار واحد.', 'error')
+    if points < 100:
+        flash('تحتاج إلى 100 نقطة على الأقل لتحويلها إلى دولار واحد.', 'error')
     else:
-        dollars = points // 70
-        user.loyalty_points -= dollars * 70
+        dollars = points // 100
+        user.loyalty_points -= dollars * 100
         user.balance_usd = (user.balance_usd or 0) + dollars
-        db.session.add(WalletTransaction(user_id=user.id, admin_id=user.id, transaction_type='loyalty', amount=float(dollars), reason=f'استبدال {dollars*70} نقطة ولاء'))
+        db.session.add(WalletTransaction(user_id=user.id, admin_id=user.id, transaction_type='loyalty', amount=float(dollars), reason=f'استبدال {dollars*100} نقطة ولاء'))
         db.session.commit()
         send_user_notification(user.id, 'تم استبدال نقاط الولاء', f'تمت إضافة ${dollars} إلى رصيدك.', '/profile')
-        flash(f'تم تحويل {dollars*70} نقطة إلى ${dollars}.', 'success')
+        flash(f'تم تحويل {dollars*100} نقطة إلى ${dollars}.', 'success')
     return redirect(url_for('profile'))
 
 @app.route('/admin/notifications/broadcast', methods=['POST'])
@@ -3064,12 +3006,9 @@ with app.app_context():
     try:
         from sqlalchemy import inspect
         merchant_columns = {column['name'] for column in inspect(db.engine).get_columns('merchant_application')}
-        for col, definition in (("facebook_url", "VARCHAR(500) DEFAULT ''"), ("instagram_url", "VARCHAR(500) DEFAULT ''"), ("full_name", "VARCHAR(180) DEFAULT ''")):
+        for col in ('facebook_url', 'instagram_url'):
             if col not in merchant_columns:
-                db.session.execute(db.text(f"ALTER TABLE merchant_application ADD COLUMN {col} {definition}"))
-        social_columns = {column['name'] for column in inspect(db.engine).get_columns('social_reward_request')}
-        if 'proof_images' not in social_columns:
-            db.session.execute(db.text("ALTER TABLE social_reward_request ADD COLUMN proof_images TEXT DEFAULT '[]'"))
+                db.session.execute(db.text(f"ALTER TABLE merchant_application ADD COLUMN {col} VARCHAR(500) DEFAULT ''"))
         db.session.commit()
     except Exception:
         db.session.rollback()

@@ -17,15 +17,14 @@
       </div>
     </div>
 
-    <details class="yn-account-accordion"><summary><span class="yn-account-icon">💳</span><span><b>رصيد المحفظة</b><small>عرض رصيدك الحالي</small></span><strong class="yn-account-balance">${{ user.balance_usd|money }}</strong><span class="yn-accordion-chevron">⌄</span></summary><div class="yn-accordion-body"><div class="mb-5 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+    <div class="mb-5 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4">
       <p class="text-xs text-gray-400">رصيد المحفظة</p>
       <p class="mt-1 text-2xl font-black text-cyan-400">${{ user.balance_usd|money }}</p>
-    </div></div></details>
+    </div>
 
-    <details class="yn-account-accordion"><summary><span class="yn-account-icon">⭐</span><span><b>نقاط الولاء</b><small>رصيد النقاط وطريقة جمعها</small></span><span class="yn-accordion-chevron">⌄</span></summary><div class="yn-accordion-body"><div class="mb-5 rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-400/10 to-blue-500/5 p-4">
-      <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="text-xs font-bold text-amber-200">⭐ نقاط الولاء</p><p class="mt-1 text-2xl font-black text-amber-300">{{ user.loyalty_points or 0 }} نقطة</p><p class="mt-1 text-[11px] text-gray-300">كل 70 نقطة = 1 دولار رصيد</p></div>
-      <form method="post" action="/profile/redeem-points"><button class="rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-black text-gray-950 disabled:opacity-40" {% if (user.loyalty_points or 0) < 70 %}disabled{% endif %}>استبدال النقاط</button></form></div>
-      <div class="mt-3 rounded-xl border border-amber-300/20 bg-slate-950/50 p-3"><div class="flex items-center justify-between text-[11px]"><span class="text-slate-300">رصيدك القابل للتحويل</span><b class="text-amber-300">${{ (user.loyalty_points or 0) // 70 }}</b></div><div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-700"><div class="h-full rounded-full bg-amber-400 transition-all duration-500" style="width: {{ (((user.loyalty_points or 0) % 70) / 70 * 100)|round(1) }}%"></div></div><p class="mt-2 text-[10px] text-slate-400">{{ (user.loyalty_points or 0) % 70 }} / 70 نقطة نحو الدولار التالي. النقاط المتبقية لا تضيع عند الاستبدال.</p></div>
+    <div class="mb-5 rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-400/10 to-blue-500/5 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="text-xs font-bold text-amber-200">⭐ نقاط الولاء</p><p class="mt-1 text-2xl font-black text-amber-300">{{ user.loyalty_points or 0 }} نقطة</p><p class="mt-1 text-[11px] text-gray-300">كل 100 نقطة = 1 دولار رصيد</p></div>
+      <form method="post" action="/profile/redeem-points"><button class="rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-black text-gray-950 disabled:opacity-40" {% if (user.loyalty_points or 0) < 100 %}disabled{% endif %}>استبدال النقاط</button></form></div>
       <details class="mt-4 overflow-hidden rounded-xl border border-blue-300/20 bg-slate-950/40">
         <summary class="cursor-pointer list-none px-4 py-3 text-center text-xs font-black text-blue-200">🎁 كيف أجمع النقاط؟ اضغط للشرح</summary>
         <div class="space-y-3 border-t border-blue-300/15 p-4 text-xs leading-6 text-gray-200">
@@ -35,33 +34,28 @@
           <p class="rounded-lg bg-blue-500/10 p-3 text-[11px] text-blue-100">تُضاف نقاط الشراء بعد تحويل الطلب إلى «مكتمل»، ومكافأة الدعوة تُمنح مرة واحدة فقط بعد أول طلب مكتمل للصديق. لا ترسل كلمة مرور حساباتك كإثبات.</p>
         </div>
       </details>
-    </div></div></details>
+    </div>
 
-    <details class="yn-account-accordion"><summary><span class="yn-account-icon">👥</span><span><b>دعوة الأصدقاء</b><small>رمز الدعوة ومكافأة 40 نقطة</small></span><span class="yn-accordion-chevron">⌄</span></summary><div class="yn-accordion-body"><section class="mb-5 rounded-2xl border border-blue-400/25 bg-blue-500/5 p-4">
+    <section class="mb-5 rounded-2xl border border-blue-400/25 bg-blue-500/5 p-4">
       <h2 class="text-sm font-black text-white">👥 ادعُ صديقاً واكسب 40 نقطة</h2>
       <p class="mt-1 text-xs leading-6 text-gray-300">رمز الدعوة الخاص بك. انسخه وأرسله لصديقك ليضعه عند إنشاء حسابه.</p>
       <div class="mt-3 flex items-center gap-2"><code id="ynReferralCode" class="flex-1 rounded-xl border border-blue-300/20 bg-slate-950 px-3 py-3 text-center text-lg font-black tracking-widest text-blue-200">{{ user.referral_code }}</code><button type="button" onclick="navigator.clipboard.writeText('{{ user.referral_code }}').then(()=>this.textContent='تم النسخ ✓')" class="rounded-xl bg-blue-600 px-4 py-3 text-xs font-black text-white">نسخ الرمز</button></div>
       <button type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/register?ref={{ user.referral_code }}').then(()=>this.textContent='تم نسخ رابط الدعوة ✓')" class="mt-2 w-full rounded-xl border border-blue-300/30 px-3 py-2 text-xs font-bold text-blue-200">نسخ رابط الدعوة</button>
       <p class="mt-2 text-[10px] text-gray-400">المكافأة بعد أول شراء مكتمل للصديق، وليس بمجرد التسجيل.</p>
-    </section></div></details>
+    </section>
 
-    <details class="yn-account-accordion"><summary><span class="yn-account-icon">📣</span><span><b>متابعة صفحاتنا</b><small>إرسال 3 صور لإثبات المتابعة</small></span><span class="yn-accordion-chevron">⌄</span></summary><div class="yn-accordion-body"><section class="mb-5 rounded-2xl border border-amber-400/25 bg-amber-400/5 p-4">
+    <section class="mb-5 rounded-2xl border border-amber-400/25 bg-amber-400/5 p-4">
       <h2 class="text-sm font-black text-white">📣 تابع صفحاتنا واكسب 15 نقطة</h2>
       <p class="mt-1 text-xs leading-6 text-gray-300">تابع صفحات YNOVA STORE الرسمية، ثم أرسل روابط الصفحات التي تابعتها أو رابط الإثبات. ستُضاف النقاط بعد مراجعة الإدارة.</p>
       {% if social_links %}<div class="mt-3 flex flex-wrap gap-2">{% for link in social_links if link.url %}<a href="{{ link.url }}" target="_blank" rel="noopener" class="rounded-lg border border-amber-300/20 bg-slate-950/50 px-3 py-2 text-[11px] font-bold text-amber-100">{{ link.platform }} · زيارة الصفحة ↗</a>{% endfor %}</div>{% endif %}
-      <form method="post" action="/profile/social-reward" enctype="multipart/form-data" class="mt-3 space-y-3">
-        <p class="text-xs font-bold text-amber-100">ارفع 3 صور، صورة لكل صفحة أو حساب تتابعه:</p>
-        <label class="block text-xs text-gray-300">الصورة الأولى <input type="file" name="proof_image_1" accept="image/png,image/jpeg,image/webp,image/gif" required class="mt-1 block w-full rounded-xl border border-gray-700 bg-gray-950 p-2 text-xs text-white"></label>
-        <label class="block text-xs text-gray-300">الصورة الثانية <input type="file" name="proof_image_2" accept="image/png,image/jpeg,image/webp,image/gif" required class="mt-1 block w-full rounded-xl border border-gray-700 bg-gray-950 p-2 text-xs text-white"></label>
-        <label class="block text-xs text-gray-300">الصورة الثالثة <input type="file" name="proof_image_3" accept="image/png,image/jpeg,image/webp,image/gif" required class="mt-1 block w-full rounded-xl border border-gray-700 bg-gray-950 p-2 text-xs text-white"></label>
-        <textarea name="proof" maxlength="1500" rows="2" placeholder="ملاحظة للإدارة (اختياري)" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white"></textarea>
-        <p class="text-[10px] text-gray-400">PNG أو JPG أو WEBP، بحد أقصى 1 ميغابايت لكل صورة. لا ترسل كلمة مرور حسابك.</p>
-        <button class="w-full rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-gray-950">إرسال الصور للمراجعة (+15 نقطة)</button>
+      <form method="post" action="/profile/social-reward" class="mt-3 space-y-2">
+        <textarea name="proof" required minlength="8" maxlength="1500" rows="3" placeholder="ضع روابط صفحاتنا التي تابعتها أو رابط الإثبات هنا..." class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white"></textarea>
+        <button class="w-full rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-gray-950">إرسال الإثبات للمراجعة (+15 نقطة)</button>
       </form>
       {% for req in social_reward_requests %}<div class="mt-2 rounded-lg bg-slate-950/50 p-2 text-[11px] text-gray-300">طلب #{{ req.id }} · {% if req.status == 'pending' %}قيد المراجعة{% elif req.status == 'approved' %}مقبول · أضيفت 15 نقطة{% else %}مرفوض{% endif %}{% if req.admin_note %} · {{ req.admin_note }}{% endif %}</div>{% endfor %}
-    </section></div></details>
+    </section>
 
-    <details class="yn-account-accordion"><summary><span class="yn-account-icon">👤</span><span><b>المعلومات الشخصية</b><small>تعديل الاسم والبريد والهاتف</small></span><span class="yn-accordion-chevron">⌄</span></summary><div class="yn-accordion-body"><form method="post" class="space-y-3">
+    <form method="post" class="space-y-3">
       <h2 class="mb-2 text-sm font-black text-white">المعلومات الشخصية</h2>
       <label class="block text-xs text-gray-400">الاسم الكامل</label>
       <input name="full_name" value="{{ user.full_name or '' }}" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
@@ -70,11 +64,11 @@
       <label class="block text-xs text-gray-400">الهاتف</label>
       <input name="phone" value="{{ user.phone or '' }}" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
       <button class="w-full rounded-xl bg-cyan-500 p-3 text-sm font-black text-gray-950">حفظ التعديلات</button>
-    </form></div></details>
+    </form>
 
-    <details class="yn-account-accordion"><summary><span class="yn-account-icon">✓</span><span><b>توثيق الحساب</b><small>حالة التوثيق وطلب التحقق</small></span><span class="yn-accordion-chevron">⌄</span></summary><div class="yn-accordion-body"><a href="/verification" class="mt-4 flex items-center justify-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 text-sm font-black text-blue-300">
+    <a href="/verification" class="mt-4 flex items-center justify-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 text-sm font-black text-blue-300">
       {% if user.is_verified %}✓ حسابك موثّق{% else %}توثيق الحساب{% endif %}
-    </a></div></details>
+    </a>
 
     <div class="mt-6 border-t border-gray-800 pt-5">
       <h2 class="mb-3 text-sm font-black text-white">خدمات الحساب</h2>
@@ -86,7 +80,7 @@
           </summary>
           <div class="border-t border-blue-400/10 p-4">
             <p class="text-xs leading-6 text-gray-400">تراجع الإدارة الطلب. بعد الموافقة، يمكن تحديد دفعة أسبوعية، وتبقى الأسعار حسب إعدادات المتجر.</p>
-            <p class="mt-2 text-xs leading-6 text-amber-200">شرط التقديم: شحن محفظتك في الموقع بمبلغ إجمالي لا يقل عن 1 دولار، وإدخال اسمك الثلاثي، وإرفاق رابط صفحتك على فيسبوك ورابط حسابك على إنستغرام.</p>
+            <p class="mt-2 text-xs leading-6 text-amber-200">شرط التقديم: شحن محفظتك في الموقع بمبلغ إجمالي لا يقل عن 1 دولار، وإرفاق رابط صفحتك على فيسبوك ورابط حسابك على إنستغرام.</p>
             {% if merchant_application %}
               <p class="mt-3 text-sm text-gray-200">آخر طلب:
                 <b class="{% if merchant_application.status == 'approved' %}text-emerald-400{% elif merchant_application.status == 'rejected' %}text-rose-400{% else %}text-amber-300{% endif %}">{{ 'مقبول' if merchant_application.status == 'approved' else ('مرفوض' if merchant_application.status == 'rejected' else 'قيد المراجعة') }}</b>
@@ -95,7 +89,6 @@
             {% endif %}
             {% if not user.is_trusted_merchant and (not merchant_application or merchant_application.status != 'pending') %}
               <form method="post" action="{{ url_for('merchant_request') }}" class="mt-3 space-y-3">
-                <input name="merchant_full_name" required minlength="5" maxlength="180" value="{{ user.full_name or '' }}" placeholder="الاسم الثلاثي (الاسم + اسم الأب + العائلة)" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white">
                 <input type="url" name="facebook_url" required placeholder="رابط صفحتك على Facebook (https://...)" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white" dir="ltr">
                 <input type="url" name="instagram_url" required placeholder="رابط حسابك على Instagram (https://...)" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white" dir="ltr">
                 <textarea name="details" rows="3" placeholder="معلومات إضافية (اختياري)" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white"></textarea>
@@ -184,7 +177,7 @@
       </div>
     </details>
 
-    <details class="yn-account-accordion"><summary><span class="yn-account-icon">🛍️</span><span><b>مشتريات متجر الحسابات</b><small>عرض مشترياتك السابقة</small></span><span class="yn-accordion-chevron">⌄</span></summary><div class="yn-accordion-body"><a href="/store/accounts/my" class="mt-4 flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-gray-300">مشتريات متجر الحسابات</a></div></details>
+    <a href="/store/accounts/my" class="mt-4 flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-gray-300">مشتريات متجر الحسابات</a>
 
     <div class="mt-5 border-t border-gray-800 pt-5">
       <a href="/logout" class="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-black text-rose-400 transition hover:bg-rose-500/20" onclick="return confirm('هل تريد تسجيل الخروج من حسابك؟')">

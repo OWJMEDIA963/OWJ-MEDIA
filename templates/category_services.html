@@ -15,11 +15,23 @@
  .owj-subcategory-card img{aspect-ratio:1/1!important;object-fit:contain!important;padding:7px!important;background:#0c1728!important}
  .owj-subcategory-card>div{padding:7px 4px!important;font-size:clamp(10px,2.8vw,12px)!important}
  .yn-order-overlay{align-items:flex-end!important;padding:0!important}
- .yn-order-sheet{width:100%!important;max-width:none!important;max-height: min(92dvh,850px)!important;overflow-y:auto!important;overscroll-behavior:contain!important;border-radius:26px 26px 0 0!important;padding:20px 16px calc(18px + env(safe-area-inset-bottom))!important;border-bottom:0!important;box-shadow:0 -16px 48px rgba(0,0,0,.42)!important}
- .yn-order-sheet:before{content:"";display:block;width:42px;height:4px;border-radius:99px;background:#60758e;opacity:.65;margin:-8px auto 12px}
- #modalTotal{font-size:clamp(26px,8vw,34px)!important}
- #orderForm input{min-height:48px!important;border-radius:14px!important}
- #orderForm button{min-height:48px!important}
+ /* Compact mobile order sheet: less clutter, shorter controls, and scroll only when needed */
+ .yn-order-sheet{width:100%!important;max-width:560px!important;max-height: min(80dvh,680px)!important;overflow-y:auto!important;overscroll-behavior:contain!important;border-radius:20px 20px 0 0!important;padding:12px 12px calc(10px + env(safe-area-inset-bottom))!important;border-bottom:0!important;box-shadow:0 -12px 32px rgba(0,0,0,.35)!important;gap:10px!important}
+ .yn-order-sheet:before{content:"";display:block;width:34px;height:3px;border-radius:99px;background:#60758e;opacity:.65;margin:-3px auto 7px}
+ .yn-order-sheet .border-b{padding-bottom:7px!important}
+ #modalServiceDescription{padding:8px!important;line-height:1.5!important}
+ #orderForm{gap:9px!important}
+ #orderForm label{margin-bottom:3px!important;line-height:1.35!important}
+ #orderForm input{min-height:38px!important;height:38px!important;border-radius:10px!important;padding:7px 10px!important;font-size:12px!important}
+ #orderForm button{min-height:40px!important;padding:9px 10px!important;border-radius:11px!important}
+ #orderForm .rounded-2xl{border-radius:12px!important}
+ #orderForm .p-4{padding:10px!important}
+ #orderForm .space-y-3{row-gap:6px!important}
+ #modalTotal{font-size:clamp(23px,6.5vw,28px)!important;line-height:1.15!important}
+ #modalSavingMessage{margin-top:4px!important}
+ #couponPreviewStatus,#orderValidationMessage{padding:7px!important}
+ #orderExtraDetailsButton{min-height:34px!important;padding:7px!important}
+ #serviceDetailsModal>div{max-height:82dvh!important;overflow-y:auto!important;border-radius:18px!important}
  #serviceDetailsModal>div{max-height:88dvh!important;overflow-y:auto!important;border-radius:24px!important}
 }
 @media(min-width:640px){.yn-order-sheet{max-height:90vh!important;overflow-y:auto!important}}

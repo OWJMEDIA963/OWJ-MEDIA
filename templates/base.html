@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NOVA STORE</title>
-    <meta name="description" content="NOVA STORE - متجر رقمي لشراء الخدمات الرقمية وشحن الألعاب وحسابات التواصل الاجتماعي مع دعم فني ومتابعة الطلبات.">
+    <title>YNOVA STORE</title>
+    <meta name="description" content="YNOVA STORE - متجر رقمي لشراء الخدمات الرقمية وشحن الألعاب وحسابات التواصل الاجتماعي مع دعم فني ومتابعة الطلبات.">
     <meta name="robots" content="index,follow,max-image-preview:large">
     <link rel="canonical" href="{{ request.url_root.rstrip('/') }}{{ request.path }}">
-    <meta property="og:type" content="website"><meta property="og:site_name" content="NOVA STORE">
-    <meta property="og:title" content="NOVA STORE | المتجر الرقمي">
+    <meta property="og:type" content="website"><meta property="og:site_name" content="YNOVA STORE">
+    <meta property="og:title" content="YNOVA STORE | المتجر الرقمي">
     <meta property="og:description" content="خدمات رقمية وشحن ألعاب وحسابات تواصل اجتماعي ودعم فني.">
     <meta property="og:url" content="{{ request.url }}">
     <meta name="theme-color" content="#08091b">
@@ -51,7 +51,7 @@
         body.light-theme nav span, body.light-theme nav a { color:#475569 !important; }
     
 
-/* NOVA STORE: realistic royal-blue theme (solid colors, restrained shadows) */
+/* YNOVA STORE: realistic royal-blue theme (solid colors, restrained shadows) */
 :root{--yn-blue:#2457d6;--yn-blue-hover:#1d4ed8;--yn-blue-soft:#93c5fd;--yn-bg:#0b1220;--yn-panel:#111c2e;--yn-panel-2:#16243a;--yn-border:#263b60;--yn-text:#e8eef8;--yn-muted:#a8b6cc}
 html{color-scheme:dark}
 body{background-color:var(--yn-bg)!important;color:var(--yn-text)}
@@ -118,7 +118,7 @@ body.light-theme #sidebarMenu a,body.light-theme #sidebarMenu button{color:#2530
 }
 </style>
 <style id="nova-complete-light-theme">
-/* NOVA STORE - complete light appearance: no dark panels left behind */
+/* YNOVA STORE - complete light appearance: no dark panels left behind */
 body.light-theme{
   --yn-bg:#f5f7fb;--yn-panel:#ffffff;--yn-panel-2:#f8fafc;--yn-border:#e2e8f0;
   --yn-text:#172033;--yn-muted:#64748b;--yn-blue:#2457d6;
@@ -223,7 +223,7 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
 
 </head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
-<div id="novaLoading" aria-live="polite"><div class="nova-loader"><img src="{{ url_for('static',filename='images/nova-symbol.svg') }}" alt="NOVA"><div class="nova-spin"></div><div class="text-white text-sm font-black">NOVA STORE</div><div class="text-slate-400 text-xs mt-2">جاري إتمام العملية...</div></div></div>
+<div id="novaLoading" aria-live="polite"><div class="nova-loader"><img src="{{ url_for('static',filename='images/nova-symbol.svg') }}" alt="NOVA"><div class="nova-spin"></div><div class="text-white text-sm font-black">YNOVA STORE</div><div class="text-slate-400 text-xs mt-2">جاري إتمام العملية...</div></div></div>
 
 
     <div id="sidebarOverlay" onclick="toggleSidebar()"></div>
@@ -235,7 +235,7 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
                 <div class="flex items-center gap-3">
                     <div class="w-12 h-12 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-400 font-black">NOVA</div>
                     <div>
-                        <h3 class="text-sm font-black text-white">NOVA STORE</h3>
+                        <h3 class="text-sm font-black text-white">YNOVA STORE</h3>
                         <p class="text-[11px] text-gray-400">الخدمات الرقمية</p>
                     </div>
                 </div>
@@ -287,7 +287,7 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
             {% if current_user %}
             <a href="/logout" class="block bg-rose-500/10 border border-rose-500/30 text-rose-400 py-3 rounded-2xl text-xs font-bold mb-3">تسجيل الخروج</a>
             {% endif %}
-            <p class="text-[10px] text-gray-500">© 2026 NOVA STORE</p>
+            <p class="text-[10px] text-gray-500">© 2026 YNOVA STORE</p>
         </div>
     </div>
 
@@ -299,7 +299,7 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
                 <a href="/" class="text-sm font-black text-white flex items-center gap-1.5">
-                    <span>NOVA STORE</span>
+                    <span>YNOVA STORE</span>
                     {% if current_user and current_user.is_verified %}
                     <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.25a.75.75 0 00-1.14-.976l-3.36 3.92-1.74-1.74a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.12-.08l4-4.5z"/></svg>
                     {% endif %}
@@ -368,7 +368,7 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
     </nav>
 
 
-<!-- مساعد NOVA STORE العائم: هوية محادثة بنفسجي/نيلي مستقلة عن ألوان المتجر -->
+<!-- مساعد YNOVA STORE العائم: هوية محادثة بنفسجي/نيلي مستقلة عن ألوان المتجر -->
 <style>
  #owjBotButton{background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:1px solid #c4b5fd;box-shadow:0 12px 32px rgba(99,102,241,.38)}
  #owjBotWindow{background:#111126;border:1px solid rgba(167,139,250,.42);box-shadow:0 24px 70px rgba(20,12,55,.58)}
@@ -383,18 +383,18 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
  #owjBotMessages .quick-question{background:#30285b;border:1px solid #6d5ca8;color:#ddd6fe}
  @media(max-width:480px){ #owjBotWindow{bottom:6.1rem;left:.75rem;width:calc(100vw - 1.5rem);max-width:none}#owjBotMessages{height: min(56vh,390px)}}
 </style>
-<button id="owjBotButton" type="button" aria-label="فتح مساعد NOVA STORE" aria-controls="owjBotWindow" aria-expanded="false" class="fixed bottom-24 left-4 z-50 w-14 h-14 rounded-full flex items-center justify-center active:scale-95 transition">
+<button id="owjBotButton" type="button" aria-label="فتح مساعد YNOVA STORE" aria-controls="owjBotWindow" aria-expanded="false" class="fixed bottom-24 left-4 z-50 w-14 h-14 rounded-full flex items-center justify-center active:scale-95 transition">
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-7 h-7"><rect x="3" y="7" width="18" height="13" rx="4"/><path d="M12 3v4M8 13h.01M16 13h.01M9 17h6"/></svg>
  <span class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#111126]"></span>
 </button>
-<section id="owjBotWindow" dir="rtl" role="dialog" aria-label="مساعد NOVA STORE" aria-modal="false" class="fixed bottom-40 left-4 z-50 w-[calc(100vw-2rem)] max-w-sm hidden overflow-hidden rounded-3xl">
+<section id="owjBotWindow" dir="rtl" role="dialog" aria-label="مساعد YNOVA STORE" aria-modal="false" class="fixed bottom-40 left-4 z-50 w-[calc(100vw-2rem)] max-w-sm hidden overflow-hidden rounded-3xl">
  <header class="owj-bot-head flex items-center justify-between p-4">
-  <div class="flex items-center gap-3"><div class="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-black text-xs">NOVA</div><div><h2 class="text-sm font-black text-white">مساعد NOVA STORE</h2><p class="text-[10px] text-violet-200 flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span> جاهز لمساعدتك</p></div></div>
+  <div class="flex items-center gap-3"><div class="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-black text-xs">NOVA</div><div><h2 class="text-sm font-black text-white">مساعد YNOVA STORE</h2><p class="text-[10px] text-violet-200 flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span> جاهز لمساعدتك</p></div></div>
   <button id="owjBotClose" type="button" aria-label="إغلاق المحادثة" class="w-9 h-9 rounded-xl bg-white/10 text-white hover:bg-white/20 text-xl">×</button>
  </header>
  <div class="px-4 py-2 bg-[#1c1938] text-[10px] text-violet-200 border-b border-violet-400/10">اسأل عن الخدمات أو الطلبات أو شحن المحفظة</div>
  <div id="owjBotMessages" aria-live="polite" class="h-80 overflow-y-auto p-4 space-y-3 text-xs">
-  <div class="bot-msg max-w-[92%] p-3 leading-6">أهلاً بك في NOVA STORE<br>أنا مساعدك الرقمي، كيف فيني أساعدك اليوم؟
+  <div class="bot-msg max-w-[92%] p-3 leading-6">أهلاً بك في YNOVA STORE<br>أنا مساعدك الرقمي، كيف فيني أساعدك اليوم؟
    <div class="mt-3 flex flex-wrap gap-2"><button type="button" data-question="كيف أطلب خدمة؟" class="quick-question rounded-xl px-3 py-2">طريقة الطلب</button><button type="button" data-question="كيف أشحن رصيدي؟" class="quick-question rounded-xl px-3 py-2">شحن الرصيد</button><button type="button" data-question="كيف أتابع طلباتي؟" class="quick-question rounded-xl px-3 py-2">متابعة الطلبات</button></div>
   </div>
  </div>

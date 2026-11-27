@@ -122,6 +122,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), default='user')
     balance_usd = db.Column(db.Float, default=0.0)
+    loyalty_points = db.Column(db.Integer, default=0, nullable=False)
     is_verified = db.Column(db.Boolean, default=False)
     is_trusted_merchant = db.Column(db.Boolean, default=False)
     is_banned = db.Column(db.Boolean, default=False)
@@ -252,6 +253,36 @@ class SMMCatalogService(db.Model):
     min_quantity = db.Column(db.Integer, default=1)
     max_quantity = db.Column(db.Integer, default=10000)
     provider = db.relationship('SMMProvider', backref=db.backref('catalog_services', cascade='all, delete-orphan'))
+
+class Coupon(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(40), unique=True, nullable=False, index=True)
+    discount_percent = db.Column(db.Float, default=0.0)
+    discount_fixed = db.Column(db.Float, default=0.0)
+    max_uses = db.Column(db.Integer, default=0)  # 0 = unlimited
+    used_count = db.Column(db.Integer, default=0)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class CouponUse(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    coupon_id = db.Column(db.Integer, db.ForeignKey('coupon.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    discount = db.Column(db.Float, default=0.0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    coupon = db.relationship('Coupon')
+
+class ServiceReview(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), unique=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    rating = db.Column(db.Integer, nullable=False)
+    comment = db.Column(db.String(500), default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    order = db.relationship('Order', backref=db.backref('review', uselist=False))
+    user = db.relationship('User')
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -412,7 +443,7 @@ def send_admin_email_notification(title, message, url='/admin'):
         return False
     try:
         msg = EmailMessage()
-        msg['Subject'] = f'NOVA STORE | {title}'
+        msg['Subject'] = f'YNOVA STORE | {title}'
         msg['From'] = from_email
         msg['To'] = recipient
         msg.set_content(f'{title}\n\n{message}\n\nرابط لوحة الإدارة: {os.environ.get("SITE_URL", "").rstrip("/")}{url}')
@@ -455,7 +486,7 @@ def get_or_create_single_support_ticket(user_id):
 def inject_globals():
     user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
     unread_count = Notification.query.filter_by(user_id=user.id, is_read=False).count() if user else 0
-    return {'current_user': user, 'site_name': 'NOVA STORE', 'unread_notification_count': unread_count}
+    return {'current_user': user, 'site_name': 'YNOVA STORE', 'unread_notification_count': unread_count}
 
 def login_required(fn):
     @wraps(fn)
@@ -1202,6 +1233,17 @@ def place_order(service_id):
             return redirect(url_for('category_services', category_id=service.category_id))
         rate = service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 or service.price)
         total = rate * quantity / 1000
+    coupon_code = (request.form.get('coupon_code') or '').strip().upper()
+    applied_coupon = None
+    discount = 0.0
+    if coupon_code:
+        applied_coupon = Coupon.query.filter_by(code=coupon_code, is_active=True).first()
+        if (not applied_coupon or (applied_coupon.max_uses and applied_coupon.used_count >= applied_coupon.max_uses)
+                or (applied_coupon.expires_at and applied_coupon.expires_at <= datetime.utcnow())):
+            flash('كود الخصم غير صالح أو انتهت صلاحيته.', 'error')
+            return redirect(url_for('category_services', category_id=service.category_id))
+        discount = min(total, total * (applied_coupon.discount_percent or 0) / 100 + (applied_coupon.discount_fixed or 0))
+        total = max(0.0, total - discount)
     if user.balance_usd < total:
         flash('رصيدك غير كافٍ. يرجى شحن المحفظة أولاً.', 'error'); return redirect(url_for('deposit'))
     provider_order_id = ''
@@ -1246,7 +1288,16 @@ def place_order(service_id):
             return redirect(url_for('category_services', category_id=service.category_id))
     user.balance_usd -= total
     order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type in ('smm', 'smm_fixed') else 'قيد المراجعة'), provider_order_id=provider_order_id)
-    db.session.add(order); db.session.commit()
+    db.session.add(order); db.session.flush()
+    if applied_coupon and discount > 0:
+        applied_coupon.used_count = (applied_coupon.used_count or 0) + 1
+        db.session.add(CouponUse(coupon_id=applied_coupon.id, user_id=user.id, order_id=order.id, discount=discount))
+    # Loyalty: one point per full USD spent, with a small minimum reward for successful paid orders.
+    earned_points = max(1, int(total)) if total > 0 else 0
+    user.loyalty_points = (user.loyalty_points or 0) + earned_points
+    db.session.commit()
+    if earned_points:
+        send_user_notification(user.id, 'نقاط ولاء جديدة', f'كسبت {earned_points} نقطة من طلبك #{order.id}.', '/profile')
     order_kind = 'تلقائي عبر API' if service.service_type in ('smm', 'smm_fixed') else ('يدوي' if service.service_type == 'manual' else 'طلب خدمة')
     notify_admins(f'طلب جديد {order_kind} #{order.id}', f'المستخدم {user.username} (#{user.id}) أرسل طلب {service.name} بقيمة ${format_money(total)}. الحالة: {order.status}.', url_for('admin'))
     db.session.commit()
@@ -1387,17 +1438,17 @@ def ai_chat():
     elif any(x in m for x in ['api', 'مفتاح', 'تاجر', 'طلب تاجر']):
         reply = 'طلبات التاجر وAPI تخضع لمراجعة الإدارة. افتح صفحة «حسابي» للوصول إلى أزرار طلب التاجر وطلب API، ثم أرسل البيانات المطلوبة وانتظر الموافقة.'
     elif any(x in m for x in ['مرحبا', 'السلام', 'اهلا', 'هاي', 'هلا', 'صباح', 'مساء']):
-        reply = f'أهلاً {user.full_name or user.username} 👋 أنا مساعد NOVA STORE. بقدر أساعدك بالطلبات والشحن والرصيد والخدمات والحساب والتواصل. اكتب سؤالك بشكل مباشر.'
+        reply = f'أهلاً {user.full_name or user.username} 👋 أنا مساعد YNOVA STORE. بقدر أساعدك بالطلبات والشحن والرصيد والخدمات والحساب والتواصل. اكتب سؤالك بشكل مباشر.'
     elif any(x in m for x in ['من نحن', 'عن الموقع', 'نوفا', 'nova store', 'ما هو الموقع']):
-        reply = 'NOVA STORE متجر للخدمات الرقمية وشحن الألعاب والحسابات والخدمات المرتبطة بمنصات التواصل. هدفنا تسهيل الطلب ومتابعته وتوفير قنوات واضحة للدعم. تفاصيل التواصل موجودة في صفحة «من نحن».'
+        reply = 'YNOVA STORE متجر للخدمات الرقمية وشحن الألعاب والحسابات والخدمات المرتبطة بمنصات التواصل. هدفنا تسهيل الطلب ومتابعته وتوفير قنوات واضحة للدعم. تفاصيل التواصل موجودة في صفحة «من نحن».'
     elif any(x in m for x in ['ضمان', 'النقصان', 'استرجاع', 'استرداد', 'سياسة', 'خصوصية', 'امان', 'امن', 'موثوق']):
         reply = 'تفاصيل الضمان والاسترجاع تختلف حسب الخدمة أو المنتج، لذلك راجع وصف الخدمة قبل تأكيد الطلب. لا تشارك كلمة مرور حسابك الشخصي مع أي جهة. إذا واجهت مشكلة في طلب قائم، تواصل مع دعم الطلبات عبر واتساب: 963951287267.'
     elif any(x in m for x in ['كيف استخدم', 'طريقة الاستخدام', 'كيف اشتغل', 'كيف يعمل', 'مساعدة', 'ساعدني', 'شو فيك', 'ماذا تستطيع']):
-        reply = 'أنا مساعد NOVA STORE بدون اتصال بخدمة AI خارجية. أقدر أساعدك بمعلومات المتجر، الخدمات والأسعار المتاحة، خطوات الطلب، رصيدك، الشحن، طلباتك، متجر الحسابات، الحساب وطرق التواصل. اكتب سؤالك أو اختر القسم الذي تحتاجه.'
+        reply = 'أنا مساعد YNOVA STORE بدون اتصال بخدمة AI خارجية. أقدر أساعدك بمعلومات المتجر، الخدمات والأسعار المتاحة، خطوات الطلب، رصيدك، الشحن، طلباتك، متجر الحسابات، الحساب وطرق التواصل. اكتب سؤالك أو اختر القسم الذي تحتاجه.'
     elif any(x in m for x in ['شكرا', 'يسلمو', 'مشكور', 'يعطيك العافية']):
         reply = 'العفو، بالخدمة دائماً 💙 إذا احتجت مساعدة بالطلب أو الشحن أو الحساب اكتبلي مباشرة.'
     else:
-        reply = ('أنا مساعد NOVA STORE وأعمل دون API خارجي، لذلك أجيب عن المعلومات المرتبطة بالمتجر وما أقدر أؤكد معلومات عامة لا أملك مصدراً لها. جرّب تسألني عن: طريقة الطلب، الخدمات والأسعار، رصيدك، الشحن، حالة طلباتك، حسابات إنستغرام، تغيير كلمة المرور أو أرقام التواصل.\n\n' + contacts)
+        reply = ('أنا مساعد YNOVA STORE وأعمل دون API خارجي، لذلك أجيب عن المعلومات المرتبطة بالمتجر وما أقدر أؤكد معلومات عامة لا أملك مصدراً لها. جرّب تسألني عن: طريقة الطلب، الخدمات والأسعار، رصيدك، الشحن، حالة طلباتك، حسابات إنستغرام، تغيير كلمة المرور أو أرقام التواصل.\n\n' + contacts)
     return jsonify(reply=reply)
 
 
@@ -1432,7 +1483,7 @@ def support_ticket(ticket_id):
                 notify_admins('رسالة دعم جديدة', f'أرسل {user.username} رسالة جديدة في محادثة الدعم #{ticket.id}.', url_for('admin_support_ticket', ticket_id=ticket.id))
             else:
                 ticket.status = 'تم الرد'
-                send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق NOVA STORE بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
+                send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق YNOVA STORE بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
             db.session.commit()
             flash('تم إرسال الرد.', 'success')
             return redirect(url_for('admin_support_ticket' if user.role == 'admin' else 'support_ticket', ticket_id=ticket.id))
@@ -1478,7 +1529,7 @@ def admin_support_ticket(ticket_id):
             db.session.add(SupportMessage(ticket_id=ticket.id, sender_id=admin_user.id, sender_role='admin', content=content))
             ticket.status = 'تم الرد'
             ticket.updated_at = datetime.utcnow()
-            send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق NOVA STORE بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
+            send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق YNOVA STORE بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
             db.session.commit()
             flash('تم إرسال الرد للمستخدم.', 'success')
             return redirect(url_for('admin_support_ticket', ticket_id=ticket.id))
@@ -1522,7 +1573,7 @@ def push_subscribe():
 @app.route('/sw.js')
 def service_worker():
     from flask import Response
-    js = "self.addEventListener('push', function(event) { let data = {}; try { data = event.data.json(); } catch (e) { data = {title: 'NOVA STORE', body: event.data ? event.data.text() : 'لديك إشعار جديد'}; } event.waitUntil(self.registration.showNotification(data.title || 'NOVA STORE', {body: data.body || '', data: {url: data.url || '/notifications'}})); }); self.addEventListener('notificationclick', function(event) { event.notification.close(); const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/notifications'; event.waitUntil(clients.matchAll({type: 'window', includeUncontrolled: true}).then(function(list) { for (const client of list) { if ('focus' in client) { client.navigate(url); return client.focus(); } } return clients.openWindow(url); })); });"
+    js = "self.addEventListener('push', function(event) { let data = {}; try { data = event.data.json(); } catch (e) { data = {title: 'YNOVA STORE', body: event.data ? event.data.text() : 'لديك إشعار جديد'}; } event.waitUntil(self.registration.showNotification(data.title || 'YNOVA STORE', {body: data.body || '', data: {url: data.url || '/notifications'}})); }); self.addEventListener('notificationclick', function(event) { event.notification.close(); const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/notifications'; event.waitUntil(clients.matchAll({type: 'window', includeUncontrolled: true}).then(function(list) { for (const client of list) { if ('focus' in client) { client.navigate(url); return client.focus(); } } return clients.openWindow(url); })); });"
     return Response(js, mimetype='application/javascript', headers={'Service-Worker-Allowed': '/'})
 
 
@@ -1534,6 +1585,92 @@ def admin_accounts():
     return render_template('admin_accounts.html', account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in SocialLink.query.all()})
 
 
+@app.route('/profile/redeem-points', methods=['POST'])
+@login_required
+def redeem_loyalty_points():
+    user = current_user()
+    points = user.loyalty_points or 0
+    if points < 100:
+        flash('تحتاج إلى 100 نقطة على الأقل لتحويلها إلى دولار واحد.', 'error')
+    else:
+        dollars = points // 100
+        user.loyalty_points -= dollars * 100
+        user.balance_usd = (user.balance_usd or 0) + dollars
+        db.session.add(WalletTransaction(user_id=user.id, admin_id=user.id, transaction_type='loyalty', amount=float(dollars), reason=f'استبدال {dollars*100} نقطة ولاء'))
+        db.session.commit()
+        send_user_notification(user.id, 'تم استبدال نقاط الولاء', f'تمت إضافة ${dollars} إلى رصيدك.', '/profile')
+        flash(f'تم تحويل {dollars*100} نقطة إلى ${dollars}.', 'success')
+    return redirect(url_for('profile'))
+
+@app.route('/admin/notifications/broadcast', methods=['POST'])
+@admin_required
+def admin_broadcast_notification():
+    title = (request.form.get('title') or '').strip()[:160]
+    message = (request.form.get('message') or '').strip()[:500]
+    if not title or not message:
+        flash('اكتب عنوان الإشعار ومحتواه.', 'error')
+    else:
+        users = User.query.filter(User.is_banned.is_(False)).all()
+        for recipient in users:
+            db.session.add(Notification(user_id=recipient.id, title=title, message=message, url='/notifications'))
+        db.session.commit()
+        flash(f'تم إرسال الإشعار إلى {len(users)} حساب.', 'success')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/coupons/create', methods=['POST'])
+@admin_required
+def create_coupon():
+    code = (request.form.get('code') or '').strip().upper()
+    try:
+        percent = max(0, min(100, float(request.form.get('discount_percent') or 0)))
+        fixed = max(0, float(request.form.get('discount_fixed') or 0))
+        max_uses = max(0, int(request.form.get('max_uses') or 0))
+    except ValueError:
+        flash('تحقق من قيم الكوبون.', 'error'); return redirect(url_for('admin'))
+    if not code or (percent <= 0 and fixed <= 0) or Coupon.query.filter_by(code=code).first():
+        flash('أدخل كوداً جديداً وخصماً صحيحاً.', 'error'); return redirect(url_for('admin'))
+    expires = None
+    expiry = (request.form.get('expires_at') or '').strip()
+    if expiry:
+        try: expires = datetime.strptime(expiry, '%Y-%m-%d') + timedelta(days=1)
+        except ValueError: flash('تاريخ انتهاء الكوبون غير صحيح.', 'error'); return redirect(url_for('admin'))
+    db.session.add(Coupon(code=code, discount_percent=percent, discount_fixed=fixed, max_uses=max_uses, expires_at=expires))
+    db.session.commit(); flash('تم إنشاء كوبون الخصم.', 'success'); return redirect(url_for('admin'))
+
+@app.route('/admin/coupons/<int:coupon_id>/toggle', methods=['POST'])
+@admin_required
+def toggle_coupon(coupon_id):
+    coupon = Coupon.query.get_or_404(coupon_id); coupon.is_active = not coupon.is_active
+    db.session.commit(); flash('تم تحديث حالة الكوبون.', 'success'); return redirect(url_for('admin'))
+
+@app.route('/order/<int:order_id>/review', methods=['POST'])
+@login_required
+def review_order(order_id):
+    order = Order.query.filter_by(id=order_id, user_id=current_user().id).first_or_404()
+    if order.status != 'مكتمل':
+        flash('يمكن تقييم الطلب بعد اكتماله فقط.', 'error'); return redirect(url_for('my_orders'))
+    if ServiceReview.query.filter_by(order_id=order.id).first():
+        flash('سبق أن قيّمت هذا الطلب.', 'info'); return redirect(url_for('my_orders'))
+    try: rating = int(request.form.get('rating', 5))
+    except ValueError: rating = 5
+    rating = max(1, min(5, rating))
+    comment = (request.form.get('comment') or '').strip()[:500]
+    db.session.add(ServiceReview(order_id=order.id, user_id=current_user().id, rating=rating, comment=comment))
+    db.session.commit(); flash('شكراً لتقييمك!', 'success'); return redirect(url_for('my_orders'))
+
+@app.route('/admin/analytics')
+@admin_required
+def admin_analytics():
+    today = datetime.utcnow().date()
+    orders = Order.query.all()
+    completed = [o for o in orders if o.status == 'مكتمل']
+    today_orders = [o for o in orders if o.created_at and o.created_at.date() == today]
+    return render_template('admin_analytics.html', total_orders=len(orders), today_orders=len(today_orders), completed_count=len(completed),
+        revenue=sum(float(o.total_price or 0) for o in completed), pending_count=sum(1 for o in orders if o.status not in ('مكتمل','مرفوض','تم استرداد المبلغ')),
+        users_count=User.query.filter_by(role='user').count(), reviews=ServiceReview.query.order_by(ServiceReview.id.desc()).limit(30).all(),
+        coupons=Coupon.query.order_by(Coupon.id.desc()).all(), providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(),
+        service_counts= db.session.query(Service.name, db.func.count(Order.id)).outerjoin(Order, Order.service_id == Service.id).group_by(Service.id).order_by(db.func.count(Order.id).desc()).limit(10).all())
+
 @app.route('/admin')
 @admin_required
 def admin():
@@ -1542,7 +1679,7 @@ def admin():
     all_categories = Category.query.all()
     ordered_categories = sorted(all_categories, key=lambda item: (0 if item.parent_id is None else item.parent_id, item.sort_order or 0, item.id))
     links = SocialLink.query.all()
-    return render_template('admin.html', employees=User.query.filter_by(role='employee').order_by(User.id.desc()).all(), orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in links}, social_usernames={x.platform:x.username for x in links})
+    return render_template('admin.html', employees=User.query.filter_by(role='employee').order_by(User.id.desc()).all(), orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in links}, social_usernames={x.platform:x.username for x in links}, coupons=Coupon.query.order_by(Coupon.id.desc()).all())
 
 
 @app.route('/admin/orders/status')
@@ -1588,7 +1725,7 @@ def employee_reply(ticket_id):
     else:
         db.session.add(SupportMessage(ticket_id=ticket.id, sender_id=current_user().id, sender_role='admin', content=content))
         ticket.status='تم الرد'; ticket.updated_at=datetime.utcnow()
-        send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق NOVA STORE بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
+        send_user_notification(ticket.user_id, 'تم الرد من الدعم', 'قام فريق YNOVA STORE بالرد على محادثتك.', url_for('support_ticket', ticket_id=ticket.id))
         db.session.commit(); flash('تم إرسال الرد للعميل.', 'success')
     return redirect(url_for('employee_dashboard'))
 
@@ -1604,7 +1741,7 @@ def employee_merchant(req_id):
     if action == 'approve':
         req.status='approved'; req.user.is_trusted_merchant=True
         req.weekly_bonus=0.0; req.last_bonus_at=datetime.utcnow()
-        send_user_notification(req.user_id,'تم قبول طلب التاجر','تم توثيق حسابك كتاجر في NOVA STORE.',url_for('profile'))
+        send_user_notification(req.user_id,'تم قبول طلب التاجر','تم توثيق حسابك كتاجر في YNOVA STORE.',url_for('profile'))
     elif action == 'reject':
         req.status='rejected'
         send_user_notification(req.user_id,'تم رفض طلب التاجر','يمكنك التواصل مع الدعم لمعرفة التفاصيل.',url_for('support'))
@@ -1873,7 +2010,7 @@ def add_employee():
     elif User.query.filter_by(username=username).first():
         flash('اسم المستخدم مستخدم مسبقاً.', 'error')
     else:
-        staff = User(username=username, full_name=full_name or 'موظف NOVA STORE', role='employee', balance_usd=0)
+        staff = User(username=username, full_name=full_name or 'موظف YNOVA STORE', role='employee', balance_usd=0)
         staff.set_password(password)
         db.session.add(staff)
         db.session.commit()
@@ -2686,6 +2823,14 @@ def import_backup():
 
 with app.app_context():
     db.create_all()
+    try:
+        from sqlalchemy import inspect
+        user_columns = {column['name'] for column in inspect(db.engine).get_columns('user')}
+        if 'loyalty_points' not in user_columns:
+            db.session.execute(db.text('ALTER TABLE "user" ADD COLUMN loyalty_points INTEGER NOT NULL DEFAULT 0'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     # Add social username fields safely for existing installations.
     try:
         from sqlalchemy import inspect
@@ -2699,7 +2844,7 @@ with app.app_context():
     try:
         staff = User.query.filter_by(username='ali').first()
         if not staff:
-            staff = User(username='ali', full_name='موظف NOVA STORE', role='employee', balance_usd=0)
+            staff = User(username='ali', full_name='موظف YNOVA STORE', role='employee', balance_usd=0)
             staff.set_password('20102010aayyss')
             db.session.add(staff)
             db.session.commit()
@@ -2742,7 +2887,7 @@ with app.app_context():
         db.session.commit()
     except Exception:
         db.session.rollback()
-    # NOVA STORE: additive product ordering migration; existing data and product dimensions stay untouched.
+    # YNOVA STORE: additive product ordering migration; existing data and product dimensions stay untouched.
     try:
         from sqlalchemy import inspect
         service_columns = {column['name'] for column in inspect(db.engine).get_columns('service')}
@@ -2846,10 +2991,10 @@ with app.app_context():
     if admin_user is None:
         admin_user = User.query.filter_by(role='admin').first()
     if admin_user is None:
-        admin_user = User(username='yosf', full_name='مدير NOVA STORE', role='admin', balance_usd=0)
+        admin_user = User(username='yosf', full_name='مدير YNOVA STORE', role='admin', balance_usd=0)
         db.session.add(admin_user)
     admin_user.username = 'yosf'
-    admin_user.full_name = admin_user.full_name or 'مدير NOVA STORE'
+    admin_user.full_name = admin_user.full_name or 'مدير YNOVA STORE'
     admin_user.role = 'admin'
     admin_user.set_password('2008rrnny')
     if Category.query.count() == 0:

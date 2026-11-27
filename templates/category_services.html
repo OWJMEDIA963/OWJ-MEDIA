@@ -258,6 +258,11 @@
                 <input type="number" id="modalQuantity" name="quantity" value="10" min="1" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none" oninput="calcTotal()">
             </div>
 
+            <div class="space-y-1">
+                <label class="block text-[11px] font-bold text-gray-300">كود خصم (اختياري)</label>
+                <input type="text" name="coupon_code" maxlength="40" placeholder="أدخل كود الخصم" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white uppercase">
+            </div>
+
             <div class="bg-gray-950 p-3 rounded-2xl border border-gray-800 flex justify-between items-center text-xs">
                 <span class="text-gray-400 font-bold">التكلفة:</span>
                 <span id="modalTotal" class="text-cyan-400 font-black">$0.00</span>

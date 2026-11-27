@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="robots" content="noindex,nofollow"><title>قفل NOVA STORE</title>
+  <meta name="robots" content="noindex,nofollow"><title>قفل YNOVA STORE</title>
   <style>
     *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:#0b1220;color:#e8eef8;font-family:Tahoma,Arial,sans-serif}
     .card{width:min(100%,410px);padding:30px;border:1px solid #263b60;border-radius:24px;background:#111c2e;box-shadow:0 24px 70px #0008;text-align:center}
@@ -14,7 +14,7 @@
   </style>
 </head>
 <body><main class="card">
-  <div class="lock">🔒</div><h1>NOVA STORE مقفل</h1>
+  <div class="lock">🔒</div><h1>YNOVA STORE مقفل</h1>
   <p>أدخل كلمة مرور قفل الموقع للمتابعة، {{ user.full_name or user.username }}.</p>
   {% with messages = get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="flash">{{ message }}</div>{% endfor %}{% endwith %}
   <form method="post" action="{{ url_for('site_lock_unlock') }}">

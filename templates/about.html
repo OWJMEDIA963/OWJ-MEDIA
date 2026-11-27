@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}من نحن والتواصل - NOVA STORE{% endblock %}
+{% block title %}من نحن والتواصل - YNOVA STORE{% endblock %}
 {% block content %}
 <style>
 .about-wrap{max-width:850px;margin:auto;padding:28px 16px 42px}.about-card{background:linear-gradient(145deg,#111c2e,#0d1728);border:1px solid #263b60;border-radius:26px;padding:24px;box-shadow:0 16px 45px rgba(0,0,0,.18)}.contact-card{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#14233a;border:1px solid #29446d;border-radius:18px;padding:16px;margin-top:12px}.contact-card a{white-space:nowrap;background:#16845b;color:white;padding:10px 15px;border-radius:12px;font-size:12px;font-weight:900}.contact-number{direction:ltr;display:block;font-weight:900;letter-spacing:.5px;color:#bfdbfe;margin-top:5px}
@@ -7,15 +7,15 @@
 </style>
 <div class="about-wrap" dir="rtl">
  <section class="about-card">
-  <div class="text-center mb-7"><div class="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600/20 border border-blue-400/30 text-blue-300 text-xl font-black">N</div><h1 class="text-2xl font-black text-white">من نحن - NOVA STORE</h1><p class="text-sm text-blue-200 mt-2">متجرك للخدمات الرقمية في مكان واحد</p></div>
-  <p class="text-sm leading-8 text-slate-300">NOVA STORE منصة رقمية لتسهيل الوصول إلى الخدمات الرقمية وشحن الألعاب والخدمات المرتبطة بمنصات التواصل والحسابات الرقمية. نعمل على جعل تجربة الطلب ومتابعته واضحة وسهلة، مع توفير قنوات مباشرة للتواصل عند وجود استفسار أو مشكلة.</p>
+  <div class="text-center mb-7"><div class="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600/20 border border-blue-400/30 text-blue-300 text-xl font-black">N</div><h1 class="text-2xl font-black text-white">من نحن - YNOVA STORE</h1><p class="text-sm text-blue-200 mt-2">متجرك للخدمات الرقمية في مكان واحد</p></div>
+  <p class="text-sm leading-8 text-slate-300">YNOVA STORE منصة رقمية لتسهيل الوصول إلى الخدمات الرقمية وشحن الألعاب والخدمات المرتبطة بمنصات التواصل والحسابات الرقمية. نعمل على جعل تجربة الطلب ومتابعته واضحة وسهلة، مع توفير قنوات مباشرة للتواصل عند وجود استفسار أو مشكلة.</p>
   <div class="mt-7"><h2 class="text-lg font-black text-white mb-2">قنوات التواصل والدعم</h2><p class="text-xs leading-6 text-slate-400 mb-4">اختر جهة التواصل المناسبة لمشكلتك حتى تصل رسالتك إلى الشخص المختص.</p>
    <div class="contact-card"><div><div class="font-bold text-white">مؤسس ومبرمج الموقع</div><span class="contact-number">+963 952 169 815</span></div><a href="https://wa.me/963952169815" target="_blank" rel="noopener">تواصل عبر واتساب</a></div>
    <div class="contact-card"><div><div class="font-bold text-white">دعم الشحن والإبلاغ عن مشكلة</div><span class="contact-number">+963 984 727 823</span></div><a href="https://wa.me/963984727823" target="_blank" rel="noopener">تواصل عبر واتساب</a></div>
    <div class="contact-card"><div><div class="font-bold text-white">الطلبات أو تسريع طلب أو الإبلاغ عن خطأ</div><span class="contact-number">+963 951 287 267</span></div><a href="https://wa.me/963951287267" target="_blank" rel="noopener">تواصل عبر واتساب</a></div>
   </div>
   <div class="mt-7">
-   <h2 class="text-lg font-black text-white mb-3">تابع NOVA STORE</h2>
+   <h2 class="text-lg font-black text-white mb-3">تابع YNOVA STORE</h2>
    <div class="flex flex-wrap gap-3">
     {% if social_links.get('whatsapp') %}<a href="{{ social_links.get('whatsapp') }}" target="_blank" rel="noopener" aria-label="WhatsApp" class="flex items-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-emerald-300"><span class="text-2xl">☏</span><span><b>واتساب</b>{% if social_usernames.get('whatsapp') %}<small class="block text-[11px] opacity-80">{{ social_usernames.get('whatsapp') }}</small>{% endif %}</span></a>{% endif %}
     {% if social_links.get('facebook') %}<a href="{{ social_links.get('facebook') }}" target="_blank" rel="noopener" aria-label="Facebook" class="flex items-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 py-3 text-blue-300"><span class="text-2xl font-black">f</span><span><b>فيسبوك</b>{% if social_usernames.get('facebook') %}<small class="block text-[11px] opacity-80">{{ social_usernames.get('facebook') }}</small>{% endif %}</span></a>{% endif %}

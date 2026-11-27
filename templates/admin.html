@@ -2,6 +2,37 @@
 {% block title %}لوحة التحكم الإدارية{% endblock %}
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+  <section class="rounded-2xl border border-blue-400/20 bg-gray-900 p-4 space-y-3">
+    <h2 class="text-sm font-black text-blue-300">مركز تطوير وإدارة YNOVA</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <a href="/admin/analytics" class="rounded-xl bg-blue-600 p-3 text-center text-xs font-black text-white">📊 الإحصائيات والأرباح</a>
+      <a href="#coupon-center" class="rounded-xl border border-gray-700 bg-gray-950 p-3 text-center text-xs font-bold text-white">🎟️ كوبونات الخصم</a>
+      <a href="#api-health-center" class="rounded-xl border border-gray-700 bg-gray-950 p-3 text-center text-xs font-bold text-white">🔌 مراقبة API</a>
+      <a href="#broadcast-center" class="rounded-xl border border-gray-700 bg-gray-950 p-3 text-center text-xs font-bold text-white">🔔 إرسال إشعار عام</a>
+    </div>
+  </section>
+  <section id="coupon-center" class="rounded-2xl border border-amber-400/20 bg-gray-900 p-4 space-y-3">
+    <h2 class="text-sm font-black text-amber-300">🎟️ إدارة كوبونات الخصم</h2>
+    <form method="post" action="/admin/coupons/create" class="grid grid-cols-2 gap-2">
+      <input name="code" required maxlength="40" placeholder="الكود مثال WELCOME10" class="col-span-2 rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white">
+      <input name="discount_percent" type="number" min="0" max="100" step="0.1" placeholder="خصم %" class="rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white">
+      <input name="discount_fixed" type="number" min="0" step="0.01" placeholder="خصم ثابت $" class="rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white">
+      <input name="max_uses" type="number" min="0" placeholder="عدد الاستخدامات (0 بلا حد)" class="rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white">
+      <input name="expires_at" type="date" class="rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white">
+      <button class="col-span-2 rounded-xl bg-amber-400 p-3 text-xs font-black text-gray-950">إنشاء الكوبون</button>
+    </form>
+    <div class="space-y-2">{% for coupon in coupons %}<div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-800 bg-gray-950 p-3"><div><b class="text-xs text-white">{{ coupon.code }}</b><p class="text-[10px] text-gray-400">{{ coupon.discount_percent }}% + ${{ coupon.discount_fixed|money }} · {{ coupon.used_count }}/{{ coupon.max_uses or '∞' }} استخدام</p></div><form method="post" action="/admin/coupons/{{ coupon.id }}/toggle"><button class="rounded-lg px-3 py-2 text-[10px] font-bold {% if coupon.is_active %}bg-emerald-700 text-white{% else %}bg-gray-700 text-gray-200{% endif %}">{% if coupon.is_active %}تعطيل{% else %}تفعيل{% endif %}</button></form></div>{% else %}<p class="text-xs text-gray-500">لا توجد كوبونات بعد.</p>{% endfor %}</div>
+  </section>
+  <section id="api-health-center" class="rounded-2xl border border-cyan-400/20 bg-gray-900 p-4 space-y-3">
+    <h2 class="text-sm font-black text-cyan-300">🔌 مراقبة مزوّدي API</h2>
+    <p class="text-[11px] leading-5 text-gray-400">هذه الشاشة تعرض حالة التفعيل وتتيح اختبار الاتصال والرصيد يدوياً. لا يتم إجراء طلبات فحص تلقائية متكررة حتى لا نستهلك رصيد المزوّد.</p>
+    {% for provider in smm_providers %}<div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-800 bg-gray-950 p-3"><div><b class="text-xs text-white">{{ provider.name }}</b><p class="text-[10px] {% if provider.is_active %}text-emerald-300{% else %}text-rose-300{% endif %}">{% if provider.is_active %}مفعّل{% else %}معطّل{% endif %} · {{ provider.api_protocol }}</p></div><form method="post" action="/admin/test_smm_provider/{{ provider.id }}"><button class="rounded-lg bg-cyan-600 px-3 py-2 text-[10px] font-bold text-white">اختبار الاتصال والرصيد</button></form></div>{% else %}<p class="text-xs text-gray-500">لم تتم إضافة مزوّد API.</p>{% endfor %}
+  </section>
+  <section id="broadcast-center" class="rounded-2xl border border-violet-400/20 bg-gray-900 p-4 space-y-3">
+    <h2 class="text-sm font-black text-violet-300">🔔 إرسال إشعار لجميع العملاء</h2>
+    <form method="post" action="/admin/notifications/broadcast" class="space-y-2"><input name="title" maxlength="160" required placeholder="عنوان الإشعار" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white"><textarea name="message" maxlength="500" required placeholder="محتوى الإشعار" class="w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-xs text-white"></textarea><button onclick="return confirm('سيصل الإشعار إلى جميع الحسابات غير المحظورة. متابعة؟')" class="w-full rounded-xl bg-violet-600 p-3 text-xs font-black text-white">إرسال الإشعار العام</button></form>
+  </section>
+
   <!-- Quick navigation added without changing the existing dashboard theme or removing sections -->
   <nav aria-label="اختصارات لوحة الإدارة" class="rounded-2xl border border-gray-800 bg-gray-900 p-3">
     <p class="mb-2 text-xs font-black text-cyan-300">وصول سريع — اختر المهمة مباشرة</p>
@@ -15,7 +46,7 @@
     </div>
   </nav>
 <section id="social-accounts" class="mx-auto my-8 max-w-5xl rounded-3xl border border-cyan-400/20 bg-gray-900 p-6 space-y-4">
-  <h2 class="text-lg font-black text-cyan-300">روابط حسابات NOVA STORE الاجتماعية</h2>
+  <h2 class="text-lg font-black text-cyan-300">روابط حسابات YNOVA STORE الاجتماعية</h2>
   <p class="text-xs leading-6 text-gray-400">أضف الروابط لاحقاً أو اترك الحقل فارغاً لإخفاء الأيقونة من صفحة «من نحن».</p>
   <form method="post" action="{{ url_for('admin_social_links') }}" class="grid gap-3">
     <div class="rounded-xl border border-gray-800 p-3"><label class="text-xs text-gray-300">رابط واتساب <input type="url" name="whatsapp" value="{{ social_links.get('whatsapp','') }}" placeholder="https://wa.me/..." dir="ltr" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label><label class="mt-2 block text-xs text-gray-300">اليوزر / الاسم الظاهر <input name="whatsapp_username" value="{{ social_usernames.get('whatsapp','') }}" placeholder="مثال: NOVA Support" dir="auto" class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-950 p-3 text-white"></label></div>
@@ -131,7 +162,7 @@
             <h2 class="text-sm font-black text-white">جميع الطلبات — يدوي وتلقائي عبر API</h2>
             <span class="rounded-lg bg-cyan-500/10 px-3 py-1 text-[10px] font-bold text-cyan-300">{{ orders|length }} طلب</span>
         </div>
-        <p class="text-[11px] leading-6 text-gray-400">تتم مزامنة حالات الطلبات التلقائية مع المزوّد عند فتح لوحة الإدارة. السعر المعروض هو السعر المحفوظ في NOVA STORE وليس سعر المزوّد.</p>
+        <p class="text-[11px] leading-6 text-gray-400">تتم مزامنة حالات الطلبات التلقائية مع المزوّد عند فتح لوحة الإدارة. السعر المعروض هو السعر المحفوظ في YNOVA STORE وليس سعر المزوّد.</p>
         {% if orders %}
             <div class="space-y-3">
                 {% for ord in orders %}

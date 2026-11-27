@@ -269,6 +269,7 @@ class Coupon(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class CouponUse(db.Model):
+    __table_args__ = (db.UniqueConstraint('coupon_id', 'user_id', name='uq_coupon_use_per_user'),)
     id = db.Column(db.Integer, primary_key=True)
     coupon_id = db.Column(db.Integer, db.ForeignKey('coupon.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -276,6 +277,7 @@ class CouponUse(db.Model):
     discount = db.Column(db.Float, default=0.0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     coupon = db.relationship('Coupon')
+    user = db.relationship('User')
 
 class ServiceReview(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1304,7 +1306,7 @@ def preview_coupon(service_id):
     final_total = max(0.0, base_total - discount)
     return jsonify({'valid': True, 'has_coupon': True, 'base': round(base_total, 2),
                     'discount': round(discount, 2), 'total': round(final_total, 2),
-                    'message': 'كود الخصم فعّال وتم تطبيقه بنجاح.'})
+                    'saving_message': f'وفّرت ${discount:.2f} على هذا الطلب.', 'message': 'كود الخصم فعّال وتم تطبيقه بنجاح.'})
 
 @app.route('/order/<int:service_id>', methods=['POST'])
 @login_required
@@ -1397,10 +1399,16 @@ def place_order(service_id):
     user.balance_usd -= total
     order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type in ('smm', 'smm_fixed') else 'قيد المراجعة'), provider_order_id=provider_order_id)
     db.session.add(order); db.session.flush()
-    if applied_coupon and discount > 0:
+    if applied_coupon:
         applied_coupon.used_count = (applied_coupon.used_count or 0) + 1
         db.session.add(CouponUse(coupon_id=applied_coupon.id, user_id=user.id, order_id=order.id, discount=discount))
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as commit_error:
+        db.session.rollback()
+        app.logger.warning('Order commit failed, possibly duplicate coupon redemption: %s', commit_error)
+        flash('لم يكتمل الطلب بسبب استخدام الكود في طلب آخر أو تعارض متزامن. حدّث الصفحة وتحقق من طلباتك.', 'error')
+        return redirect(url_for('my_orders'))
     order_kind = 'تلقائي عبر API' if service.service_type in ('smm', 'smm_fixed') else ('يدوي' if service.service_type == 'manual' else 'طلب خدمة')
     notify_admins(f'طلب جديد {order_kind} #{order.id}', f'المستخدم {user.username} (#{user.id}) أرسل طلب {service.name} بقيمة ${format_money(total)}. الحالة: {order.status}.', url_for('admin'))
     db.session.commit()
@@ -1815,7 +1823,7 @@ def admin_analytics():
     return render_template('admin_analytics.html', total_orders=len(orders), today_orders=len(today_orders), completed_count=len(completed),
         revenue=sum(float(o.total_price or 0) for o in completed), pending_count=sum(1 for o in orders if o.status not in ('مكتمل','مرفوض','تم استرداد المبلغ')),
         users_count=User.query.filter_by(role='user').count(), reviews=ServiceReview.query.order_by(ServiceReview.id.desc()).limit(30).all(),
-        coupons=Coupon.query.order_by(Coupon.id.desc()).all(), providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(),
+        coupons=Coupon.query.order_by(Coupon.id.desc()).all(), coupon_uses=CouponUse.query.order_by(CouponUse.created_at.desc()).all(), coupon_discount_total=(db.session.query(db.func.coalesce(db.func.sum(CouponUse.discount), 0)).scalar() or 0), providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(),
         service_counts= db.session.query(Service.name, db.func.count(Order.id)).outerjoin(Order, Order.service_id == Service.id).group_by(Service.id).order_by(db.func.count(Order.id).desc()).limit(10).all())
 
 @app.route('/admin')
@@ -1826,7 +1834,7 @@ def admin():
     all_categories = Category.query.all()
     ordered_categories = sorted(all_categories, key=lambda item: (0 if item.parent_id is None else item.parent_id, item.sort_order or 0, item.id))
     links = SocialLink.query.all()
-    return render_template('admin.html', employees=User.query.filter_by(role='employee').order_by(User.id.desc()).all(), orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in links}, social_usernames={x.platform:x.username for x in links}, coupons=Coupon.query.order_by(Coupon.id.desc()).all())
+    return render_template('admin.html', employees=User.query.filter_by(role='employee').order_by(User.id.desc()).all(), orders=Order.query.order_by(Order.id.desc()).all(), verification_requests=VerificationRequest.query.filter_by(status='pending').all(), categories=all_categories, ordered_categories=ordered_categories, services=Service.query.order_by(Service.sort_order.asc(), Service.id.desc()).all(), deposits=DepositRequest.query.filter_by(status='قيد المراجعة').order_by(DepositRequest.id.desc()).all(), payment_methods=PaymentMethod.query.order_by(PaymentMethod.id.desc()).all(), agents=Agent.query.order_by(Agent.id.desc()).all(), sms_number_providers=SMSNumberProvider.query.order_by(SMSNumberProvider.id.desc()).all(), smm_providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(), smm_catalog_services=SMMCatalogService.query.order_by(SMMCatalogService.name.asc()).all(), support_count=SupportTicket.query.filter(SupportTicket.status != 'مغلقة').count(), account_lookup=account_lookup, account_lookup_id=account_lookup_id, social_links={x.platform:x.url for x in links}, social_usernames={x.platform:x.username for x in links}, coupons=Coupon.query.order_by(Coupon.id.desc()).all(), coupon_uses=CouponUse.query.order_by(CouponUse.created_at.desc()).all(), coupon_discount_total=(db.session.query(db.func.coalesce(db.func.sum(CouponUse.discount), 0)).scalar() or 0))
 
 
 @app.route('/admin/orders/status')
@@ -2972,6 +2980,14 @@ def import_backup():
 
 with app.app_context():
     db.create_all()
+    # Prevent concurrent requests from redeeming the same coupon twice per account.
+    # Existing historical data is preserved; if duplicates already exist, log and continue.
+    try:
+        db.session.execute(db.text('CREATE UNIQUE INDEX IF NOT EXISTS uq_coupon_use_per_user_idx ON coupon_use (coupon_id, user_id)'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Could not create coupon redemption uniqueness index; inspect existing coupon_use duplicates')
     try:
         from sqlalchemy import inspect
         user_columns = {column['name'] for column in inspect(db.engine).get_columns('user')}

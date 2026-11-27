@@ -297,10 +297,10 @@
             <div class="rounded-2xl border border-cyan-400/20 bg-slate-950/90 p-4 space-y-3 text-xs shadow-inner">
                 <div class="flex justify-between"><span class="text-gray-400">السعر الأصلي:</span><span id="modalOriginalTotal" class="text-gray-300 font-bold">$0.00</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">قيمة الخصم:</span><span id="modalDiscount" class="text-emerald-300 font-bold">$0.00</span></div>
-                <div class="flex flex-wrap justify-between items-center gap-2 border-t border-cyan-400/20 pt-3"><span class="text-white font-black text-sm">السعر النهائي بعد الخصم</span><span id="modalTotal" aria-live="polite" class="text-emerald-300 font-black text-3xl tracking-wide">$0.00</span></div><p class="text-[10px] leading-5 text-gray-500">سيتم خصم هذا المبلغ فقط من رصيد محفظتك عند تأكيد الطلب.</p>
+                <div class="flex flex-wrap justify-between items-center gap-2 border-t border-cyan-400/20 pt-3"><span class="text-white font-black text-sm">السعر النهائي بعد الخصم</span><span id="modalTotal" aria-live="polite" class="text-emerald-300 font-black text-3xl tracking-wide">$0.00</span></div><p id="modalSavingMessage" class="text-[11px] font-bold text-amber-300">أدخل كود خصم لمعرفة مقدار التوفير.</p><p class="text-[10px] leading-5 text-gray-500">سيتم خصم هذا المبلغ فقط من رصيد محفظتك عند تأكيد الطلب.</p>
             </div>
 
-            <button type="submit" class="yn-confirm-order w-full bg-gradient-to-r from-emerald-400 to-cyan-400 hover:brightness-105 text-slate-950 font-black py-3.5 rounded-2xl text-sm shadow-xl shadow-emerald-500/10 transition">
+            <button type="submit" class="yn-confirm-order w-full bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black py-3.5 rounded-2xl text-sm shadow-xl shadow-emerald-500/10 transition">
                 تأكيد وإرسال الطلب
             </button>
             <button type="button" id="orderExtraDetailsButton" class="w-full rounded-2xl border border-cyan-400/70 bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-black text-cyan-200 transition">تفاصيل أكثر</button>
@@ -461,6 +461,7 @@
         if (isMerchantAccount) document.getElementById('merchantDiscountAmount').textContent = '-' + moneyText(Math.max(0, publicTotal - total));
         document.getElementById('modalDiscount').textContent = moneyText(0);
         document.getElementById('modalTotal').textContent = moneyText(total);
+        document.getElementById('modalSavingMessage').textContent = isMerchantAccount ? ('وفّرت ' + moneyText(Math.max(0, publicTotal - total)) + ' مقارنة بسعر الزبون العادي.') : 'أدخل كود خصم لمعرفة مقدار التوفير.';
     }
     function showCouponStatus(message, valid) {
         const box = document.getElementById('couponPreviewStatus');
@@ -493,6 +494,7 @@
             document.getElementById('modalOriginalTotal').textContent = moneyText(data.base);
             document.getElementById('modalDiscount').textContent = '-' + moneyText(data.discount);
             document.getElementById('modalTotal').textContent = moneyText(data.total);
+            document.getElementById('modalSavingMessage').textContent = data.saving_message || ('وفّرت ' + moneyText(data.discount) + ' على هذا الطلب.');
             showCouponStatus(data.message, true);
         } catch (error) {
             couponIsValid = false;

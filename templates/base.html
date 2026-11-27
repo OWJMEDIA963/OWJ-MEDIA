@@ -11,7 +11,7 @@
     <meta property="og:title" content="YNOVA STORE | المتجر الرقمي">
     <meta property="og:description" content="خدمات رقمية وشحن ألعاب وحسابات تواصل اجتماعي ودعم فني.">
     <meta property="og:url" content="{{ request.url }}">
-    <meta name="theme-color" content="#08091b">
+    <meta name="theme-color" content="#f5f7fb">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
@@ -302,7 +302,64 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
 @media(prefers-reduced-motion:no-preference){body,body *{transition-property:background-color,border-color,color,box-shadow;transition-duration:.18s;transition-timing-function:ease}}
 </style>
 
-</head>
+
+<style id="ynova-default-light-finish">
+/* Light is the default appearance; preserve royal blue and gold accents */
+body.light-theme{background:#f5f7fb!important;color:#172033!important}
+body.light-theme #sidebarMenu{background:#fff!important}
+body.light-theme #novaLoading{background:rgba(245,247,251,.94)!important}
+body.light-theme .nova-loader{background:#fff!important;color:#172033!important;border-color:#dbe5f2!important}
+body.light-theme .nova-loader .text-white{color:#172033!important}
+body.light-theme .nova-loader .text-slate-400{color:#64748b!important}
+body.light-theme .ai-shell{background:#fff!important;border-color:#dbe5f2!important;box-shadow:0 18px 50px rgba(15,23,42,.09)!important}
+body.light-theme .ai-head{background:linear-gradient(110deg,#eaf3ff,#f5f9ff)!important;border-color:#dbeafe!important}
+body.light-theme .ai-title{color:#172033!important}
+body.light-theme .ai-head p{color:#526783!important}
+body.light-theme .ai-feed{background:linear-gradient(180deg,#f8fbff,#f1f6fc)!important}
+body.light-theme .ai-msg.bot{background:#fff!important;border-color:#dbe5f2!important;color:#334155!important}
+body.light-theme .ai-msg.user{background:linear-gradient(135deg,#8bcaff,#b9e3ff)!important;color:#09233d!important;border-color:#a9d8ff!important}
+body.light-theme .ai-form{background:#fff!important;border-color:#e2e8f0!important}
+body.light-theme .ai-form input{background:#fff!important;color:#172033!important;border-color:#cbd5e1!important}
+body.light-theme .ai-form input::placeholder{color:#94a3b8!important}
+body.light-theme .ai-quick{background:#eff6ff!important;border-color:#bfdbfe!important;color:#1d4ed8!important}
+body.light-theme .ai-note{color:#64748b!important}
+body.light-theme .yn-account-menu{background:#eaf5ff!important;border-color:#bfdbfe!important;color:#17416d!important}
+body.light-theme .yn-notify-menu{background:#fff8e6!important;border-color:#f5d77e!important;color:#805b08!important}
+body.light-theme .yn-purchases-menu{background:#f3efff!important;border-color:#d8ccff!important;color:#59439b!important}
+body.light-theme .yn-ai-menu{background:#e8f7ff!important;border-color:#a5ddf7!important;color:#145276!important}
+body.light-theme .yn-home-nav{color:#245b91!important}
+body.light-theme .yn-home-nav-icon{border-color:#f5f7fb!important}
+body.light-theme .yn-confirm-order{background:#f5c542!important;color:#172033!important}
+</style>
+\n
+<style id="ynova-ocean-blue-palette">
+/* Ocean Blue identity – light-first storefront */
+:root{--yn-ocean:#315b78;--yn-ocean-deep:#24465f;--yn-ocean-soft:#83b3cc}
+body.light-theme{
+ --yn-bg:#f3f7fa!important;
+ --yn-panel:#ffffff!important;
+ --yn-panel-2:#f5f9fc!important;
+ --yn-border:#d5e2ea!important;
+ --yn-text:#1b2d3b!important;
+ --yn-muted:#607789!important;
+ --yn-blue:#315b78!important;
+ --yn-blue-hover:#24465f!important;
+ --yn-blue-soft:#83b3cc!important;
+ background:#f3f7fa!important;
+ color:#1b2d3b!important;
+}
+body.light-theme .bg-blue-700,body.light-theme .bg-blue-800,body.light-theme .bg-blue-900,
+body.light-theme main .bg-blue-700,body.light-theme main .bg-blue-800,body.light-theme main .bg-blue-900{
+ background:#315b78!important;color:#fff!important
+}
+body.light-theme #owjBotButton,body.light-theme #owjBotSend{
+ background:linear-gradient(135deg,#315b78,#477f9e)!important;color:#fff!important
+}
+body.light-theme .yn-home-nav{color:#315b78!important}
+body.light-theme .yn-home-nav-icon{background:#b9d9e8!important;color:#18364b!important}
+body.light-theme .ai-brand{color:#315b78!important}
+</style>
+\n</head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
 <div id="novaLoading" aria-live="polite"><div class="nova-loader"><img src="{{ url_for('static',filename='images/nova-symbol.svg') }}" alt="NOVA"><div class="nova-spin"></div><div class="text-white text-sm font-black">YNOVA STORE</div><div class="text-slate-400 text-xs mt-2">جاري إتمام العملية...</div></div></div>
 
@@ -505,7 +562,7 @@ body.light-theme .backdrop-blur-md,body.light-theme .backdrop-blur-lg{backdrop-f
             try { localStorage.setItem('owj-theme', next); } catch (e) {}
             applyTheme(next);
         }
-        try { applyTheme(localStorage.getItem('owj-theme') || 'dark'); } catch (e) { applyTheme('dark'); }
+        try { applyTheme(localStorage.getItem('owj-theme') || 'light'); } catch (e) { applyTheme('light'); }
         function toggleSidebar() {
             document.getElementById('sidebarMenu').classList.toggle('open');
             document.getElementById('sidebarOverlay').classList.toggle('open');

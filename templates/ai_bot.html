@@ -37,3 +37,15 @@
 (()=>{const feed=document.getElementById('fullChat'),form=document.getElementById('fullChatForm'),input=document.getElementById('fullChatInput'),send=document.getElementById('fullChatSend');function add(t,c){const d=document.createElement('div');d.className='ai-msg '+c;d.textContent=t;feed.appendChild(d);feed.scrollTop=feed.scrollHeight;return d;}async function ask(q){if(!q.trim()||send.disabled)return;add(q,'user');send.disabled=true;send.textContent='لحظة...';const wait=add('NOVA عم يراجع معلومات المتجر وبيحضّرلك الرد…','bot');try{const r=await fetch('/api/ai_chat',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-Requested-With':'XMLHttpRequest'},credentials:'same-origin',cache:'no-store',body:JSON.stringify({message:q})});const d=await r.json().catch(()=>({reply:'تعذّر قراءة رد المساعد. أعد المحاولة.'}));wait.textContent=d.reply||'ما وصلني رد واضح، جرّب صياغة السؤال بطريقة ثانية.';}catch(e){wait.textContent='تعذّر الاتصال بالمساعد حالياً. تأكد من اتصال الموقع ثم أعد المحاولة.';}finally{send.disabled=false;send.textContent='إرسال';input.focus();feed.scrollTop=feed.scrollHeight;}}form.addEventListener('submit',e=>{e.preventDefault();e.stopPropagation();const q=input.value.trim();if(!q)return;input.value='';ask(q);});feed.addEventListener('click',e=>{const b=e.target.closest('[data-q]');if(b)ask(b.dataset.q);});})();
 </script>
 {% endblock %}
+
+<style>
+body.light-theme .ai-page{color:#172033!important}
+body.light-theme .ai-brand{background:linear-gradient(145deg,#eaf4ff,#f7fbff)!important;border-color:#bfdbfe!important;color:#2457a7!important}
+body.light-theme .ai-status{background:#fff8e6!important;border-color:#f5d77e!important;color:#805b08!important}
+</style>
+
+<style>
+body.light-theme .ai-head{background:linear-gradient(110deg,#e8f2f7,#f6fafc)!important;border-color:#d5e2ea!important}
+body.light-theme .ai-quick{background:#edf5f9!important;border-color:#c5dbe7!important;color:#315b78!important}
+body.light-theme .ai-form input:focus{border-color:#83b3cc!important;box-shadow:0 0 0 3px rgba(49,91,120,.12)!important}
+</style>

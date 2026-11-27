@@ -1296,6 +1296,10 @@ def preview_coupon(service_id):
             or (coupon.max_uses and coupon.used_count >= coupon.max_uses)
             or (coupon.expires_at and coupon.expires_at <= datetime.utcnow())):
         return jsonify({'valid': False, 'message': 'كود الخصم غير صالح أو متوقف أو انتهت صلاحيته.'})
+    # Each account may redeem a given coupon only once, regardless of product.
+    previous_use = CouponUse.query.filter_by(coupon_id=coupon.id, user_id=user.id).first()
+    if previous_use:
+        return jsonify({'valid': False, 'message': 'استخدمت هذا الكود مسبقاً في حسابك. يمكن استخدامه مرة واحدة فقط.'})
     discount = min(base_total, base_total * (coupon.discount_percent or 0) / 100 + (coupon.discount_fixed or 0))
     final_total = max(0.0, base_total - discount)
     return jsonify({'valid': True, 'has_coupon': True, 'base': round(base_total, 2),
@@ -1341,6 +1345,10 @@ def place_order(service_id):
         if (not applied_coupon or (applied_coupon.max_uses and applied_coupon.used_count >= applied_coupon.max_uses)
                 or (applied_coupon.expires_at and applied_coupon.expires_at <= datetime.utcnow())):
             flash('كود الخصم غير صالح أو انتهت صلاحيته.', 'error')
+            return redirect(url_for('category_services', category_id=service.category_id))
+        # Re-check on the server at checkout; browser preview is never trusted.
+        if CouponUse.query.filter_by(coupon_id=applied_coupon.id, user_id=user.id).first():
+            flash('لقد استخدمت هذا الكود مسبقاً في حسابك. يسمح باستخدامه مرة واحدة فقط.', 'error')
             return redirect(url_for('category_services', category_id=service.category_id))
         discount = min(total, total * (applied_coupon.discount_percent or 0) / 100 + (applied_coupon.discount_fixed or 0))
         total = max(0.0, total - discount)

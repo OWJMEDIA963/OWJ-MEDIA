@@ -247,7 +247,7 @@
 
         <div id="modalServiceDescription" class="hidden rounded-xl border border-red-500/50 bg-red-950/40 p-3 text-xs leading-6 text-red-300 font-bold whitespace-pre-line"></div>
 
-        <form id="orderForm" method="POST" class="space-y-3">
+        <form id="orderForm" method="POST" class="space-y-4">
             <div id="orderValidationMessage" role="alert" aria-live="polite" class="hidden rounded-xl border border-red-500/50 bg-red-950/50 p-3 text-xs font-black leading-6 text-red-300"></div>
             <div class="space-y-1">
                 <label id="modalInputLabel" class="block text-[11px] font-bold text-gray-300"></label>
@@ -269,13 +269,13 @@
                 <div class="text-[10px] text-emerald-200/80">يُطبّق تلقائياً على هذا المنتج ولا يحتاج إلى كود خصم.</div>
             </div>
 
-            <div class="bg-gray-950 p-3 rounded-2xl border border-gray-800 space-y-2 text-xs">
+            <div class="rounded-2xl border border-cyan-400/20 bg-slate-950/90 p-4 space-y-3 text-xs shadow-inner">
                 <div class="flex justify-between"><span class="text-gray-400">السعر الأصلي:</span><span id="modalOriginalTotal" class="text-gray-300 font-bold">$0.00</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">قيمة الخصم:</span><span id="modalDiscount" class="text-emerald-300 font-bold">$0.00</span></div>
-                <div class="flex justify-between items-center border-t border-gray-800 pt-2"><span class="text-white font-black text-sm">الإجمالي النهائي بعد الخصم:</span><span id="modalTotal" class="text-yellow-300 font-black text-2xl tracking-wide">$0.00</span></div>
+                <div class="flex flex-wrap justify-between items-center gap-2 border-t border-cyan-400/20 pt-3"><span class="text-white font-black text-sm">السعر النهائي بعد الخصم</span><span id="modalTotal" aria-live="polite" class="text-emerald-300 font-black text-3xl tracking-wide">$0.00</span></div><p class="text-[10px] leading-5 text-gray-500">سيتم خصم هذا المبلغ فقط من رصيد محفظتك عند تأكيد الطلب.</p>
             </div>
 
-            <button type="submit" class="yn-confirm-order w-full bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black py-3 rounded-2xl text-sm shadow-xl shadow-yellow-500/20 transition">
+            <button type="submit" class="yn-confirm-order w-full bg-gradient-to-r from-emerald-400 to-cyan-400 hover:brightness-105 text-slate-950 font-black py-3.5 rounded-2xl text-sm shadow-xl shadow-emerald-500/10 transition">
                 تأكيد وإرسال الطلب
             </button>
             <button type="button" id="orderExtraDetailsButton" class="w-full rounded-2xl border border-cyan-400/70 bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-black text-cyan-200 transition">تفاصيل أكثر</button>
@@ -284,7 +284,7 @@
 </div>
 
 <div id="serviceDetailsModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] hidden flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="serviceDetailsTitle">
-    <div class="bg-gray-900 border border-cyan-500/40 rounded-3xl p-5 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl">
+    <div class="bg-gradient-to-b from-slate-900 to-gray-950 border border-cyan-400/30 rounded-3xl p-5 sm:p-6 w-full max-w-md space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto">
         <div class="flex justify-between items-center border-b border-gray-800 pb-3 gap-3">
             <h3 id="serviceDetailsTitle" class="text-sm font-black text-white">تفاصيل المنتج</h3>
             <button type="button" onclick="closeServiceDetails()" class="text-gray-400 hover:text-white p-1" aria-label="إغلاق التفاصيل">✕</button>

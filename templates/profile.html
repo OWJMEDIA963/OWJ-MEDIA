@@ -5,10 +5,14 @@
 /* Account page: clear, consistent tap targets while keeping every existing action intact. */
 .profile-panel { border-radius: 18px; box-shadow: 0 8px 24px rgba(0,0,0,.16); }
 .profile-panel > summary {
-  min-height: 58px; border-radius: 14px; background: rgba(15,23,42,.72);
-  transition: background .18s ease, border-color .18s ease;
+  min-height: 62px; width:100%; border-radius: 14px; background: rgba(15,23,42,.82);
+  border:1px solid rgba(148,163,184,.14); cursor:pointer; user-select:none;
+  transition: background .18s ease, border-color .18s ease, transform .16s ease;
 }
-.profile-panel[open] > summary { background: rgba(30,41,59,.9); border-radius: 14px 14px 0 0; }
+.profile-panel[open] > summary { background: rgba(30,41,59,.95); border-color:rgba(96,165,250,.35); border-radius: 14px 14px 0 0; }
+.profile-panel > summary:hover { background:rgba(51,65,85,.72); border-color:rgba(96,165,250,.35); }
+.profile-panel > summary:active { transform:scale(.992); }
+.profile-panel > summary::-webkit-details-marker { display:none; }
 .profile-panel > summary:focus-visible, .profile-action:focus-visible {
   outline: 2px solid #22d3ee; outline-offset: 3px;
 }
@@ -44,9 +48,13 @@
       <p class="mt-1 text-2xl font-black text-cyan-400">${{ user.balance_usd|money }}</p>
     </div>
 
-    <div class="mb-5 rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-400/10 to-blue-500/5 p-4">
-      <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="text-xs font-bold text-amber-200">⭐ نقاط الولاء</p><p class="mt-1 text-2xl font-black text-amber-300">{{ user.loyalty_points or 0 }} نقطة</p><p class="mt-1 text-[11px] text-gray-300">كل 100 نقطة = 1 دولار رصيد</p></div>
-      <form method="post" action="/profile/redeem-points"><button class="rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-black text-gray-950 disabled:opacity-40" {% if (user.loyalty_points or 0) < 100 %}disabled{% endif %}>استبدال النقاط</button></form></div>
+    <details class="profile-panel group mb-5 overflow-hidden rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-400/10 to-blue-500/5">
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-black text-amber-200">
+        <span><span class="block text-xs text-amber-100/80">نقاط الولاء</span><span class="mt-1 block text-2xl font-black text-amber-300">{{ user.loyalty_points or 0 }} نقطة</span><span class="mt-1 block text-[11px] font-normal text-gray-300">كل 100 نقطة = 1 دولار رصيد</span></span>
+        <span class="rounded-lg bg-amber-400/15 px-3 py-2 text-xs">إدارة النقاط <span class="inline-block transition-transform group-open:rotate-180">⌄</span></span>
+      </summary>
+      <div class="border-t border-amber-400/15 p-4">
+      <div class="flex justify-end"><form method="post" action="/profile/redeem-points"><button class="profile-action rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-black text-gray-950 disabled:opacity-40" {% if (user.loyalty_points or 0) < 100 %}disabled{% endif %}>استبدال النقاط</button></form></div>
       <details class="mt-4 overflow-hidden rounded-xl border border-blue-300/20 bg-slate-950/40">
         <summary class="cursor-pointer list-none px-4 py-3 text-center text-xs font-black text-blue-200">🎁 كيف أجمع النقاط؟ اضغط للشرح</summary>
         <div class="space-y-3 border-t border-blue-300/15 p-4 text-xs leading-6 text-gray-200">
@@ -56,7 +64,8 @@
           <p class="rounded-lg bg-blue-500/10 p-3 text-[11px] text-blue-100">تُضاف نقاط الشراء بعد تحويل الطلب إلى «مكتمل»، ومكافأة الدعوة تُمنح مرة واحدة فقط بعد أول طلب مكتمل للصديق. لا ترسل كلمة مرور حساباتك كإثبات.</p>
         </div>
       </details>
-    </div>
+      </div>
+    </details>
 
     <section class="mb-5 rounded-2xl border border-blue-400/25 bg-blue-500/5 p-4">
       <h2 class="text-sm font-black text-white">👥 ادعُ صديقاً واكسب 40 نقطة</h2>
@@ -66,8 +75,12 @@
       <p class="mt-2 text-[10px] text-gray-400">المكافأة بعد أول شراء مكتمل للصديق، وليس بمجرد التسجيل.</p>
     </section>
 
-    <section class="mb-5 rounded-2xl border border-amber-400/25 bg-amber-400/5 p-4">
-      <h2 class="text-sm font-black text-white">📣 تابع صفحاتنا واكسب 15 نقطة</h2>
+    <details class="profile-panel group mb-5 overflow-hidden rounded-2xl border border-amber-400/25 bg-amber-400/5">
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-black text-amber-200">
+        <span class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15"> <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-5-5 18-4-8-9-5Z"/><path d="m12 16 4-5"/></svg></span> متابعة صفحاتنا وجمع النقاط</span>
+        <span class="rounded-lg bg-amber-400/15 px-3 py-2 text-xs">فتح <span class="inline-block transition-transform group-open:rotate-180">⌄</span></span>
+      </summary>
+      <div class="border-t border-amber-400/10 p-4">
       <p class="mt-1 text-xs leading-6 text-gray-300">تابع صفحات YNOVA STORE الرسمية، ثم أرسل روابط الصفحات التي تابعتها أو رابط الإثبات. ستُضاف النقاط بعد مراجعة الإدارة.</p>
       {% if social_links %}<div class="mt-3 flex flex-wrap gap-2">{% for link in social_links if link.url %}<a href="{{ link.url }}" target="_blank" rel="noopener" class="rounded-lg border border-amber-300/20 bg-slate-950/50 px-3 py-2 text-[11px] font-bold text-amber-100">{{ link.platform }} · زيارة الصفحة ↗</a>{% endfor %}</div>{% endif %}
       <form method="post" action="/profile/social-reward" class="mt-3 space-y-2">
@@ -75,9 +88,15 @@
         <button class="w-full rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-gray-950">إرسال الإثبات للمراجعة (+15 نقطة)</button>
       </form>
       {% for req in social_reward_requests %}<div class="mt-2 rounded-lg bg-slate-950/50 p-2 text-[11px] text-gray-300">طلب #{{ req.id }} · {% if req.status == 'pending' %}قيد المراجعة{% elif req.status == 'approved' %}مقبول · أضيفت 15 نقطة{% else %}مرفوض{% endif %}{% if req.admin_note %} · {{ req.admin_note }}{% endif %}</div>{% endfor %}
-    </section>
+      </div>
+    </details>
 
-    <form method="post" class="space-y-3">
+    <details class="profile-panel group mb-5 overflow-hidden rounded-2xl border border-cyan-400/25 bg-cyan-500/5">
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-black text-cyan-200">
+        <span class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/15"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span> تعديل المعلومات الشخصية</span>
+        <span class="rounded-lg bg-cyan-400/15 px-3 py-2 text-xs">فتح <span class="inline-block transition-transform group-open:rotate-180">⌄</span></span>
+      </summary>
+      <form method="post" class="space-y-3 border-t border-cyan-400/10 p-4">
       <h2 class="profile-section-title">المعلومات الشخصية</h2>
       <label class="block text-xs text-gray-400">الاسم الكامل</label>
       <input name="full_name" value="{{ user.full_name or '' }}" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
@@ -85,8 +104,9 @@
       <input name="email" type="email" value="{{ user.email or '' }}" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
       <label class="block text-xs text-gray-400">الهاتف</label>
       <input name="phone" value="{{ user.phone or '' }}" class="w-full rounded-xl border border-gray-800 bg-gray-950 p-3 text-sm text-white">
-      <button class="w-full rounded-xl bg-cyan-500 p-3 text-sm font-black text-gray-950">حفظ التعديلات</button>
-    </form>
+      <button class="profile-action w-full rounded-xl bg-cyan-500 p-3 text-sm font-black text-gray-950">حفظ التعديلات</button>
+      </form>
+    </details>
 
     <a href="/verification" class="mt-4 flex items-center justify-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 text-sm font-black text-blue-300">
       {% if user.is_verified %}✓ حسابك موثّق{% else %}توثيق الحساب{% endif %}

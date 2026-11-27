@@ -1269,15 +1269,25 @@ def preview_coupon(service_id):
     except (TypeError, ValueError):
         quantity = 0
     if service.service_type in ('manual', 'smm_fixed'):
+        public_total = float(service.price or 0)
         base_total = (service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else service.price) or 0
     else:
         minimum = service.min_quantity or 1
         maximum = service.max_quantity or 10000
         if quantity < minimum or quantity > maximum:
             return jsonify({'valid': False, 'message': f'الكمية يجب أن تكون بين {minimum} و{maximum}.'}), 400
-        rate = service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 or service.price)
-        base_total = (rate or 0) * quantity / 1000
+        public_rate = service.price_per_1000 or service.price or 0
+        merchant_rate = service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else public_rate
+        public_total = float(public_rate or 0) * quantity / 1000
+        base_total = (merchant_rate or 0) * quantity / 1000
     base_total = max(0.0, float(base_total))
+    public_total = max(0.0, float(public_total))
+    if user.is_trusted_merchant:
+        automatic_discount = max(0.0, public_total - base_total)
+        return jsonify({'valid': True, 'has_coupon': False, 'merchant': True,
+                        'base': round(public_total, 2), 'discount': round(automatic_discount, 2),
+                        'total': round(base_total, 2),
+                        'message': 'تم تطبيق سعر التاجر والخصم تلقائياً على هذا المنتج.'})
     if not code:
         return jsonify({'valid': True, 'has_coupon': False, 'base': round(base_total, 2),
                         'discount': 0, 'total': round(base_total, 2), 'message': 'أدخل كود الخصم للتحقق منه.'})
@@ -1322,7 +1332,8 @@ def place_order(service_id):
             return redirect(url_for('category_services', category_id=service.category_id))
         rate = service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 or service.price)
         total = rate * quantity / 1000
-    coupon_code = (request.form.get('coupon_code') or '').strip().upper()
+    # Merchant accounts receive their preconfigured merchant price automatically; they cannot stack public coupons.
+    coupon_code = '' if user.is_trusted_merchant else (request.form.get('coupon_code') or '').strip().upper()
     applied_coupon = None
     discount = 0.0
     if coupon_code:

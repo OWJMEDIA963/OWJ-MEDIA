@@ -206,10 +206,11 @@
             <div class="owj-service-content">
                 <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
                 <div class="owj-service-price-strip" aria-label="السعر">
-                    {% set public_price = (service.price_per_1000 or service.price if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price) %}
+                    {% set public_price = (service.price_per_1000 or service.price if service.service_type in ['smm', 'manual_quantity'] else service.price) %}
                     {% if current_user and current_user.is_trusted_merchant and (service.merchant_price or 0) > 0 %}
                     <span class="text-[9px] sm:text-xs text-gray-400 line-through">${{ public_price|money }}</span>
                     <span class="owj-price-value">${{ service.merchant_price|money }}</span>
+                    <span class="block text-[9px] font-black text-emerald-300">خصم التاجر: ${{ ([public_price - service.merchant_price, 0]|max)|money }}</span>
                     {% else %}<span class="owj-price-value">${{ public_price|money }}</span>{% endif %}
                 </div>
                 {% if not service.is_available %}
@@ -219,7 +220,7 @@
 
             <div class="mt-1 sm:mt-2">
                 {% if service.is_available %}
-                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.merchant_price if current_user and current_user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price) }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}" data-extra-details="{{ (service.extra_details or '')|e }}">
+                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.merchant_price if current_user and current_user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 if service.service_type in ['smm', 'manual_quantity'] else service.price) }}" data-public-price="{{ service.price_per_1000 if service.service_type in ['smm', 'manual_quantity'] else service.price }}" data-merchant-price="{{ service.merchant_price or 0 }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}" data-extra-details="{{ (service.extra_details or '')|e }}">
                     اطلب الآن
                 </button>
                 {% else %}
@@ -258,19 +259,23 @@
                 <input type="number" id="modalQuantity" name="quantity" value="10" min="1" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none" oninput="calcTotal()">
             </div>
 
-            <div class="space-y-1">
+            <div id="couponEntryArea" class="space-y-1" {% if current_user and current_user.is_trusted_merchant %}hidden{% endif %}>
                 <label class="block text-[11px] font-bold text-gray-300">كود خصم (اختياري)</label>
                 <input type="text" id="modalCouponCode" name="coupon_code" maxlength="40" autocomplete="off" placeholder="أدخل كود الخصم" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white uppercase">
                 <div id="couponPreviewStatus" aria-live="polite" class="hidden rounded-xl border p-2.5 text-[11px] font-bold"></div>
+            </div>
+            <div id="merchantAutoDiscount" class="space-y-1 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-bold text-emerald-300" {% if not current_user or not current_user.is_trusted_merchant %}hidden{% endif %}>
+                <div class="flex justify-between gap-2"><span>خصم التاجر التلقائي</span><span id="merchantDiscountAmount">$0.00</span></div>
+                <div class="text-[10px] text-emerald-200/80">يُطبّق تلقائياً على هذا المنتج ولا يحتاج إلى كود خصم.</div>
             </div>
 
             <div class="bg-gray-950 p-3 rounded-2xl border border-gray-800 space-y-2 text-xs">
                 <div class="flex justify-between"><span class="text-gray-400">السعر الأصلي:</span><span id="modalOriginalTotal" class="text-gray-300 font-bold">$0.00</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">قيمة الخصم:</span><span id="modalDiscount" class="text-emerald-300 font-bold">$0.00</span></div>
-                <div class="flex justify-between items-center border-t border-gray-800 pt-2"><span class="text-gray-200 font-black">السعر بعد الخصم:</span><span id="modalTotal" class="text-cyan-400 font-black text-base">$0.00</span></div>
+                <div class="flex justify-between items-center border-t border-gray-800 pt-2"><span class="text-white font-black text-sm">الإجمالي النهائي بعد الخصم:</span><span id="modalTotal" class="text-yellow-300 font-black text-2xl tracking-wide">$0.00</span></div>
             </div>
 
-            <button type="submit" class="yn-confirm-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-2.5 rounded-2xl text-xs shadow-xl transition">
+            <button type="submit" class="yn-confirm-order w-full bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black py-3 rounded-2xl text-sm shadow-xl shadow-yellow-500/20 transition">
                 تأكيد وإرسال الطلب
             </button>
             <button type="button" id="orderExtraDetailsButton" class="w-full rounded-2xl border border-cyan-400/70 bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-black text-cyan-200 transition">تفاصيل أكثر</button>
@@ -291,9 +296,14 @@
 
 <script>
     let currentPrice = 0;
+    let currentPublicPrice = 0;
+    let currentServiceId = null;
+    let isMerchantAccount = {{ 'true' if current_user and current_user.is_trusted_merchant else 'false' }};
     let currentType = '';
     let currentMinQuantity = 1;
     let currentMaxQuantity = 10000;
+    let couponIsValid = true;
+    let couponPreviewTimer = null;
 
     function showOrderValidation(message) {
         const box = document.getElementById('orderValidationMessage');
@@ -306,7 +316,9 @@
         box.classList.add('hidden');
     }
 
-    function openOrderModal(id, name, price, type, label, minQty, maxQty, description, extraDetails) {
+    function openOrderModal(id, name, price, publicPrice, merchantPrice, type, label, minQty, maxQty, description, extraDetails) {
+        currentServiceId = id;
+        currentPublicPrice = Number.parseFloat(publicPrice) || Number.parseFloat(price) || 0;
         currentPrice = Number.parseFloat(price) || 0;
         currentType = type || '';
         currentMinQuantity = Number.parseInt(minQty, 10) || 1;
@@ -325,7 +337,10 @@
         const qtyContainer = document.getElementById('quantityContainer');
         const quantityInput = document.getElementById('modalQuantity');
         document.getElementById('modalCouponCode').value = '';
+        couponIsValid = true;
         document.getElementById('couponPreviewStatus').classList.add('hidden');
+        document.getElementById('couponEntryArea').classList.toggle('hidden', isMerchantAccount);
+        document.getElementById('merchantAutoDiscount').classList.toggle('hidden', !isMerchantAccount);
         if (currentType === 'smm' || currentType === 'manual_quantity') {
             qtyContainer.classList.remove('hidden');
             quantityInput.min = String(currentMinQuantity);
@@ -347,6 +362,8 @@
                 button.dataset.serviceId,
                 button.dataset.serviceName,
                 button.dataset.servicePrice,
+                button.dataset.publicPrice,
+                button.dataset.merchantPrice,
                 button.dataset.serviceType,
                 button.dataset.inputLabel,
                 button.dataset.minQuantity,
@@ -414,7 +431,9 @@
     }
     function updateBasePriceDisplay() {
         const total = currentBaseTotal();
-        document.getElementById('modalOriginalTotal').textContent = moneyText(total);
+        const publicTotal = (currentType === 'smm' || currentType === 'manual_quantity') ? (currentPublicPrice / 1000) * (Number.parseFloat(document.getElementById('modalQuantity').value) || 0) : currentPublicPrice;
+        document.getElementById('modalOriginalTotal').textContent = moneyText(isMerchantAccount ? publicTotal : total);
+        if (isMerchantAccount) document.getElementById('merchantDiscountAmount').textContent = '-' + moneyText(Math.max(0, publicTotal - total));
         document.getElementById('modalDiscount').textContent = moneyText(0);
         document.getElementById('modalTotal').textContent = moneyText(total);
     }

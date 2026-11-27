@@ -2578,7 +2578,10 @@ def add_service():
         flash('لخدمة SMM تلقائية، اختر مزوّد API وأدخل رقم الخدمة لدى المزوّد.', 'error'); return redirect(url_for('admin'))
     merchant_price=max(0.0, request.form.get('merchant_price', type=float) or 0.0)
     service=Service(name=name, category_id=cat.id, price=price, price_per_1000=price, merchant_price=merchant_price, min_quantity=(minimum if typ in ('smm', 'manual_quantity') else 1), max_quantity=(maximum if typ in ('smm', 'manual_quantity') else 1), input_label=request.form.get('input_label','الرابط أو الآيدي').strip(), service_type=typ, api_provider_id=provider_id, api_service_id=api_service_id, image_url=product_image, description=request.form.get('description','').strip(), extra_details=request.form.get('extra_details','').strip(), is_available=(request.form.get('is_available', '1') == '1'))
-    db.session.add(service); db.session.commit(); flash('تمت إضافة الخدمة.', 'success'); return redirect(url_for('admin'))
+    db.session.add(service); db.session.commit()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.best == 'application/json':
+        return jsonify(ok=True, message='تمت إضافة المنتج بنجاح.', service_id=service.id)
+    flash('تمت إضافة الخدمة.', 'success'); return redirect(url_for('admin#add-product'))
 
 @app.route('/admin/update_service/<int:service_id>', methods=['POST'])
 @admin_required

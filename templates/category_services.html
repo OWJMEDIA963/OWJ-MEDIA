@@ -260,12 +260,14 @@
 
             <div class="space-y-1">
                 <label class="block text-[11px] font-bold text-gray-300">كود خصم (اختياري)</label>
-                <input type="text" name="coupon_code" maxlength="40" placeholder="أدخل كود الخصم" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white uppercase">
+                <input type="text" id="couponCodeInput" name="coupon_code" maxlength="40" placeholder="أدخل كود الخصم" autocomplete="off" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white uppercase">
+                <p id="couponFeedback" class="hidden text-[11px] font-bold" aria-live="polite"></p>
             </div>
 
-            <div class="bg-gray-950 p-3 rounded-2xl border border-gray-800 flex justify-between items-center text-xs">
-                <span class="text-gray-400 font-bold">التكلفة:</span>
-                <span id="modalTotal" class="text-cyan-400 font-black">$0.00</span>
+            <div class="bg-gray-950 p-3 rounded-2xl border border-gray-800 space-y-2 text-xs">
+                <div class="flex justify-between items-center"><span class="text-gray-400 font-bold">السعر قبل الخصم:</span><span id="modalSubtotal" class="text-gray-300 font-bold">$0.00</span></div>
+                <div id="couponDiscountRow" class="hidden flex justify-between items-center"><span class="text-emerald-400 font-bold">قيمة الخصم:</span><span id="modalDiscount" class="text-emerald-400 font-black">-$0.00</span></div>
+                <div class="border-t border-gray-800 pt-2 flex justify-between items-center"><span class="text-white font-black">السعر النهائي:</span><span id="modalTotal" class="text-cyan-400 font-black text-base">$0.00</span></div>
             </div>
 
             <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-2.5 rounded-2xl text-xs shadow-xl transition">
@@ -290,6 +292,9 @@
 <script>
     let currentPrice = 0;
     let currentType = '';
+    let currentServiceId = null;
+    let couponPreviewRequest = 0;
+    let couponPreviewTimer = null;
     let currentMinQuantity = 1;
     let currentMaxQuantity = 10000;
 
@@ -307,6 +312,7 @@
     function openOrderModal(id, name, price, type, label, minQty, maxQty, description, extraDetails) {
         currentPrice = Number.parseFloat(price) || 0;
         currentType = type || '';
+        currentServiceId = id;
         currentMinQuantity = Number.parseInt(minQty, 10) || 1;
         currentMaxQuantity = Number.parseInt(maxQty, 10) || 10000;
         clearOrderValidation();
@@ -319,6 +325,9 @@
         document.getElementById('serviceDetailsContent').textContent = (extraDetails || '').trim() || 'لا توجد تفاصيل إضافية لهذا المنتج حالياً.';
         document.getElementById('orderExtraDetailsButton').dataset.detailsReady = '1';
         document.getElementById('orderForm').action = '/order/' + encodeURIComponent(id);
+        document.getElementById('couponCodeInput').value = '';
+        document.getElementById('couponFeedback').classList.add('hidden');
+        document.getElementById('couponDiscountRow').classList.add('hidden');
 
         const qtyContainer = document.getElementById('quantityContainer');
         const quantityInput = document.getElementById('modalQuantity');
@@ -327,11 +336,10 @@
             quantityInput.min = String(currentMinQuantity);
             quantityInput.max = String(currentMaxQuantity);
             quantityInput.value = currentMinQuantity;
-            document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * Number(quantityInput.value)).toFixed(2).replace(/\.?0+$/,'');
         } else {
             qtyContainer.classList.add('hidden');
-            document.getElementById('modalTotal').textContent = '$' + currentPrice.toFixed(2).replace(/\.?0+$/,'');
         }
+        updateCouponPricePreview();
         document.getElementById('orderModal').classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
     }
@@ -374,7 +382,12 @@
         if (event.target === this) closeServiceDetails();
     });
 
-    document.getElementById('modalQuantity').addEventListener('input', clearOrderValidation);
+    document.getElementById('modalQuantity').addEventListener('input', function() {
+        clearOrderValidation();
+        scheduleCouponPreview();
+    });
+    document.getElementById('couponCodeInput').addEventListener('input', scheduleCouponPreview);
+    document.getElementById('couponCodeInput').addEventListener('change', updateCouponPricePreview);
     document.querySelector('#orderForm input[name="link"]').addEventListener('input', clearOrderValidation);
     document.getElementById('orderForm').addEventListener('submit', function(event) {
         clearOrderValidation();
@@ -394,11 +407,81 @@
         }
     });
 
-    function calcTotal() {
+    function moneyText(value) {
+        return '$' + (Number(value) || 0).toFixed(2);
+    }
+
+    function baseOrderTotal() {
         if (currentType === 'smm' || currentType === 'manual_quantity') {
             const qty = Number.parseFloat(document.getElementById('modalQuantity').value) || 0;
-            document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * qty).toFixed(2).replace(/\.?0+$/,'');
+            return (currentPrice / 1000) * qty;
         }
+        return currentPrice;
+    }
+
+    async function updateCouponPricePreview() {
+        const code = document.getElementById('couponCodeInput').value.trim().toUpperCase();
+        const subtotal = baseOrderTotal();
+        const feedback = document.getElementById('couponFeedback');
+        const discountRow = document.getElementById('couponDiscountRow');
+        const subtotalEl = document.getElementById('modalSubtotal');
+        const discountEl = document.getElementById('modalDiscount');
+        const totalEl = document.getElementById('modalTotal');
+        subtotalEl.textContent = moneyText(subtotal);
+
+        if (!code || !currentServiceId) {
+            couponPreviewRequest++;
+            discountRow.classList.add('hidden');
+            totalEl.textContent = moneyText(subtotal);
+            feedback.classList.add('hidden');
+            return;
+        }
+
+        const requestId = ++couponPreviewRequest;
+        feedback.textContent = 'جارٍ التحقق من الكوبون...';
+        feedback.className = 'text-[11px] font-bold text-sky-400';
+        try {
+            const body = new URLSearchParams();
+            body.set('coupon_code', code);
+            if (currentType === 'smm' || currentType === 'manual_quantity') {
+                body.set('quantity', document.getElementById('modalQuantity').value || '0');
+            }
+            const response = await fetch('/coupon/preview/' + encodeURIComponent(currentServiceId), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest'},
+                body: body.toString()
+            });
+            const result = await response.json();
+            if (requestId !== couponPreviewRequest) return;
+            if (!response.ok || !result.valid) {
+                discountRow.classList.add('hidden');
+                totalEl.textContent = moneyText(subtotal);
+                feedback.textContent = result.message || 'تعذر تطبيق الكوبون.';
+                feedback.className = 'text-[11px] font-bold text-red-400';
+                return;
+            }
+            subtotalEl.textContent = moneyText(result.subtotal);
+            discountEl.textContent = '-' + moneyText(result.discount);
+            totalEl.textContent = moneyText(result.total);
+            discountRow.classList.remove('hidden');
+            feedback.textContent = '✓ ' + (result.message || 'تم تطبيق الخصم');
+            feedback.className = 'text-[11px] font-bold text-emerald-400';
+        } catch (error) {
+            if (requestId !== couponPreviewRequest) return;
+            discountRow.classList.add('hidden');
+            totalEl.textContent = moneyText(subtotal);
+            feedback.textContent = 'تعذر التحقق الآن. سيتم التحقق عند إرسال الطلب.';
+            feedback.className = 'text-[11px] font-bold text-amber-400';
+        }
+    }
+
+    function scheduleCouponPreview() {
+        clearTimeout(couponPreviewTimer);
+        couponPreviewTimer = setTimeout(updateCouponPricePreview, 300);
+    }
+
+    function calcTotal() {
+        scheduleCouponPreview();
     }
 
     document.getElementById('orderModal').addEventListener('click', function(event) {

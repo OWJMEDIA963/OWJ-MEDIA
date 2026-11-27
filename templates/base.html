@@ -434,6 +434,51 @@ body.light-theme main .text-blue-200,body.light-theme main .text-blue-300,body.l
  #owjBotSend{background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff}
  #owjBotMessages .quick-question{background:#30285b;border:1px solid #6d5ca8;color:#ddd6fe}
  @media(max-width:480px){ #owjBotWindow{bottom:6.1rem;left:.75rem;width:calc(100vw - 1.5rem);max-width:none}#owjBotMessages{height: min(56vh,390px)}}
+
+/* YNOVA clean bright theme: high contrast, calm surfaces, clear controls */
+:root{
+ --yn-bg:#f2f5fa;--yn-panel:#ffffff;--yn-panel-2:#f7f9fc;
+ --yn-border:#d8e0eb;--yn-text:#17243a;--yn-muted:#52627a;
+ --yn-accent:#1769d2;--yn-accent-hover:#1058b8;--yn-accent-soft:#e8f1ff;
+ --yn-gold:#b7791f;
+}
+html{color-scheme:light;scroll-behavior:smooth}
+body{background:#f2f5fa!important;color:#17243a!important}
+header,nav{background:rgba(255,255,255,.97)!important;border-color:#d8e0eb!important;color:#17243a!important}
+header a,header button,nav a,nav span{color:#26364f!important}
+#sidebarMenu{background:#fff!important;border-color:#d8e0eb!important}
+main{color:#17243a!important}
+main h1,main h2,main h3,main h4{color:#17243a!important}
+main .text-white,main .text-gray-100,main .text-gray-200{color:#25344c!important}
+main .text-gray-300,main .text-gray-400,main .text-gray-500{color:#5c6b80!important}
+main [class*="bg-gray-950"],main [class*="bg-gray-900"],main [class*="bg-slate-950"],main [class*="bg-slate-900"]{background:#fff!important}
+main [class*="border-gray-800"],main [class*="border-gray-700"],main [class*="border-slate-800"],main [class*="border-slate-700"]{border-color:#d8e0eb!important}
+main [class*="bg-cyan-"],main [class*="bg-sky-"],main [class*="bg-indigo-"],main [class*="bg-violet-"],main [class*="bg-purple-"],main [class*="bg-blue-600"]{background:#1769d2!important;color:#fff!important}
+main [class*="text-cyan-"],main [class*="text-sky-"],main [class*="text-indigo-"],main [class*="text-violet-"],main [class*="text-purple-"]{color:#1769d2!important}
+main input,main textarea,main select{background:#fff!important;color:#17243a!important;border-color:#cbd5e1!important}
+main input::placeholder,main textarea::placeholder{color:#8290a5!important}
+main button,main a{transition:background-color .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease}
+main button:active,main a:active{transform:translateY(1px)}
+main button:focus-visible,main a:focus-visible,main summary:focus-visible{outline:3px solid rgba(23,105,210,.28);outline-offset:2px}
+#sidebarOverlay{background:rgba(15,23,42,.38)!important}
+.yn-account-accordion{margin-top:12px;border:1px solid #d8e0eb;border-radius:17px;background:#fff;overflow:hidden;box-shadow:0 3px 12px rgba(25,45,75,.045)}
+.yn-account-accordion>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:66px;padding:13px 15px;cursor:pointer;list-style:none;color:#17243a;font-weight:800;background:#fff;transition:background .18s ease}
+.yn-account-accordion>summary::-webkit-details-marker{display:none}
+.yn-account-accordion>summary:hover{background:#f5f8fd}
+.yn-account-accordion>summary>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:3px;text-align:right}
+.yn-account-accordion>summary b{font-size:13px;color:#17243a}
+.yn-account-accordion>summary small{font-size:10px;font-weight:600;color:#65758c}
+.yn-account-balance{font-size:14px;font-weight:900;color:#1769d2;direction:ltr;white-space:nowrap}.yn-account-icon{width:39px;height:39px;flex:0 0 39px;display:grid;place-items:center;border-radius:12px;background:#eaf2ff;color:#1769d2;font-size:18px}
+.yn-accordion-chevron{font-size:20px;color:#1769d2;transition:transform .22s ease}
+.yn-account-accordion[open]>.yn-account-accordion>summary .yn-accordion-chevron,
+.yn-account-accordion[open]>summary .yn-accordion-chevron{transform:rotate(180deg)}
+.yn-accordion-body{padding:13px;border-top:1px solid #e5ebf3;animation:ynAccordionIn .22s ease both}
+.yn-accordion-body>div:first-child,.yn-accordion-body>section:first-child,.yn-accordion-body>form:first-child{margin-top:0}
+@keyframes ynAccordionIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+body.light-theme{background:#f2f5fa!important;color:#17243a!important}
+body.light-theme header,body.light-theme nav{background:rgba(255,255,255,.97)!important;border-color:#d8e0eb!important}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
 </style>
 <button id="owjBotButton" type="button" aria-label="فتح مساعد YNOVA STORE" aria-controls="owjBotWindow" aria-expanded="false" class="fixed bottom-24 left-4 z-50 w-14 h-14 rounded-full flex items-center justify-center active:scale-95 transition">
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-7 h-7"><rect x="3" y="7" width="18" height="13" rx="4"/><path d="M12 3v4M8 13h.01M16 13h.01M9 17h6"/></svg>
@@ -473,10 +518,10 @@ body.light-theme main .text-blue-200,body.light-theme main .text-blue-300,body.l
         }
         function toggleTheme() {
             const next = document.body.classList.contains('light-theme') ? 'dark' : 'light';
-            try { localStorage.setItem('owj-theme', next); } catch (e) {}
+            try { localStorage.setItem('owj-theme-v2', next); } catch (e) {}
             applyTheme(next);
         }
-        try { applyTheme(localStorage.getItem('owj-theme') || 'dark'); } catch (e) { applyTheme('dark'); }
+        try { applyTheme(localStorage.getItem('owj-theme-v2') || 'light'); } catch (e) { applyTheme('dark'); }
         function toggleSidebar() {
             document.getElementById('sidebarMenu').classList.toggle('open');
             document.getElementById('sidebarOverlay').classList.toggle('open');

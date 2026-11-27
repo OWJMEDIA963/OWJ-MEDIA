@@ -1269,6 +1269,44 @@ def my_orders():
         refresh_api_order_status(order)
     return render_template('my_orders.html', orders=orders)
 
+
+@app.route('/coupon/preview/<int:service_id>', methods=['POST'])
+@login_required
+def preview_coupon(service_id):
+    """Validate a coupon and preview the exact discounted price without consuming it."""
+    service = Service.query.get_or_404(service_id)
+    user = current_user()
+    code = (request.form.get('coupon_code') or '').strip().upper()
+    if not code:
+        return jsonify({'valid': True, 'has_coupon': False, 'subtotal': 0, 'discount': 0, 'total': 0, 'message': ''})
+    coupon = Coupon.query.filter_by(code=code, is_active=True).first()
+    if (not coupon or (coupon.max_uses and coupon.used_count >= coupon.max_uses)
+            or (coupon.expires_at and coupon.expires_at <= datetime.utcnow())):
+        return jsonify({'valid': False, 'message': 'كود الخصم غير صالح أو منتهي الصلاحية.'}), 400
+
+    if service.service_type in ('manual', 'smm_fixed'):
+        subtotal = (service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else service.price) or 0
+    else:
+        try:
+            quantity = int(request.form.get('quantity', service.min_quantity or 1))
+        except (TypeError, ValueError):
+            return jsonify({'valid': False, 'message': 'أدخل كمية صحيحة أولاً.'}), 400
+        minimum = service.min_quantity or 1
+        maximum = service.max_quantity or 10000
+        if quantity < minimum or quantity > maximum:
+            return jsonify({'valid': False, 'message': f'الكمية يجب أن تكون بين {minimum} و{maximum}.'}), 400
+        rate = service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 or service.price)
+        subtotal = (rate or 0) * quantity / 1000
+
+    discount = min(float(subtotal), float(subtotal) * (coupon.discount_percent or 0) / 100 + (coupon.discount_fixed or 0))
+    total = max(0.0, float(subtotal) - discount)
+    return jsonify({
+        'valid': True, 'has_coupon': True, 'code': coupon.code,
+        'subtotal': round(float(subtotal), 4), 'discount': round(discount, 4),
+        'total': round(total, 4),
+        'message': 'تم تطبيق الخصم بنجاح'
+    })
+
 @app.route('/order/<int:service_id>', methods=['POST'])
 @login_required
 def place_order(service_id):

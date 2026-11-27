@@ -45,6 +45,32 @@
 </style>
 
 {% endblock %}
+
+<style id="nova-order-modal-extra-compact">
+@media (max-width: 639px) {
+  #orderModal.yn-order-overlay { padding: 6px !important; align-items: center !important; justify-content: center !important; }
+  #orderModal .yn-order-sheet { width: min(270px, 88vw) !important; max-width: 88vw !important; max-height: 52dvh !important; padding: 7px !important; gap: 3px !important; border-radius: 13px !important; overflow-y: auto !important; }
+  #orderModal .yn-order-sheet > .border-b { padding-bottom: 3px !important; min-height: 0 !important; }
+  #orderModal #modalServiceName { font-size: 10px !important; line-height: 1.2 !important; }
+  #orderModal #modalServiceDescription { padding: 5px !important; margin: 0 !important; font-size: 9px !important; line-height: 1.25 !important; border-radius: 8px !important; }
+  #orderModal #orderForm { gap: 4px !important; }
+  #orderModal #orderForm > div { margin-top: 0 !important; }
+  #orderModal #orderForm label { font-size: 9px !important; line-height: 1.2 !important; margin-bottom: 1px !important; }
+  #orderModal #orderForm input { height: 27px !important; min-height: 27px !important; padding: 3px 7px !important; border-radius: 7px !important; font-size: 10px !important; }
+  #orderModal #couponPreviewStatus, #orderModal #orderValidationMessage { padding: 4px !important; font-size: 9px !important; line-height: 1.25 !important; }
+  #orderModal #merchantAutoDiscount { padding: 6px !important; font-size: 9px !important; }
+  #orderModal #orderForm .rounded-2xl { border-radius: 9px !important; }
+  #orderModal #orderForm .p-4 { padding: 6px !important; }
+  #orderModal #orderForm .space-y-3 { row-gap: 3px !important; }
+  #orderModal #orderForm .pt-3 { padding-top: 4px !important; }
+  #orderModal #orderForm .text-3xl { font-size: 1.05rem !important; line-height: 1.05 !important; }
+  #orderModal #modalTotal { font-size: 18px !important; line-height: 1.05 !important; }
+  #orderModal #modalSavingMessage { font-size: 9px !important; line-height: 1.2 !important; margin-top: 2px !important; }
+  #orderModal #orderForm p.text-\[10px\] { font-size: 8px !important; line-height: 1.25 !important; }
+  #orderModal #orderForm button[type="submit"] { min-height: 32px !important; padding: 6px !important; border-radius: 9px !important; font-size: 10px !important; }
+  #orderModal #orderExtraDetailsButton { min-height: 26px !important; padding: 4px !important; border-radius: 8px !important; font-size: 10px !important; }
+}
+</style>
 {% block content %}
 <style>
 /* Store-style responsive cards: balanced image, readable details, no narrow single-column cards */

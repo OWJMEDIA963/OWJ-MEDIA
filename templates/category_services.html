@@ -1,5 +1,31 @@
 {% extends "base.html" %}
-{% block title %}{{ category.name }}{% endblock %}
+{% block title %}{{ category.name }}
+<style id="yn-category-mobile-refresh">
+@media(max-width:639px){
+ .owj-products-grid,.owj-subcategory-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important}
+ .owj-service-card,.owj-subcategory-card{border-radius:15px!important;border:1px solid rgba(105,190,220,.24)!important;background:linear-gradient(160deg,#172b43 0%,#101b2c 100%)!important;box-shadow:0 7px 18px rgba(0,0,0,.2)!important}
+ .owj-service-media{aspect-ratio:1/1!important;background:#0c1728!important}
+ .owj-service-background{object-fit:contain!important;padding:7px!important}
+ .owj-service-content{padding:8px 5px 5px!important;gap:5px!important;min-height:0!important}
+ .owj-service-content h3{font-size:clamp(10px,2.9vw,12px)!important;line-height:1.4!important;min-height:2.8em!important}
+ .owj-service-price-strip{display:flex!important;flex-wrap:wrap!important;align-items:center!important;justify-content:center!important;gap:3px 5px!important;min-height:31px!important;padding:4px 3px!important;border-radius:9px!important;font-size:clamp(10px,2.8vw,12px)!important}
+ .owj-price-value{font-size:clamp(12px,3.2vw,14px)!important;color:#7ee7df!important;font-weight:900!important}
+ .owj-service-card>div:last-child{padding:0 5px 6px!important}
+ .owj-service-card button{min-height:36px!important;padding:7px 2px!important;border-radius:10px!important;font-size:clamp(9px,2.5vw,11px)!important;line-height:1.25!important}
+ .owj-subcategory-card img{aspect-ratio:1/1!important;object-fit:contain!important;padding:7px!important;background:#0c1728!important}
+ .owj-subcategory-card>div{padding:7px 4px!important;font-size:clamp(10px,2.8vw,12px)!important}
+ .yn-order-overlay{align-items:flex-end!important;padding:0!important}
+ .yn-order-sheet{width:100%!important;max-width:none!important;max-height: min(92dvh,850px)!important;overflow-y:auto!important;overscroll-behavior:contain!important;border-radius:26px 26px 0 0!important;padding:20px 16px calc(18px + env(safe-area-inset-bottom))!important;border-bottom:0!important;box-shadow:0 -16px 48px rgba(0,0,0,.42)!important}
+ .yn-order-sheet:before{content:"";display:block;width:42px;height:4px;border-radius:99px;background:#60758e;opacity:.65;margin:-8px auto 12px}
+ #modalTotal{font-size:clamp(26px,8vw,34px)!important}
+ #orderForm input{min-height:48px!important;border-radius:14px!important}
+ #orderForm button{min-height:48px!important}
+ #serviceDetailsModal>div{max-height:88dvh!important;overflow-y:auto!important;border-radius:24px!important}
+}
+@media(min-width:640px){.yn-order-sheet{max-height:90vh!important;overflow-y:auto!important}}
+</style>
+
+{% endblock %}
 {% block content %}
 <style>
 /* Store-style responsive cards: balanced image, readable details, no narrow single-column cards */
@@ -210,7 +236,6 @@
                     {% if current_user and current_user.is_trusted_merchant and (service.merchant_price or 0) > 0 %}
                     <span class="text-[9px] sm:text-xs text-gray-400 line-through">${{ public_price|money }}</span>
                     <span class="owj-price-value">${{ service.merchant_price|money }}</span>
-                    <span class="block text-[9px] font-black text-emerald-300">خصم التاجر: ${{ ([public_price - service.merchant_price, 0]|max)|money }}</span>
                     {% else %}<span class="owj-price-value">${{ public_price|money }}</span>{% endif %}
                 </div>
                 {% if not service.is_available %}
@@ -236,8 +261,8 @@
 </div>
 
 <!-- نافذة الطلب المنبثقة مع تغبيش الخلفية (Modal) والتوجيه التلقائي لطلباتي -->
-<div id="orderModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center px-4">
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
+<div id="orderModal" role="dialog" aria-modal="true" aria-labelledby="modalServiceName" class="yn-order-overlay fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center px-4">
+    <div class="yn-order-sheet bg-gray-900 border border-gray-800 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
         <div class="flex justify-between items-center border-b border-gray-800 pb-3">
             <h3 id="modalServiceName" class="text-xs font-black text-white"></h3>
             <button onclick="closeOrderModal()" class="text-gray-400 hover:text-white p-1">

@@ -391,19 +391,7 @@
         button.addEventListener('click', function(event) {
             event.preventDefault();
             event.stopPropagation();
-            openOrderModal(
-                button.dataset.serviceId,
-                button.dataset.serviceName,
-                button.dataset.servicePrice,
-                button.dataset.publicPrice,
-                button.dataset.merchantPrice,
-                button.dataset.serviceType,
-                button.dataset.inputLabel,
-                button.dataset.minQuantity,
-                button.dataset.maxQuantity,
-                button.dataset.serviceDescription,
-                button.dataset.extraDetails
-            );
+            window.location.href = '/product/' + encodeURIComponent(button.dataset.serviceId);
         });
     });
 

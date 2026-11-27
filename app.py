@@ -725,6 +725,11 @@ def category_services(category_id):
     subcategories = Category.query.filter_by(parent_id=category_id).order_by(Category.sort_order.asc(), Category.id.asc()).all()
     return render_template('category_services.html', category=category, services=services, subcategories=subcategories)
 
+@app.route('/product/<int:service_id>')
+def product_page(service_id):
+    service = Service.query.get_or_404(service_id)
+    return render_template('product_page.html', service=service)
+
 @app.route('/login', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
@@ -1314,13 +1319,13 @@ def place_order(service_id):
     service = Service.query.get_or_404(service_id)
     user = current_user()
     if not service.is_available:
-        flash('هذه الخدمة غير متوفرة حالياً.', 'error'); return redirect(url_for('category_services', category_id=service.category_id))
+        flash('هذه الخدمة غير متوفرة حالياً.', 'error'); return redirect(url_for('product_page', service_id=service.id))
     link = request.form.get('link','').strip()
     if service.service_type in ('manual', 'smm_fixed'):
         # manual أو API بسعر ثابت لكل طلب: لا توجد كمية يحددها العميل.
         quantity = 1
         if not link:
-            flash('أدخل الآيدي أو البيانات المطلوبة.', 'error'); return redirect(url_for('category_services', category_id=service.category_id))
+            flash('أدخل الآيدي أو البيانات المطلوبة.', 'error'); return redirect(url_for('product_page', service_id=service.id))
         total = (service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else service.price)
     else:
         try: quantity = int(request.form.get('quantity', service.min_quantity or 1))
@@ -1329,13 +1334,13 @@ def place_order(service_id):
         maximum = service.max_quantity or 10000
         if not link:
             flash('أدخل الرابط أو البيانات المطلوبة.', 'error')
-            return redirect(url_for('category_services', category_id=service.category_id))
+            return redirect(url_for('product_page', service_id=service.id))
         if quantity < minimum:
             flash(f'الكمية أقل من المطلوب. لازم تكون الكمية {minimum} على الأقل.', 'error')
-            return redirect(url_for('category_services', category_id=service.category_id))
+            return redirect(url_for('product_page', service_id=service.id))
         if quantity > maximum:
             flash(f'الكمية أكبر من الحد المسموح. الحد الأقصى هو {maximum}.', 'error')
-            return redirect(url_for('category_services', category_id=service.category_id))
+            return redirect(url_for('product_page', service_id=service.id))
         rate = service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 or service.price)
         total = rate * quantity / 1000
     # Merchant accounts receive their preconfigured merchant price automatically; they cannot stack public coupons.
@@ -1347,11 +1352,11 @@ def place_order(service_id):
         if (not applied_coupon or (applied_coupon.max_uses and applied_coupon.used_count >= applied_coupon.max_uses)
                 or (applied_coupon.expires_at and applied_coupon.expires_at <= datetime.utcnow())):
             flash('كود الخصم غير صالح أو انتهت صلاحيته.', 'error')
-            return redirect(url_for('category_services', category_id=service.category_id))
+            return redirect(url_for('product_page', service_id=service.id))
         # Re-check on the server at checkout; browser preview is never trusted.
         if CouponUse.query.filter_by(coupon_id=applied_coupon.id, user_id=user.id).first():
             flash('لقد استخدمت هذا الكود مسبقاً في حسابك. يسمح باستخدامه مرة واحدة فقط.', 'error')
-            return redirect(url_for('category_services', category_id=service.category_id))
+            return redirect(url_for('product_page', service_id=service.id))
         discount = min(total, total * (applied_coupon.discount_percent or 0) / 100 + (applied_coupon.discount_fixed or 0))
         total = max(0.0, total - discount)
     if user.balance_usd < total:
@@ -1363,7 +1368,7 @@ def place_order(service_id):
         provider = SMMProvider.query.filter_by(id=service.api_provider_id, is_active=True).first() if service.api_provider_id else None
         if not provider or not service.api_service_id:
             flash('هذه الخدمة التلقائية غير مربوطة بمزوّد API بشكل صحيح. تواصل مع الإدارة.', 'error')
-            return redirect(url_for('category_services', category_id=service.category_id))
+            return redirect(url_for('product_page', service_id=service.id))
         try:
             # SMM providers commonly expect application/x-www-form-urlencoded.
             # requests encodes the data dict accordingly; do not send JSON and form data together.
@@ -1395,7 +1400,7 @@ def place_order(service_id):
         except Exception as exc:
             app.logger.warning('SMM provider order failed: %s', exc)
             flash('الخدمة غير متاحة حاليا، حاول بعد 5 دقائق.', 'error')
-            return redirect(url_for('category_services', category_id=service.category_id))
+            return redirect(url_for('product_page', service_id=service.id))
     user.balance_usd -= total
     order = Order(user_id=user.id, service_id=service.id, service_name=service.name, link=link, quantity=quantity, total_price=total, status=('قيد التنفيذ' if service.service_type in ('smm', 'smm_fixed') else 'قيد المراجعة'), provider_order_id=provider_order_id)
     db.session.add(order); db.session.flush()

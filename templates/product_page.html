@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ service.name }} | NOVA STORE{% endblock %}
+{% block content %}
+<style>
+.product-page{max-width:760px;margin:0 auto;padding:12px 12px 30px;color:#e5edf7}
+.product-back{display:inline-flex;align-items:center;gap:7px;color:#9eb7ce;font-size:12px;font-weight:800;margin:2px 0 12px}
+.product-panel{background:linear-gradient(160deg,#14243a,#0d1728);border:1px solid rgba(89,174,210,.22);border-radius:20px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.2)}
+.product-hero{display:grid;grid-template-columns:112px minmax(0,1fr);gap:14px;align-items:center;padding:14px}
+.product-image{width:112px;aspect-ratio:1/1;object-fit:contain;background:#f5f7fa;border-radius:14px;padding:6px;box-sizing:border-box}
+.product-image-placeholder{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#dceef2,#f7fafc);color:#0e7490;font-size:32px;font-weight:900}
+.product-name{font-size:clamp(17px,4vw,23px);font-weight:900;line-height:1.45;margin:0 0 7px;overflow-wrap:anywhere}
+.product-price{font-size:19px;color:#5ee6bf;font-weight:900}
+.product-description{padding:0 14px 12px;font-size:12px;line-height:1.8;color:#d0dce9;white-space:pre-line;overflow-wrap:anywhere}
+.product-meta{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid rgba(148,163,184,.13);font-size:11px;color:#b7c7d8}
+.product-form{padding:14px;display:flex;flex-direction:column;gap:11px}
+.product-label{display:block;font-size:11px;font-weight:800;color:#c5d3e2;margin-bottom:5px}
+.product-input{width:100%;min-height:39px;box-sizing:border-box;background:#091322;border:1px solid #263d56;border-radius:11px;padding:9px 11px;color:#fff;font-size:12px;outline:none}
+.product-input:focus{border-color:#38bdf8;box-shadow:0 0 0 2px rgba(56,189,248,.12)}
+.product-price-box{border:1px solid rgba(56,189,248,.2);background:rgba(2,8,20,.55);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.product-price-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px}
+.product-total{border-top:1px solid rgba(56,189,248,.2);padding-top:9px;margin-top:2px;font-size:13px;font-weight:900}
+.product-total strong{font-size:22px;color:#5ee6bf}
+.product-submit{width:100%;min-height:43px;border:0;border-radius:12px;background:#f5bd4f;color:#172033;font-size:13px;font-weight:900;box-shadow:0 6px 16px rgba(245,189,79,.12);cursor:pointer}
+.product-submit:disabled{opacity:.6;cursor:wait}
+.product-extra{margin:0 14px 14px;border:1px solid rgba(56,189,248,.17);border-radius:12px;padding:10px 12px;font-size:11px;color:#c4d6e8;line-height:1.8}
+.product-extra summary{font-weight:800;cursor:pointer;color:#8bdcf2}
+@media(max-width:420px){.product-page{padding:8px 9px 22px}.product-hero{grid-template-columns:86px minmax(0,1fr);gap:10px;padding:11px}.product-image{width:86px;border-radius:11px}.product-name{font-size:16px}.product-price{font-size:17px}.product-description{padding:0 11px 10px;font-size:11px}.product-meta{padding:9px 11px}.product-form{padding:11px;gap:9px}.product-input{min-height:36px}.product-price-box{padding:10px}.product-total strong{font-size:20px}}
+</style>
+<div class="product-page" dir="rtl">
+  <a class="product-back" href="{{ url_for('category_services', category_id=service.category_id) }}">← العودة إلى المنتجات</a>
+  <main class="product-panel">
+    <section class="product-hero">
+      {% if service.image_url and service.image_url.strip() %}
+        <img class="product-image" src="{{ service.image_url }}" alt="{{ service.name }}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+        <div class="product-image product-image-placeholder" style="display:none">{{ service.name[:2] }}</div>
+      {% else %}
+        <div class="product-image product-image-placeholder">{{ service.name[:2] }}</div>
+      {% endif %}
+      <div>
+        <h1 class="product-name">{{ service.name }}</h1>
+        {% set shown_price = (service.merchant_price if current_user and current_user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 or service.price if service.service_type in ['smm', 'manual_quantity'] else service.price)) %}
+        <div class="product-price">${{ shown_price|money }}{% if service.service_type in ['smm', 'manual_quantity'] %} <span style="font-size:10px;color:#9fb2c7">/ لكل 1000</span>{% endif %}</div>
+        <div style="margin-top:7px;font-size:10px;font-weight:800;color:{% if service.is_available %}#5ee6bf{% else %}#fda4af{% endif %}">{% if service.is_available %}● متوفر للطلب{% else %}● غير متوفر حالياً{% endif %}</div>
+      </div>
+    </section>
+    {% if service.description %}<div class="product-description">{{ service.description }}</div>{% endif %}
+    <div class="product-meta"><span>◷</span><span><b style="color:#e5edf7">وقت البدء:</b> يختلف حسب الخدمة ومزوّدها</span></div>
+    {% if service.is_available %}
+    <form class="product-form" id="productOrderForm" method="POST" action="{{ url_for('place_order', service_id=service.id) }}">
+      <div id="productValidation" role="alert" style="display:none;background:rgba(127,29,29,.3);border:1px solid rgba(248,113,113,.4);color:#fca5a5;padding:9px;border-radius:10px;font-size:11px;font-weight:800"></div>
+      <div>
+        <label class="product-label" for="productLink">{{ service.input_label or 'الرابط أو الآيدي' }}</label>
+        <input class="product-input" id="productLink" type="text" name="link" placeholder="أدخل البيانات المطلوبة هنا..." required autocomplete="off">
+      </div>
+      {% if service.service_type in ['smm', 'manual_quantity'] %}
+      <div>
+        <label class="product-label" for="productQuantity">الكمية (من {{ service.min_quantity or 1 }} إلى {{ service.max_quantity or 10000 }})</label>
+        <input class="product-input" id="productQuantity" type="number" name="quantity" value="{{ service.min_quantity or 1 }}" min="{{ service.min_quantity or 1 }}" max="{{ service.max_quantity or 10000 }}" step="1" required>
+      </div>
+      {% endif %}
+      {% if not (current_user and current_user.is_trusted_merchant) %}
+      <div>
+        <label class="product-label" for="productCoupon">كود الخصم (اختياري)</label>
+        <input class="product-input" id="productCoupon" type="text" name="coupon_code" maxlength="40" autocomplete="off" placeholder="أدخل كود الخصم">
+        <div id="productCouponStatus" style="display:none;margin-top:6px;font-size:10px;font-weight:800"></div>
+      </div>
+      {% endif %}
+      <div class="product-price-box" aria-live="polite">
+        <div class="product-price-row"><span style="color:#9fb2c7">السعر الأصلي</span><b id="productOriginal">${{ '%.2f'|format((shown_price or 0) * ((service.min_quantity or 1) / 1000) if service.service_type in ['smm', 'manual_quantity'] else (shown_price or 0)) }}</b></div>
+        <div class="product-price-row"><span style="color:#9fb2c7">قيمة الخصم</span><b id="productDiscount" style="color:#5ee6bf">$0.00</b></div>
+        <div class="product-price-row product-total"><span>السعر النهائي</span><strong id="productTotal">${{ '%.2f'|format((shown_price or 0) * ((service.min_quantity or 1) / 1000) if service.service_type in ['smm', 'manual_quantity'] else (shown_price or 0)) }}</strong></div>
+      </div>
+      <button class="product-submit" id="productSubmit" type="submit">تأكيد وإرسال الطلب</button>
+    </form>
+    {% else %}<div style="padding:14px;color:#fda4af;font-size:12px;font-weight:900">هذا المنتج غير متوفر حالياً.</div>{% endif %}
+    {% if service.extra_details %}<details class="product-extra"><summary>تفاصيل وشروط إضافية</summary><div style="margin-top:7px;white-space:pre-line">{{ service.extra_details }}</div></details>{% endif %}
+  </main>
+</div>
+<script>
+(function(){
+ const form=document.getElementById('productOrderForm'); if(!form)return;
+ const quantity=document.getElementById('productQuantity'), coupon=document.getElementById('productCoupon');
+ const original=document.getElementById('productOriginal'), discount=document.getElementById('productDiscount'), total=document.getElementById('productTotal');
+ const status=document.getElementById('productCouponStatus'), submit=document.getElementById('productSubmit');
+ const type={{ service.service_type|tojson }};
+ const serviceId={{ service.id }};
+ const minQty={{ service.min_quantity or 1 }}; const maxQty={{ service.max_quantity or 10000 }};
+ const price=Number({{ (shown_price or 0)|tojson }});
+ const publicPrice=Number({{ ((service.price_per_1000 or service.price) if service.service_type in ['smm','manual_quantity'] else service.price)|tojson }});
+ const isMerchant={{ 'true' if current_user and current_user.is_trusted_merchant else 'false' }};
+ let couponValid=true, timer=null, requestNo=0;
+ function money(n){return '$'+Number(n||0).toFixed(2)}
+ function base(){return (type==='smm'||type==='manual_quantity')?price*(Number(quantity&&quantity.value||minQty)/1000):price}
+ function publicBase(){return (type==='smm'||type==='manual_quantity')?publicPrice*(Number(quantity&&quantity.value||minQty)/1000):publicPrice}
+ function setBase(){let b=base(); original.textContent=money(isMerchant?publicBase():b);discount.textContent=money(isMerchant?Math.max(0,publicBase()-b):0);total.textContent=money(b);}
+ async function preview(){if(!coupon||!coupon.value.trim()){couponValid=true;if(status)status.style.display='none';setBase();return}
+   const thisRequest=++requestNo; couponValid=false; status.style.display='block';status.style.color='#fcd34d';status.textContent='جارٍ التحقق من كود الخصم…';
+   try{const body=new URLSearchParams({coupon_code:coupon.value.trim().toUpperCase(),quantity:quantity?quantity.value:'1'});const res=await fetch('/coupon/preview/'+serviceId,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});const data=await res.json();if(thisRequest!==requestNo)return;
+   couponValid=!!data.valid;if(data.valid){original.textContent=money(data.base);discount.textContent='-'+money(data.discount);total.textContent=money(data.total);status.style.color='#5ee6bf';status.textContent=data.message||'تم التحقق من كود الخصم'}else{setBase();status.style.color='#fda4af';status.textContent=data.message||'كود الخصم غير صالح'}
+   }catch(e){if(thisRequest!==requestNo)return;couponValid=false;setBase();status.style.color='#fda4af';status.textContent='تعذر التحقق من الكود، حاول مجدداً'}
+ }
+ function schedule(){clearTimeout(timer);couponValid=!(coupon&&coupon.value.trim());setBase();timer=setTimeout(preview,350)}
+ if(quantity)quantity.addEventListener('input',schedule);if(coupon)coupon.addEventListener('input',schedule);
+ form.addEventListener('submit',function(e){const q=quantity?Number(quantity.value):1;const msg=document.getElementById('productValidation');let error='';if(!document.getElementById('productLink').value.trim())error='أدخل البيانات المطلوبة أولاً.';else if(quantity&&(!Number.isInteger(q)||q<minQty||q>maxQty))error='الكمية يجب أن تكون بين '+minQty+' و'+maxQty+'.';else if(coupon&&coupon.value.trim()&&!couponValid)error='تحقق من كود الخصم قبل تأكيد الطلب.';if(error){e.preventDefault();msg.textContent=error;msg.style.display='block';return}submit.disabled=true;submit.textContent='جارٍ إرسال الطلب…';});
+ setBase();
+})();
+</script>
+{% endblock %}

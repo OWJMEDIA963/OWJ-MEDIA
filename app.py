@@ -1254,6 +1254,59 @@ def my_orders():
         refresh_api_order_status(order)
     return render_template('my_orders.html', orders=orders)
 
+def calculate_service_base_price(service, user, quantity):
+    """Use the same merchant/fixed/per-1000 pricing rules for preview and checkout."""
+    if service.service_type in ('manual', 'smm_fixed'):
+        return float(service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else service.price or 0)
+    rate = service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 or service.price)
+    return float(rate or 0) * int(quantity) / 1000
+
+
+def validate_coupon_code(code, now=None):
+    code = (code or '').strip().upper()
+    if not code:
+        return None, 0.0, 'أدخل كود الخصم أولاً.'
+    coupon = Coupon.query.filter_by(code=code).first()
+    if not coupon:
+        return None, 0.0, 'كود الخصم غير موجود.'
+    if not coupon.is_active:
+        return None, 0.0, 'هذا الكود غير مفعّل حالياً.'
+    if coupon.max_uses and (coupon.used_count or 0) >= coupon.max_uses:
+        return None, 0.0, 'انتهى الحد الأقصى لاستخدامات هذا الكود.'
+    if coupon.expires_at and coupon.expires_at <= (now or datetime.utcnow()):
+        return None, 0.0, 'انتهت صلاحية كود الخصم.'
+    return coupon, 0.0, ''
+
+
+@app.route('/api/coupons/validate', methods=['POST'])
+@login_required
+def validate_coupon_api():
+    payload = request.get_json(silent=True) or {}
+    try:
+        service_id = int(payload.get('service_id'))
+        service = Service.query.get_or_404(service_id)
+        if not service.is_available:
+            return jsonify(success=False, message='هذه الخدمة غير متوفرة حالياً.'), 400
+        user = current_user()
+        if service.service_type in ('manual', 'smm_fixed'):
+            quantity = 1
+        else:
+            quantity = int(payload.get('quantity') or service.min_quantity or 1)
+            if quantity < (service.min_quantity or 1) or quantity > (service.max_quantity or 10000):
+                return jsonify(success=False, message='الكمية خارج الحدود المسموحة لهذه الخدمة.'), 400
+        base_total = calculate_service_base_price(service, user, quantity)
+        coupon, _, error = validate_coupon_code(payload.get('code'))
+        if error:
+            return jsonify(success=False, message=error), 400
+        discount = min(base_total, base_total * (coupon.discount_percent or 0) / 100 + (coupon.discount_fixed or 0))
+        final_total = max(0.0, base_total - discount)
+        return jsonify(success=True, message='كود الخصم فعال وصالح للاستخدام.', code=coupon.code,
+            original=round(base_total, 2), discount=round(discount, 2), final=round(final_total, 2),
+            discount_percent=float(coupon.discount_percent or 0), discount_fixed=float(coupon.discount_fixed or 0))
+    except (TypeError, ValueError):
+        return jsonify(success=False, message='بيانات التحقق غير مكتملة أو غير صحيحة.'), 400
+
+
 @app.route('/order/<int:service_id>', methods=['POST'])
 @login_required
 def place_order(service_id):
@@ -1267,7 +1320,7 @@ def place_order(service_id):
         quantity = 1
         if not link:
             flash('أدخل الآيدي أو البيانات المطلوبة.', 'error'); return redirect(url_for('category_services', category_id=service.category_id))
-        total = (service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else service.price)
+        total = calculate_service_base_price(service, user, quantity)
     else:
         try: quantity = int(request.form.get('quantity', service.min_quantity or 1))
         except ValueError: quantity = 0
@@ -1282,17 +1335,16 @@ def place_order(service_id):
         if quantity > maximum:
             flash(f'الكمية أكبر من الحد المسموح. الحد الأقصى هو {maximum}.', 'error')
             return redirect(url_for('category_services', category_id=service.category_id))
-        rate = service.merchant_price if user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 or service.price)
-        total = rate * quantity / 1000
+        total = calculate_service_base_price(service, user, quantity)
     coupon_code = (request.form.get('coupon_code') or '').strip().upper()
     applied_coupon = None
     discount = 0.0
     if coupon_code:
-        applied_coupon = Coupon.query.filter_by(code=coupon_code, is_active=True).first()
-        if (not applied_coupon or (applied_coupon.max_uses and applied_coupon.used_count >= applied_coupon.max_uses)
-                or (applied_coupon.expires_at and applied_coupon.expires_at <= datetime.utcnow())):
-            flash('كود الخصم غير صالح أو انتهت صلاحيته.', 'error')
+        applied_coupon, _, coupon_error = validate_coupon_code(coupon_code)
+        if coupon_error:
+            flash(coupon_error, 'error')
             return redirect(url_for('category_services', category_id=service.category_id))
+        # Recompute from the original server-side service price; never trust browser totals.
         discount = min(total, total * (applied_coupon.discount_percent or 0) / 100 + (applied_coupon.discount_fixed or 0))
         total = max(0.0, total - discount)
     if user.balance_usd < total:
@@ -1453,10 +1505,6 @@ def ai_chat():
             reply = contacts
     elif any(x in m for x in ['رصيدي', 'كم رصيد', 'رصيد حسابي', 'المحفظة', 'محفظتي']):
         reply = f'رصيدك الحالي هو ${format_money(user.balance_usd)}. لشحن المحفظة افتح قسم «شحن المحفظة»، اختر طريقة الدفع، وأرسل إثبات التحويل وانتظر مراجعة الإدارة.'
-    elif any(x in m for x in ['اشعارات', 'الإشعارات', 'تنبيه', 'تنبيهات']):
-        reply = 'تقدر تراجع آخر تحديثات حسابك من صفحة «الإشعارات» في القائمة الجانبية. إذا كان عندك طلب أو شحن قيد المراجعة، تابع حالته من الصفحة المخصصة له؛ وإذا ما ظهر التحديث تواصل مع الدعم.'
-    elif any(x in m for x in ['شحن معلق', 'ايداع معلق', 'قيد المراجعة', 'اثبات التحويل', 'اثبات الدفع', 'الشحن ما وصل', 'الرصيد ما وصل']):
-        reply = 'إذا أرسلت إثبات التحويل ولم يُضف الرصيد بعد، افتح صفحة «شحن المحفظة» وتأكد من حالة طلب الشحن. لا ترسل تحويلًا جديدًا قبل مراجعة الطلب الأول. لمشكلة الشحن تواصل عبر واتساب: 963984727823.'
     elif any(x in m for x in ['طلباتي', 'حالة الطلب', 'وين طلبي', 'طلبي', 'الطلبات']):
         orders = Order.query.filter_by(user_id=user.id).order_by(Order.id.desc()).limit(7).all()
         if orders:

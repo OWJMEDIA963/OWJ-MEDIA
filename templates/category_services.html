@@ -206,7 +206,7 @@
             <div class="owj-service-content">
                 <h3 class="text-[10px] sm:text-xs font-black text-white line-clamp-2 min-h-0 mb-0.5">{{ service.name }}</h3>
                 <div class="owj-service-price-strip" aria-label="السعر">
-                    {% set public_price = (service.price_per_1000 or service.price if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price) %}
+                    {% set public_price = (service.price_per_1000 or service.price if service.service_type in ['smm', 'manual_quantity'] else service.price) %}
                     {% if current_user and current_user.is_trusted_merchant and (service.merchant_price or 0) > 0 %}
                     <span class="text-[9px] sm:text-xs text-gray-400 line-through">${{ public_price|money }}</span>
                     <span class="owj-price-value">${{ service.merchant_price|money }}</span>
@@ -219,7 +219,7 @@
 
             <div class="mt-1 sm:mt-2">
                 {% if service.is_available %}
-                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.merchant_price if current_user and current_user.is_trusted_merchant and (service.merchant_price or 0) > 0 else (service.price_per_1000 if service.service_type in ['smm', 'smm_fixed', 'manual_quantity'] else service.price) }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}" data-extra-details="{{ (service.extra_details or '')|e }}">
+                <button type="button" class="js-open-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-1 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] transition block shadow" data-service-id="{{ service.id }}" data-service-name="{{ service.name|e }}" data-service-price="{{ service.merchant_price if current_user and current_user.is_trusted_merchant and (service.merchant_price or 0) > 0 else ((service.price_per_1000 or service.price) if service.service_type in ['smm', 'manual_quantity'] else service.price) }}" data-service-type="{{ service.service_type|e }}" data-input-label="{{ service.input_label|e }}" data-min-quantity="{{ service.min_quantity }}" data-max-quantity="{{ service.max_quantity }}" data-service-description="{{ (service.description or '')|e }}" data-extra-details="{{ (service.extra_details or '')|e }}">
                     اطلب الآن
                 </button>
                 {% else %}
@@ -258,17 +258,21 @@
                 <input type="number" id="modalQuantity" name="quantity" value="10" min="1" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none" oninput="calcTotal()">
             </div>
 
-            <div class="space-y-1">
-                <label class="block text-[11px] font-bold text-gray-300">كود خصم (اختياري)</label>
-                <input type="text" name="coupon_code" maxlength="40" placeholder="أدخل كود الخصم" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white uppercase">
+            <div class="space-y-2 rounded-2xl border border-sky-200/20 bg-slate-950/60 p-3" id="couponPanel">
+                <label for="modalCouponCode" class="block text-[11px] font-bold text-gray-200">كود الخصم (اختياري)</label>
+                <div class="flex gap-2">
+                    <input id="modalCouponCode" type="text" name="coupon_code" maxlength="40" autocomplete="off" placeholder="أدخل كود الخصم" class="min-w-0 flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-xs text-white uppercase" dir="ltr">
+                    <button type="button" id="validateCouponButton" class="shrink-0 rounded-xl bg-sky-500 px-3 py-2 text-[11px] font-black text-slate-950 hover:bg-sky-400">تحقق من الكود</button>
+                </div>
+                <p id="couponStatus" role="status" aria-live="polite" class="hidden text-[11px] font-bold leading-5"></p>
+                <div class="space-y-2 border-t border-slate-700/70 pt-3 text-xs">
+                    <div class="flex justify-between gap-3 text-gray-300"><span>السعر الأصلي</span><b id="modalOriginalPrice" dir="ltr">$0.00</b></div>
+                    <div class="flex justify-between gap-3 text-emerald-300"><span>الخصم</span><b class="text-left" dir="ltr"><span id="modalDiscount">-$0.00</span><small id="modalDiscountRate" class="mr-1 text-[10px] text-gray-400"></small></b></div>
+                    <div class="flex justify-between gap-3 rounded-xl bg-sky-500/10 p-3 text-sm"><span class="font-black text-gray-100">السعر النهائي</span><b id="modalTotal" class="text-lg font-black text-sky-300" dir="ltr">$0.00</b></div>
+                </div>
             </div>
 
-            <div class="bg-gray-950 p-3 rounded-2xl border border-gray-800 flex justify-between items-center text-xs">
-                <span class="text-gray-400 font-bold">التكلفة:</span>
-                <span id="modalTotal" class="text-cyan-400 font-black">$0.00</span>
-            </div>
-
-            <button type="submit" class="yn-confirm-order w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-2.5 rounded-2xl text-xs shadow-xl transition">
+            <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-black py-2.5 rounded-2xl text-xs shadow-xl transition">
                 تأكيد وإرسال الطلب
             </button>
             <button type="button" id="orderExtraDetailsButton" class="w-full rounded-2xl border border-cyan-400/70 bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-black text-cyan-200 transition">تفاصيل أكثر</button>
@@ -292,24 +296,94 @@
     let currentType = '';
     let currentMinQuantity = 1;
     let currentMaxQuantity = 10000;
+    let currentServiceId = null;
+    let couponState = 'none';
+    let couponRequestSequence = 0;
 
+    function money(value) { return '$' + (Number(value || 0)).toFixed(2); }
+    function isQuantityService() { return currentType === 'smm' || currentType === 'manual_quantity'; }
+    function getQuantity() { return isQuantityService() ? (Number.parseInt(document.getElementById('modalQuantity').value, 10) || 0) : 1; }
+    function getBaseTotal() { return isQuantityService() ? currentPrice * getQuantity() / 1000 : currentPrice; }
     function showOrderValidation(message) {
         const box = document.getElementById('orderValidationMessage');
-        box.textContent = message;
-        box.classList.remove('hidden');
+        box.textContent = message; box.classList.remove('hidden');
     }
     function clearOrderValidation() {
         const box = document.getElementById('orderValidationMessage');
-        box.textContent = '';
-        box.classList.add('hidden');
+        box.textContent = ''; box.classList.add('hidden');
+    }
+    function showCouponStatus(message, state) {
+        const box = document.getElementById('couponStatus');
+        box.textContent = message || '';
+        box.className = 'text-[11px] font-bold leading-5 ' + (state === 'valid' ? 'text-emerald-400' : state === 'checking' ? 'text-sky-300' : 'text-rose-400');
+        box.classList.toggle('hidden', !message);
+    }
+    function renderPrice(original, discount, rateLabel='') {
+        document.getElementById('modalOriginalPrice').textContent = money(original);
+        document.getElementById('modalDiscount').textContent = '-' + money(discount);
+        document.getElementById('modalDiscountRate').textContent = rateLabel;
+        document.getElementById('modalTotal').textContent = money(Math.max(0, original - discount));
+    }
+    function resetCouponState(message='') {
+        couponRequestSequence++;
+        couponState = 'none';
+        const verifyButton = document.getElementById('validateCouponButton');
+        verifyButton.disabled = false;
+        verifyButton.textContent = 'تحقق من الكود';
+        showCouponStatus(message, 'invalid');
+        renderPrice(getBaseTotal(), 0);
+    }
+    async function verifyCoupon(silent=false) {
+        const input = document.getElementById('modalCouponCode');
+        const code = input.value.trim().toUpperCase();
+        input.value = code;
+        if (!code) { resetCouponState(''); return true; }
+        const sequence = ++couponRequestSequence;
+        couponState = 'checking';
+        showCouponStatus('جارٍ التحقق من الكود على السيرفر...', 'checking');
+        document.getElementById('validateCouponButton').disabled = true;
+        document.getElementById('validateCouponButton').textContent = 'جارٍ التحقق';
+        try {
+            const response = await fetch('/api/coupons/validate', {
+                method: 'POST', headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                body: JSON.stringify({service_id: currentServiceId, quantity: getQuantity(), code})
+            });
+            const result = await response.json();
+            if (sequence !== couponRequestSequence) return false;
+            if (!response.ok || !result.success) {
+                couponState = 'invalid';
+                showCouponStatus(result.message || 'تعذر التحقق من كود الخصم.', 'invalid');
+                renderPrice(getBaseTotal(), 0);
+                return false;
+            }
+            couponState = 'valid';
+            showCouponStatus('كود الخصم فعال وصالح ✓', 'valid');
+            renderPrice(result.original, result.discount, result.discount_percent > 0 ? '(' + Number(result.discount_percent).toFixed(2).replace(/\.?0+$/, '') + '%)' : (result.discount_fixed > 0 ? '(خصم ثابت)' : ''));
+            return true;
+        } catch (error) {
+            if (sequence === couponRequestSequence) {
+                couponState = 'invalid';
+                showCouponStatus('تعذر الاتصال بالسيرفر للتحقق من الكود. حاول مجدداً.', 'invalid');
+                renderPrice(getBaseTotal(), 0);
+            }
+            return false;
+        } finally {
+            if (sequence === couponRequestSequence) {
+                document.getElementById('validateCouponButton').disabled = false;
+                document.getElementById('validateCouponButton').textContent = 'تحقق من الكود';
+            }
+        }
     }
 
     function openOrderModal(id, name, price, type, label, minQty, maxQty, description, extraDetails) {
+        currentServiceId = Number(id);
         currentPrice = Number.parseFloat(price) || 0;
         currentType = type || '';
         currentMinQuantity = Number.parseInt(minQty, 10) || 1;
         currentMaxQuantity = Number.parseInt(maxQty, 10) || 10000;
         clearOrderValidation();
+        document.getElementById('modalCouponCode').value = '';
+        resetCouponState('');
         document.getElementById('modalServiceName').textContent = name || '';
         document.getElementById('modalInputLabel').textContent = label || 'الرابط';
         const descriptionBox = document.getElementById('modalServiceDescription');
@@ -317,95 +391,73 @@
         descriptionBox.classList.toggle('hidden', !(description && description.trim()));
         document.getElementById('serviceDetailsTitle').textContent = (name || 'المنتج') + ' - تفاصيل أكثر';
         document.getElementById('serviceDetailsContent').textContent = (extraDetails || '').trim() || 'لا توجد تفاصيل إضافية لهذا المنتج حالياً.';
-        document.getElementById('orderExtraDetailsButton').dataset.detailsReady = '1';
         document.getElementById('orderForm').action = '/order/' + encodeURIComponent(id);
-
         const qtyContainer = document.getElementById('quantityContainer');
         const quantityInput = document.getElementById('modalQuantity');
-        if (currentType === 'smm' || currentType === 'manual_quantity') {
+        if (isQuantityService()) {
             qtyContainer.classList.remove('hidden');
-            quantityInput.min = String(currentMinQuantity);
-            quantityInput.max = String(currentMaxQuantity);
+            quantityInput.min = String(currentMinQuantity); quantityInput.max = String(currentMaxQuantity);
             quantityInput.value = currentMinQuantity;
-            document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * Number(quantityInput.value)).toFixed(2).replace(/\.?0+$/,'');
         } else {
             qtyContainer.classList.add('hidden');
-            document.getElementById('modalTotal').textContent = '$' + currentPrice.toFixed(2).replace(/\.?0+$/,'');
         }
+        renderPrice(getBaseTotal(), 0);
         document.getElementById('orderModal').classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
     }
 
     document.querySelectorAll('.js-open-order').forEach(function(button) {
         button.addEventListener('click', function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            openOrderModal(
-                button.dataset.serviceId,
-                button.dataset.serviceName,
-                button.dataset.servicePrice,
-                button.dataset.serviceType,
-                button.dataset.inputLabel,
-                button.dataset.minQuantity,
-                button.dataset.maxQuantity,
-                button.dataset.serviceDescription,
-                button.dataset.extraDetails
-            );
+            event.preventDefault(); event.stopPropagation();
+            openOrderModal(button.dataset.serviceId, button.dataset.serviceName, button.dataset.servicePrice,
+                button.dataset.serviceType, button.dataset.inputLabel, button.dataset.minQuantity,
+                button.dataset.maxQuantity, button.dataset.serviceDescription, button.dataset.extraDetails);
         });
     });
-
     function closeOrderModal() {
         document.getElementById('orderModal').classList.add('hidden');
         document.body.classList.remove('overflow-hidden');
     }
-
     document.getElementById('orderExtraDetailsButton').addEventListener('click', function() {
         document.getElementById('serviceDetailsModal').classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
     });
-
     function closeServiceDetails() {
         document.getElementById('serviceDetailsModal').classList.add('hidden');
-        if (document.getElementById('orderModal').classList.contains('hidden')) {
-            document.body.classList.remove('overflow-hidden');
-        }
+        if (document.getElementById('orderModal').classList.contains('hidden')) document.body.classList.remove('overflow-hidden');
     }
-    document.getElementById('serviceDetailsModal').addEventListener('click', function(event) {
-        if (event.target === this) closeServiceDetails();
-    });
+    document.getElementById('serviceDetailsModal').addEventListener('click', function(event) { if (event.target === this) closeServiceDetails(); });
 
-    document.getElementById('modalQuantity').addEventListener('input', clearOrderValidation);
-    document.querySelector('#orderForm input[name="link"]').addEventListener('input', clearOrderValidation);
-    document.getElementById('orderForm').addEventListener('submit', function(event) {
+    document.getElementById('validateCouponButton').addEventListener('click', () => verifyCoupon());
+    document.getElementById('modalCouponCode').addEventListener('input', function() {
+        resetCouponState(this.value.trim() ? 'تغيّر الكود؛ يرجى التحقق منه مجدداً.' : '');
+    });
+    document.getElementById('modalQuantity').addEventListener('input', function() {
         clearOrderValidation();
-        if (currentType === 'smm' || currentType === 'manual_quantity') {
-            const quantity = Number.parseInt(document.getElementById('modalQuantity').value, 10) || 0;
-            if (quantity < currentMinQuantity) {
+        const code = document.getElementById('modalCouponCode').value.trim();
+        if (code) { resetCouponState('تغيّرت الكمية؛ جارٍ إعادة احتساب الخصم.'); verifyCoupon(true); }
+        else renderPrice(getBaseTotal(), 0);
+    });
+    document.querySelector('#orderForm input[name="link"]').addEventListener('input', clearOrderValidation);
+    document.getElementById('orderForm').addEventListener('submit', async function(event) {
+        clearOrderValidation();
+        if (isQuantityService()) {
+            const quantity = getQuantity();
+            if (quantity < currentMinQuantity || quantity > currentMaxQuantity) {
                 event.preventDefault();
-                showOrderValidation('الكمية أقل من المطلوب. لازم تكون الكمية ' + currentMinQuantity + ' على الأقل.');
-                document.getElementById('modalQuantity').focus();
-                return;
-            }
-            if (quantity > currentMaxQuantity) {
-                event.preventDefault();
-                showOrderValidation('الكمية أكبر من الحد المسموح. الحد الأقصى هو ' + currentMaxQuantity + '.');
-                document.getElementById('modalQuantity').focus();
+                showOrderValidation(quantity < currentMinQuantity ? 'الكمية أقل من المطلوب. الحد الأدنى ' + currentMinQuantity + '.' : 'الكمية أكبر من الحد المسموح. الحد الأقصى ' + currentMaxQuantity + '.');
+                document.getElementById('modalQuantity').focus(); return;
             }
         }
-    });
-
-    function calcTotal() {
-        if (currentType === 'smm' || currentType === 'manual_quantity') {
-            const qty = Number.parseFloat(document.getElementById('modalQuantity').value) || 0;
-            document.getElementById('modalTotal').textContent = '$' + ((currentPrice / 1000) * qty).toFixed(2).replace(/\.?0+$/,'');
+        const code = document.getElementById('modalCouponCode').value.trim();
+        if (code && couponState !== 'valid') {
+            event.preventDefault();
+            if (couponState === 'checking') showOrderValidation('انتظر حتى ينتهي التحقق من كود الخصم.');
+            else showOrderValidation('تحقق من كود الخصم قبل تأكيد الطلب، أو احذف الكود للمتابعة دون خصم.');
+            return;
         }
-    }
-
-    document.getElementById('orderModal').addEventListener('click', function(event) {
-        if (event.target === this) closeOrderModal();
     });
-    document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape') { closeOrderModal(); closeServiceDetails(); }
-    });
+    document.getElementById('orderModal').addEventListener('click', function(event) { if (event.target === this) closeOrderModal(); });
+    document.addEventListener('keydown', function(event) { if (event.key === 'Escape') { closeOrderModal(); closeServiceDetails(); } });
 </script>
 {% endblock %}

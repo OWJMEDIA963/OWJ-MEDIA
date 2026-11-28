@@ -16,6 +16,7 @@ import posixpath
 import hashlib
 import requests
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
@@ -413,6 +414,21 @@ class PushSubscription(db.Model):
     user = db.relationship('User', backref=db.backref('push_subscriptions', lazy=True, cascade='all, delete-orphan'))
 
 
+class SiteSetting(db.Model):
+    __tablename__ = 'site_setting'
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    value = db.Column(db.String(500), nullable=False, default='')
+
+
+def get_site_setting(key, default=''):
+    try:
+        row = SiteSetting.query.filter_by(key=key).first()
+        return row.value if row and row.value is not None else default
+    except Exception:
+        return default
+
+
 class SocialRewardRequest(db.Model):
     __tablename__ = 'social_reward_request'
     id = db.Column(db.Integer, primary_key=True)
@@ -505,14 +521,31 @@ def get_or_create_single_support_ticket(user_id):
 def inject_globals():
     user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
     unread_count = Notification.query.filter_by(user_id=user.id, is_read=False).count() if user else 0
-    return {'current_user': user, 'site_name': 'YNOVA STORE', 'unread_notification_count': unread_count}
+    return {'current_user': user, 'site_name': 'YNOVA STORE', 'unread_notification_count': unread_count, 'site_default_theme': get_site_setting('default_theme', 'dark')}
 
 def login_required(fn):
     @wraps(fn)
     def wrapped(*args, **kwargs):
         if not session.get('user_id'):
-            flash('سجّل الدخول أولاً للمتابعة.', 'error')
-            return redirect(url_for('login'))
+            flash('سجّل الدخول أو أنشئ حساباً أولاً لإرسال الطلب.', 'error')
+            if request.method == 'POST' and request.endpoint == 'place_order':
+                try:
+                    session['pending_order'] = {
+                        'service_id': int(kwargs.get('service_id')),
+                        'link': (request.form.get('link') or '')[:1000],
+                        'quantity': (request.form.get('quantity') or '')[:20],
+                        'coupon_code': (request.form.get('coupon_code') or '')[:40]
+                    }
+                except (TypeError, ValueError):
+                    session.pop('pending_order', None)
+            target = request.full_path.rstrip('?') if request.method == 'GET' else ''
+            if request.referrer:
+                ref = urlparse(request.referrer)
+                if not ref.netloc or ref.netloc == request.host:
+                    target = (ref.path or '/') + (('?' + ref.query) if ref.query else '')
+            if not target or not target.startswith('/') or target.startswith('//'):
+                target = url_for('index')
+            return redirect(url_for('login', next=target))
         user = db.session.get(User, session.get('user_id'))
         if not user:
             session.clear()
@@ -729,7 +762,12 @@ def category_services(category_id):
 @app.route('/product/<int:service_id>')
 def product_page(service_id):
     service = Service.query.get_or_404(service_id)
-    return render_template('product_page.html', service=service)
+    pending_order = session.get('pending_order')
+    if pending_order and pending_order.get('service_id') == service.id:
+        session.pop('pending_order', None)
+    else:
+        pending_order = None
+    return render_template('product_page.html', service=service, pending_order=pending_order)
 
 @app.route('/login', methods=['GET','POST'])
 def login():
@@ -740,9 +778,13 @@ def login():
                 return redirect(url_for('banned_account', user_id=user.id))
             session.clear(); session.permanent = True; session['user_id'] = user.id
             flash('تم تسجيل الدخول بنجاح.', 'success')
+            target = (request.form.get('next') or request.args.get('next') or '').strip()
+            # Only allow local relative paths; prevent open redirects to external sites.
+            if target.startswith('/') and not target.startswith('//') and not urlparse(target).netloc:
+                return redirect(target)
             return redirect(url_for('index'))
         flash('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error')
-    return render_template('login.html')
+    return render_template('login.html', next_url=request.args.get('next', ''))
 
 @app.route('/register', methods=['GET','POST'])
 def register():
@@ -758,7 +800,7 @@ def register():
             inviter = User.query.filter_by(referral_code=invite_code).first() if invite_code else None
             if invite_code and (not inviter or inviter.username == username):
                 flash('رمز الدعوة غير صحيح.', 'error')
-                return render_template('register.html')
+                return render_template('register.html', next_url=request.form.get('next') or request.args.get('next', ''))
             user = User(username=username, full_name=request.form.get('full_name','').strip(), email=request.form.get('email','').strip(), phone=request.form.get('phone','').strip(), referred_by_id=inviter.id if inviter else None)
             user.set_password(password); ensure_referral_code(user); db.session.add(user); db.session.commit()
             notify_admins('تسجيل حساب جديد', f'تم إنشاء حساب جديد باسم {user.username} ومعرّفه #{user.id}.', url_for('admin_accounts', account_id=user.id))
@@ -766,8 +808,11 @@ def register():
             session.permanent = True
             session['user_id'] = user.id
             flash('تم إنشاء الحساب بنجاح.', 'success')
+            target = (request.form.get('next') or request.args.get('next') or '').strip()
+            if target.startswith('/') and not target.startswith('//') and not urlparse(target).netloc:
+                return redirect(target)
             return redirect(url_for('index'))
-    return render_template('register.html')
+    return render_template('register.html', next_url=request.form.get('next') or request.args.get('next', ''))
 
 @app.route('/logout')
 def logout():
@@ -1831,6 +1876,23 @@ def admin_analytics():
         users_count=User.query.filter_by(role='user').count(), reviews=ServiceReview.query.order_by(ServiceReview.id.desc()).limit(30).all(),
         coupons=Coupon.query.order_by(Coupon.id.desc()).all(), coupon_uses=CouponUse.query.order_by(CouponUse.created_at.desc()).all(), coupon_discount_total=(db.session.query(db.func.coalesce(db.func.sum(CouponUse.discount), 0)).scalar() or 0), providers=SMMProvider.query.order_by(SMMProvider.id.desc()).all(),
         service_counts= db.session.query(Service.name, db.func.count(Order.id)).outerjoin(Order, Order.service_id == Service.id).group_by(Service.id).order_by(db.func.count(Order.id).desc()).limit(10).all())
+
+@app.route('/admin/site-settings', methods=['POST'])
+@admin_required
+def update_site_settings():
+    theme = (request.form.get('default_theme') or 'dark').strip().lower()
+    if theme not in ('dark', 'light'):
+        theme = 'dark'
+    setting = SiteSetting.query.filter_by(key='default_theme').first()
+    if setting is None:
+        setting = SiteSetting(key='default_theme', value=theme)
+        db.session.add(setting)
+    else:
+        setting.value = theme
+    db.session.commit()
+    flash('تم حفظ المظهر الافتراضي للموقع.', 'success')
+    return redirect(url_for('admin') + '#site-appearance')
+
 
 @app.route('/admin')
 @admin_required

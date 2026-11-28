@@ -11,7 +11,17 @@
     <meta property="og:title" content="YNOVA STORE | المتجر الرقمي">
     <meta property="og:description" content="خدمات رقمية وشحن ألعاب وحسابات تواصل اجتماعي ودعم فني.">
     <meta property="og:url" content="{{ request.url }}">
-    <meta name="theme-color" content="#f5f7fb">
+    <meta name="theme-color" content="#0b0f19">
+    <script>
+      (function(){
+        var serverDefault = {{ (site_default_theme or 'dark')|tojson }};
+        var chosen = serverDefault;
+        try { var saved = localStorage.getItem('owj-theme'); if (saved === 'dark' || saved === 'light') chosen = saved; } catch(e) {}
+        document.documentElement.dataset.initialTheme = chosen;
+        if (chosen === 'light') document.documentElement.classList.add('light-theme-pending');
+      })();
+    </script>
+    <style>html.light-theme-pending body{background:#f5f7fb!important;color:#172033!important}</style>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
@@ -361,6 +371,7 @@ body.light-theme .ai-brand{color:#315b78!important}
 </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between pb-28">
+<script>document.body.classList.toggle('light-theme', document.documentElement.dataset.initialTheme === 'light');</script>
 <div id="novaLoading" aria-live="polite"><div class="nova-loader"><img src="{{ url_for('static',filename='images/nova-symbol.svg') }}" alt="NOVA"><div class="nova-spin"></div><div class="text-white text-sm font-black">YNOVA STORE</div><div class="text-slate-400 text-xs mt-2">جاري إتمام العملية...</div></div></div>
 
 
@@ -553,16 +564,20 @@ body.light-theme .ai-brand{color:#315b78!important}
 
     <script>
         function applyTheme(theme) {
-            document.body.classList.toggle('light-theme', theme === 'light');
+            const isLight = theme === 'light';
+            document.body.classList.toggle('light-theme', isLight);
+            document.documentElement.classList.toggle('light-theme-pending', isLight);
             const icon = document.getElementById('themeToggleIcon');
-            if (icon) icon.textContent = theme === 'light' ? '🌙' : '☀️';
+            if (icon) icon.textContent = isLight ? '🌙' : '☀️';
+            const meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', isLight ? '#f5f7fb' : '#0b0f19');
         }
         function toggleTheme() {
             const next = document.body.classList.contains('light-theme') ? 'dark' : 'light';
             try { localStorage.setItem('owj-theme', next); } catch (e) {}
             applyTheme(next);
         }
-        try { applyTheme(localStorage.getItem('owj-theme') || 'light'); } catch (e) { applyTheme('light'); }
+        try { applyTheme(localStorage.getItem('owj-theme') || document.documentElement.dataset.initialTheme || {{ (site_default_theme or 'dark')|tojson }}); } catch (e) { applyTheme({{ (site_default_theme or 'dark')|tojson }}); }
         function toggleSidebar() {
             document.getElementById('sidebarMenu').classList.toggle('open');
             document.getElementById('sidebarOverlay').classList.toggle('open');

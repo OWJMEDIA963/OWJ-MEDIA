@@ -50,18 +50,18 @@
       <div id="productValidation" role="alert" style="display:none;background:rgba(127,29,29,.3);border:1px solid rgba(248,113,113,.4);color:#fca5a5;padding:9px;border-radius:10px;font-size:11px;font-weight:800"></div>
       <div>
         <label class="product-label" for="productLink">{{ service.input_label or 'الرابط أو الآيدي' }}</label>
-        <input class="product-input" id="productLink" type="text" name="link" placeholder="أدخل البيانات المطلوبة هنا..." required autocomplete="off">
+        <input class="product-input" id="productLink" type="text" name="link" value="{{ pending_order.link|e if pending_order else '' }}" placeholder="أدخل البيانات المطلوبة هنا..." required autocomplete="off">
       </div>
       {% if service.service_type in ['smm', 'manual_quantity'] %}
       <div>
         <label class="product-label" for="productQuantity">الكمية (من {{ service.min_quantity or 1 }} إلى {{ service.max_quantity or 10000 }})</label>
-        <input class="product-input" id="productQuantity" type="number" name="quantity" value="{{ service.min_quantity or 1 }}" min="{{ service.min_quantity or 1 }}" max="{{ service.max_quantity or 10000 }}" step="1" required>
+        <input class="product-input" id="productQuantity" type="number" name="quantity" value="{{ pending_order.quantity|e if pending_order and pending_order.quantity else (service.min_quantity or 1) }}" min="{{ service.min_quantity or 1 }}" max="{{ service.max_quantity or 10000 }}" step="1" required>
       </div>
       {% endif %}
       {% if not (current_user and current_user.is_trusted_merchant) %}
       <div>
         <label class="product-label" for="productCoupon">كود الخصم (اختياري)</label>
-        <input class="product-input" id="productCoupon" type="text" name="coupon_code" maxlength="40" autocomplete="off" placeholder="أدخل كود الخصم">
+        <input class="product-input" id="productCoupon" type="text" name="coupon_code" value="{{ pending_order.coupon_code|e if pending_order else '' }}" maxlength="40" autocomplete="off" placeholder="أدخل كود الخصم">
         <div id="productCouponStatus" style="display:none;margin-top:6px;font-size:10px;font-weight:800"></div>
       </div>
       {% endif %}
@@ -100,7 +100,7 @@
    }catch(e){if(thisRequest!==requestNo)return;couponValid=false;setBase();status.style.color='#fda4af';status.textContent='تعذر التحقق من الكود، حاول مجدداً'}
  }
  function schedule(){clearTimeout(timer);couponValid=!(coupon&&coupon.value.trim());setBase();timer=setTimeout(preview,350)}
- if(quantity)quantity.addEventListener('input',schedule);if(coupon)coupon.addEventListener('input',schedule);
+ if(quantity)quantity.addEventListener('input',schedule);if(coupon)coupon.addEventListener('input',schedule);if(coupon&&coupon.value.trim())preview();
  form.addEventListener('submit',function(e){const q=quantity?Number(quantity.value):1;const msg=document.getElementById('productValidation');let error='';if(!document.getElementById('productLink').value.trim())error='أدخل البيانات المطلوبة أولاً.';else if(quantity&&(!Number.isInteger(q)||q<minQty||q>maxQty))error='الكمية يجب أن تكون بين '+minQty+' و'+maxQty+'.';else if(coupon&&coupon.value.trim()&&!couponValid)error='تحقق من كود الخصم قبل تأكيد الطلب.';if(error){e.preventDefault();msg.textContent=error;msg.style.display='block';return}submit.disabled=true;submit.textContent='جارٍ إرسال الطلب…';});
  setBase();
 })();

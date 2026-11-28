@@ -15,6 +15,16 @@
         <a href="/admin/accounts" class="rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-center text-xs font-bold text-white hover:border-violet-400">إدارة الحسابات</a>
       </div>
     </nav>
+
+  <section id="site-appearance" class="rounded-2xl border border-indigo-400/25 bg-gray-900 p-4 space-y-3">
+    <h2 class="text-sm font-black text-indigo-300">🎨 المظهر الافتراضي للموقع</h2>
+    <p class="text-xs leading-5 text-gray-400">اختَر المظهر الذي يظهر للزوار الجدد. يحتفظ الزائر باختياره الشخصي عند تغييره، ويُطبّق المظهر المختار من دون وميض لون مختلف أثناء التنقل بين الصفحات.</p>
+    <form method="post" action="{{ url_for('update_site_settings') }}" class="flex flex-wrap items-center gap-3">
+      <label class="flex items-center gap-2 rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-xs text-white"><input type="radio" name="default_theme" value="dark" {% if site_default_theme != 'light' %}checked{% endif %}> 🌙 ليلي (افتراضي)</label>
+      <label class="flex items-center gap-2 rounded-xl border border-gray-700 bg-gray-950 px-3 py-3 text-xs text-white"><input type="radio" name="default_theme" value="light" {% if site_default_theme == 'light' %}checked{% endif %}> ☀️ نهاري</label>
+      <button class="rounded-xl bg-indigo-600 px-4 py-3 text-xs font-black text-white">حفظ المظهر</button>
+    </form>
+  </section>
   <section class="rounded-2xl border border-blue-400/20 bg-gray-900 p-4 space-y-3">
     <h2 class="text-sm font-black text-blue-300">مركز تطوير وإدارة YNOVA</h2>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
